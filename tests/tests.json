@@ -1,0 +1,95 @@
+{
+  "info": {
+    "name": "Velua API",
+    "description": "Coleccion E2E de la API de Velua. Se ejecuta con Newman en CI.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Salud",
+      "item": [
+        {
+          "name": "GET /salud",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/salud",
+              "host": ["{{base_url}}"],
+              "path": ["salud"]
+            },
+            "description": "Verifica que la API responde y que la base de datos esta conectada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Responde JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('El estado es ok', function () {",
+                  "    pm.expect(cuerpo.estado).to.eql('ok');",
+                  "});",
+                  "",
+                  "pm.test('La base de datos esta conectada', function () {",
+                  "    pm.expect(cuerpo.baseDatos).to.eql('conectada');",
+                  "});",
+                  "",
+                  "pm.test('Informa version y entorno', function () {",
+                  "    pm.expect(cuerpo.version).to.be.a('string').and.not.empty;",
+                  "    pm.expect(cuerpo.entorno).to.be.a('string').and.not.empty;",
+                  "});",
+                  "",
+                  "pm.test('Responde en menos de 2 segundos', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Errores",
+      "item": [
+        {
+          "name": "GET ruta inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/no-existe-esta-ruta",
+              "host": ["{{base_url}}"],
+              "path": ["no-existe-esta-ruta"]
+            },
+            "description": "Una ruta que no existe debe responder 404, nunca 200."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', function () {",
+                  "    pm.response.to.have.status(404);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "variable": []
+}
