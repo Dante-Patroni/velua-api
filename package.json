@@ -2,13 +2,15 @@
   "name": "velua-api",
   "version": "1.0.0",
   "description": "",
-  "main": "app.js",
+  "main": "src/server.js",
   "engines": {
     "node": ">=20"
   },
+
+  
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
     "test": "newman run tests/tests.json -e tests/entorno.json",
     "test:unit": "jest",
     "test:watch": "jest --watch",
