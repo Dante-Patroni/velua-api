@@ -23,6 +23,7 @@
   "license": "ISC",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
@@ -41,6 +42,7 @@
     "@eslint/js": "^10.0.1",
     "eslint": "^10.10.0",
     "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^63.3.3",
     "globals": "^17.12.0",
     "jest": "^30.2.0",
     "newman": "^6.2.2",
