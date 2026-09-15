@@ -11,6 +11,8 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Paginación: `?pagina=1&limite=20`. Respuesta `{ datos: [], meta: { pagina, limite, total } }`.
 - **2026-09** Importes viajan como cadena decimal, no como número.
 - **2026-09** Los tipos del frontend se generan desde el OpenAPI. Endpoint sin documentar no se aprueba.
+- **2026-09** Validación de entrada con express-validator. Los errores se devuelven como `DATOS_INVALIDOS` con `details` mapeado por campo: `{ "email": "mensaje", "cantidad": "mensaje" }`.
+-
 
 ## Dominio
 
@@ -36,3 +38,4 @@ antes de tocar código. Cada línea lleva fecha.
 
 - Servicio de conciliación automática de transferencias por CVU. Definir antes del hito 4.
 - Umbral de envío gratis y porcentaje de descuento por transferencia. Los define la dueña de la marca.
+- 2026-09 Override de `uuid` a ^11 para resolver el aviso de seguridad que arrastra Sequelize 6. Verificar Newman cuando haya colección.
