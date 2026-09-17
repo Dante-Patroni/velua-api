@@ -7,7 +7,7 @@
   },
   "servers": [
     { "url": "http://localhost:3000/api/v1", "description": "Desarrollo" },
-    { "url": "https://api.velua.com.ar/api/v1", "description": "Produccion" }
+    { "url": "https://api.veluanature.com.ar/api/v1", "description": "Produccion" }
   ],
   "tags": [
     { "name": "Catalogo", "description": "Lectura publica de categorias y productos" },
@@ -225,7 +225,11 @@
         "properties": {
           "pagina": { "type": "integer", "example": 1 },
           "limite": { "type": "integer", "example": 20 },
-          "total": { "type": "integer", "description": "Total de elementos que cumplen el filtro, no de la pagina.", "example": 47 }
+          "total": {
+            "type": "integer",
+            "description": "Total de elementos que cumplen el filtro, no de la pagina.",
+            "example": 47
+          }
         },
         "required": ["pagina", "limite", "total"]
       },
@@ -235,7 +239,11 @@
           "id": { "type": "integer", "example": 3 },
           "nombre": { "type": "string", "example": "Jabones" },
           "slug": { "type": "string", "example": "jabones" },
-          "descripcion": { "type": "string", "nullable": true, "example": "Jabones artesanales en frio" },
+          "descripcion": {
+            "type": "string",
+            "nullable": true,
+            "example": "Jabones artesanales en frio"
+          },
           "imagenUrl": { "type": "string", "nullable": true, "format": "uri" }
         },
         "required": ["id", "nombre", "slug"]
@@ -252,16 +260,27 @@
         "type": "object",
         "properties": {
           "id": { "type": "integer", "example": 12 },
-          "nombre": { "type": "string", "description": "Tamano o presentacion.", "example": "100 g" },
+          "nombre": {
+            "type": "string",
+            "description": "Tamano o presentacion.",
+            "example": "100 g"
+          },
           "sku": { "type": "string", "nullable": true, "example": "JAB-CAL-100" },
-          "precio": { "type": "string", "description": "Cadena decimal. No operar en el frontend.", "example": "12500.00" },
+          "precio": {
+            "type": "string",
+            "description": "Cadena decimal. No operar en el frontend.",
+            "example": "12500.00"
+          },
           "precioAnterior": {
             "type": "string",
             "nullable": true,
             "description": "Precio tachado. El badge de oferta se muestra SOLO si existe y es mayor que precio.",
             "example": "15000.00"
           },
-          "hayStock": { "type": "boolean", "description": "Si la variante tiene unidades disponibles." }
+          "hayStock": {
+            "type": "boolean",
+            "description": "Si la variante tiene unidades disponibles."
+          }
         },
         "required": ["id", "nombre", "precio", "hayStock"]
       },
@@ -289,7 +308,10 @@
             "nullable": true,
             "description": "Precio anterior de la variante mas barata, si esta en oferta."
           },
-          "hayStock": { "type": "boolean", "description": "True si al menos una variante activa tiene stock." },
+          "hayStock": {
+            "type": "boolean",
+            "description": "True si al menos una variante activa tiene stock."
+          },
           "destacado": { "type": "boolean" }
         },
         "required": ["id", "nombre", "slug", "categoria", "precioDesde", "hayStock", "destacado"]
@@ -303,7 +325,11 @@
           "slug": { "type": "string", "example": "jabon-calendula-karite" },
           "descripcionCorta": { "type": "string", "nullable": true },
           "descripcion": { "type": "string", "nullable": true },
-          "ingredientes": { "type": "string", "nullable": true, "description": "Listado tal como va en la etiqueta." },
+          "ingredientes": {
+            "type": "string",
+            "nullable": true,
+            "description": "Listado tal como va en la etiqueta."
+          },
           "modoUso": { "type": "string", "nullable": true },
           "destacado": { "type": "boolean" },
           "categoria": { "$ref": "#/components/schemas/Categoria" },

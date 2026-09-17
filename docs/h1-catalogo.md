@@ -1,6 +1,6 @@
 # H1 · Catálogo público
 
-*Estado: no iniciado. Depende de H0 cerrado.*
+_Estado: no iniciado. Depende de H0 cerrado._
 
 ## Objetivo
 

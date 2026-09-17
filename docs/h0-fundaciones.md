@@ -24,7 +24,7 @@ Tiempo estimado total: cinco a seis horas. Se puede partir en dos tardes.
 
 - [ ] Nuevo repositorio `velua-api`. Privado. Sin README, sin `.gitignore`, sin licencia: lo subimos nosotros.
 - [ ] Nuevo repositorio `velua-web`. Igual.
-- [ ] En cada uno: *Settings → Collaborators* → agregar a Pablo con permiso de escritura.
+- [ ] En cada uno: _Settings → Collaborators_ → agregar a Pablo con permiso de escritura.
 
 ### En local, para `velua-api`
 
@@ -66,7 +66,7 @@ git push -u origin main
 
 ## Bloque 2 · Proteger `main` · 15 min
 
-En cada repo: *Settings → Branches → Add branch ruleset*, sobre `main`.
+En cada repo: _Settings → Branches → Add branch ruleset_, sobre `main`.
 
 - [ ] Activar **Require a pull request before merging**.
 - [ ] Pedir **1 aprobación**.
@@ -177,6 +177,6 @@ Además del andamiaje, el hito incluyó:
 - Migraciones del esquema completo, en cinco grupos lógicos
 - Decisiones de hosting: Railway para API y base, Vercel para el frontend
 - Columna `public_id` en `imagenes_producto` para Cloudinary
-- Seed con datos realistas *(pendiente: esperando el catálogo de la marca)*
-- Contrato OpenAPI de catálogo *(en curso)*
-- Deploy vacío en producción *(pendiente)*
+- Seed con datos realistas _(pendiente: esperando el catálogo de la marca)_
+- Contrato OpenAPI de catálogo _(en curso)_
+- Deploy vacío en producción _(pendiente)_

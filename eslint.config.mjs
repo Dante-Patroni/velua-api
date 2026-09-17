@@ -36,7 +36,7 @@ export default [
     languageOptions: { globals: { ...globals.jest } },
   },
 
-    {
+  {
     files: ["src/**/*.js"],
     plugins: { jsdoc },
     rules: {
