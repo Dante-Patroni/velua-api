@@ -15,8 +15,7 @@ const ORIGENES = (process.env.CORS_ORIGENES || "http://localhost:5173")
   .split(",")
   .map((o) => o.trim());
 
-
-  /**
+/**
  * @description Decide si un origen tiene permitido consumir la API.
  * @param {string|undefined} origin - Origen de la peticion. Indefinido en llamadas sin navegador.
  * @param {Function} callback - Callback de cors, recibe (error, permitido).
@@ -62,6 +61,5 @@ const salud = async (req, res) => {
 };
 
 app.get("/api/v1/salud", salud);
-
 
 module.exports = app;

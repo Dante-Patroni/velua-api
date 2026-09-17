@@ -36,7 +36,7 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Cookie de sesión del panel: `velua_sesion`, httpOnly, SameSite lax, path /api/v1.
 - **2026-09** Override de `uuid` a ^11 para resolver el aviso de seguridad que arrastra Sequelize 6.
 - **2026-09** Prefijo de rutas `/api/v1`. El `base_url` de Newman ya lo incluye.
-  
+
 ## Pendientes de decidir
 
 - Servicio de conciliación automática de transferencias por CVU. Definir antes del hito 4.
@@ -45,16 +45,18 @@ antes de tocar código. Cada línea lleva fecha.
 
 - ## Dominio
 
-- **2026-09** Registrar `velua.com.ar` en NIC Argentina. Trámite por TAD, requiere
-  CUIT/CUIL y Clave Fiscal nivel 2. Arancel verificado en septiembre de 2026:
-  $8.500 de alta y $8.500 de renovación anual.
-  
+-- **2026-09** Dominio: `veluanature.com.ar`. `velua.com.ar` estaba registrado por
+un tercero. Trámite por TAD en NIC Argentina, requiere CUIT/CUIL y Clave Fiscal
+nivel 2. Arancel verificado: $8.500 de alta y $8.500 de renovación anual.
+
+- **2026-09** Subdominios: `veluanature.com.ar` al frontend y
+  `api.veluanature.com.ar` al backend. Mismo dominio registrable, que es lo que
+  permite que la cookie de sesión funcione con SameSite lax.
+
 - **2026-09** Titular: la dueña de la marca, no el desarrollador. El dominio es
   activo de Velua; ponerlo a otro nombre obliga a una transferencia ante NIC
   más adelante.
-- **2026-09** Registrar ahora, aunque falten meses para publicar. El costo es
-  despreciable frente al riesgo de perder el nombre.
-- **2026-09** Fallback si está tomado: `veluanature.com.ar`, sin guion.
+
 - **2026-09** El handle de Instagram es `@velua.nature`, con punto. El sitio lo
   cita exacto en footer y contacto.
 
@@ -62,9 +64,6 @@ antes de tocar código. Cada línea lleva fecha.
 
 - **2026-09** API y MySQL en Railway, desde USD 5/mes. Provisiona MySQL nativo.
 - **2026-09** SPA en Vercel o Netlify. Gratis, estático, servido por CDN.
-- **2026-09** DNS: `velua.com.ar` al frontend, `api.velua.com.ar` al backend.
-  Ambos bajo el mismo dominio registrable, que es lo que permite que la cookie
-  de sesión funcione con SameSite lax.
 - **2026-09** Descartado Render. Solo soporta PostgreSQL y Redis de forma nativa,
   y su tier gratuito duerme los servicios tras unos 15 minutos de inactividad.
   Una tienda de bajo volumen está inactiva casi siempre, así que el webhook de

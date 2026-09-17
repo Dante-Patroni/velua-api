@@ -8,20 +8,20 @@ Documento técnico para Dante y Pablo. Es la referencia del proyecto: si algo no
 
 Estas decisiones ya están tomadas. Cambiarlas implica revisar el plan entero.
 
-| Decisión | Definición |
-|---|---|
-| Stack | Node + Express + MySQL (Sequelize) en el backend, React + Vite en el frontend |
-| Arquitectura | API REST separada del cliente, dos repos, dos deploys |
-| Capas | `Route → Controller → Service → Repository (interfaz) → Repository (Sequelize)`, heredado de El Buen Sabor |
-| Persistencia | Solo MySQL. Sin MongoDB: el stock tiene que bajar en la misma transacción que crea el pedido |
-| Tiempo real | Sin Socket.IO. El volumen no lo justifica; el panel consulta cada treinta segundos |
-| Aromas | Cada aroma o fórmula es un producto propio, con su slug y su ficha |
-| Variantes | Un solo eje, usado para tamaño. Todo producto tiene al menos una |
-| Combos | Producto configurable con casilleros, el stock se descuenta de cada componente |
-| Precios | Un único precio de lista. El ajuste por medio de pago es global |
-| Pagos | Mercado Pago para tarjeta. Transferencia como segundo medio |
-| Cuentas de cliente | No hay. Se compra como invitado |
-| Renderizado | SPA. El tráfico viene de Instagram, no de Google |
+| Decisión           | Definición                                                                                                 |
+| ------------------ | ---------------------------------------------------------------------------------------------------------- |
+| Stack              | Node + Express + MySQL (Sequelize) en el backend, React + Vite en el frontend                              |
+| Arquitectura       | API REST separada del cliente, dos repos, dos deploys                                                      |
+| Capas              | `Route → Controller → Service → Repository (interfaz) → Repository (Sequelize)`, heredado de El Buen Sabor |
+| Persistencia       | Solo MySQL. Sin MongoDB: el stock tiene que bajar en la misma transacción que crea el pedido               |
+| Tiempo real        | Sin Socket.IO. El volumen no lo justifica; el panel consulta cada treinta segundos                         |
+| Aromas             | Cada aroma o fórmula es un producto propio, con su slug y su ficha                                         |
+| Variantes          | Un solo eje, usado para tamaño. Todo producto tiene al menos una                                           |
+| Combos             | Producto configurable con casilleros, el stock se descuenta de cada componente                             |
+| Precios            | Un único precio de lista. El ajuste por medio de pago es global                                            |
+| Pagos              | Mercado Pago para tarjeta. Transferencia como segundo medio                                                |
+| Cuentas de cliente | No hay. Se compra como invitado                                                                            |
+| Renderizado        | SPA. El tráfico viene de Instagram, no de Google                                                           |
 
 ---
 
@@ -125,7 +125,7 @@ camino a Cloudinary, así que el límite no es opcional.
 
 ### 2.8 Autenticación del panel
 
-JWT de vida corta en cookie `httpOnly`, más refresh. Para que la cookie funcione entre frontend y API conviene desplegar en subdominios del mismo dominio: `velua.com.ar` y `api.velua.com.ar`. CORS con `credentials: true` y origen explícito, nunca comodín.
+JWT de vida corta en cookie `httpOnly`, más refresh. Para que la cookie funcione entre frontend y API conviene desplegar en subdominios del mismo dominio: `veluanature.com.ar` y `api.veluanature.com.ar`. CORS con `credentials: true` y origen explícito, nunca comodín.
 | Hosting | API y MySQL en Railway, frontend en Vercel. `velua.com.ar` y `api.velua.com.ar` bajo el mismo dominio registrable |
 
 ### 2.9 Migraciones desde el día uno
@@ -229,19 +229,19 @@ Lo que sí hay que construir: migraciones y seed del esquema nuevo, contrato Ope
 
 Desplegar al final es el error más caro del oficio. Se despliega antes de tener nada que desplegar.
 
-*Terminado cuando:* el frontend en producción muestra un dato que vino de la API en producción.
+_Terminado cuando:_ el frontend en producción muestra un dato que vino de la API en producción.
 
 ### H1 · Catálogo público
 
 Endpoints de lectura de categorías y productos con filtros y paginación. Home, grilla, ficha de producto, buscador simple.
 
-*Terminado cuando:* se navega el catálogo del seed en producción, desde el teléfono.
+_Terminado cuando:_ se navega el catálogo del seed en producción, desde el teléfono.
 
 ### H2 · Panel de administración
 
 Login, CRUD de categorías, productos, variantes e imágenes, con subida a Cloudinary.
 
-*Terminado cuando:* la dueña de la marca carga un producto completo sin ayuda de nadie.
+_Terminado cuando:_ la dueña de la marca carga un producto completo sin ayuda de nadie.
 
 Este hito va temprano a propósito: alguien tiene que cargar cuarenta productos, y eso lleva semanas de trabajo que corren en paralelo al resto.
 
@@ -249,31 +249,31 @@ Este hito va temprano a propósito: alguien tiene que cargar cuarenta productos,
 
 Carrito persistente en el navegador, endpoint de cotización, zonas de envío, cupones, umbral de envío gratis.
 
-*Terminado cuando:* los totales del frontend y del backend coinciden al peso en veinte casos cubiertos por tests unitarios del cotizador, incluidos cupón más transferencia más envío gratis.
+_Terminado cuando:_ los totales del frontend y del backend coinciden al peso en veinte casos cubiertos por tests unitarios del cotizador, incluidos cupón más transferencia más envío gratis.
 
 ### H4 · Checkout y pagos
 
 Creación de pedido con transacción y reserva de stock, integración con Mercado Pago, webhook idempotente, páginas de resultado, flujo de transferencia.
 
-*Terminado cuando:* una compra real de monto chico se aprueba, el webhook la registra, el stock baja y el pedido aparece en el panel. La colección de Newman cubre el flujo completo de checkout.
+_Terminado cuando:_ una compra real de monto chico se aprueba, el webhook la registra, el stock baja y el pedido aparece en el panel. La colección de Newman cubre el flujo completo de checkout.
 
 ### H5 · Mails y tareas programadas
 
 Bandeja de salida, plantillas, dominio autenticado con SPF, DKIM y DMARC. Jobs de expiración de reserva, recordatorio de pago y carrito abandonado.
 
-*Terminado cuando:* la secuencia completa llega a Gmail y a Outlook sin caer en spam.
+_Terminado cuando:_ la secuencia completa llega a Gmail y a Outlook sin caer en spam.
 
 ### H6 · Contenido, legales y confianza
 
 Página de marca y proceso, reseñas, formulario de arrepentimiento con número de trámite, términos, política de cambios y privacidad, metadatos y sitemap.
 
-*Terminado cuando:* el checklist legal está completo y verificado contra la normativa vigente.
+_Terminado cuando:_ el checklist legal está completo y verificado contra la normativa vigente.
 
 ### H7 · Endurecimiento y salida
 
 Rate limit, cabeceras de seguridad, revisión de validaciones, tests de cotizador y webhook, backups automáticos de la base, monitoreo de caídas, carga del catálogo real, prueba con tres clientas reales.
 
-*Terminado cuando:* la tienda está abierta.
+_Terminado cuando:_ la tienda está abierta.
 
 ---
 

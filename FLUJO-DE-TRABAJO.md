@@ -101,15 +101,19 @@ Plantilla mínima:
 
 ```markdown
 ## Qué hace
+
 Dos o tres líneas.
 
 ## Por qué
+
 Qué problema resuelve o a qué parte del PLAN corresponde.
 
 ## Cómo lo probé
+
 Tests que corrí, endpoints que golpeé, qué verifiqué a mano.
 
 ## Pendientes
+
 Lo que queda para otro PR.
 
 Closes #12
