@@ -41,4 +41,50 @@ antes de tocar código. Cada línea lleva fecha.
 
 - Servicio de conciliación automática de transferencias por CVU. Definir antes del hito 4.
 - Umbral de envío gratis y porcentaje de descuento por transferencia. Los define la dueña de la marca.
-- 2026-09 Override de `uuid` a ^11 para resolver el aviso de seguridad que arrastra Sequelize 6. Verificar Newman cuando haya colección.
+- 2026-09 Override de `uuid` a ^11 para resolver el aviso de seguridad que arrastra Sequelize 6. Verificar Newman cuando haya colección.## Dominio
+
+- ## Dominio
+
+- **2026-09** Registrar `velua.com.ar` en NIC Argentina. Trámite por TAD, requiere
+  CUIT/CUIL y Clave Fiscal nivel 2. Arancel verificado en septiembre de 2026:
+  $8.500 de alta y $8.500 de renovación anual.
+  
+- **2026-09** Titular: la dueña de la marca, no el desarrollador. El dominio es
+  activo de Velua; ponerlo a otro nombre obliga a una transferencia ante NIC
+  más adelante.
+- **2026-09** Registrar ahora, aunque falten meses para publicar. El costo es
+  despreciable frente al riesgo de perder el nombre.
+- **2026-09** Fallback si está tomado: `veluanature.com.ar`, sin guion.
+- **2026-09** El handle de Instagram es `@velua.nature`, con punto. El sitio lo
+  cita exacto en footer y contacto.
+
+## Hosting
+
+- **2026-09** API y MySQL en Railway, desde USD 5/mes. Provisiona MySQL nativo.
+- **2026-09** SPA en Vercel o Netlify. Gratis, estático, servido por CDN.
+- **2026-09** DNS: `velua.com.ar` al frontend, `api.velua.com.ar` al backend.
+  Ambos bajo el mismo dominio registrable, que es lo que permite que la cookie
+  de sesión funcione con SameSite lax.
+- **2026-09** Descartado Render. Solo soporta PostgreSQL y Redis de forma nativa,
+  y su tier gratuito duerme los servicios tras unos 15 minutos de inactividad.
+  Una tienda de bajo volumen está inactiva casi siempre, así que el webhook de
+  Mercado Pago llegaría con el servicio dormido y 30 segundos de arranque en
+  frío. MP reintenta, pero no vale la pena poner esa carrera justo en la parte
+  que no puede fallar.
+- **2026-09** El backend debe estar siempre encendido; el frontend no. De ahí la
+  separación: se paga solo por la pieza que lo necesita.
+
+## Imágenes
+
+- **2026-09** Cloudinary, plan free con 25 créditos mensuales. Las fotos no van
+  en Railway ni en el repo: el filesystem del contenedor es efímero y se pierde
+  en cada deploy.
+- **2026-09** `imagenes_producto` guarda `url` y `public_id`. El `public_id` es
+  necesario para borrar el archivo remoto al eliminar un producto; sin él quedan
+  imágenes huérfanas consumiendo cuota para siempre.
+- **2026-09** Subida con multer en `memoryStorage`, nunca `diskStorage`.
+- **2026-09** Tope de 5 MB por archivo y formatos jpg, png y webp. El frontend
+  valida antes de enviar; el backend rechaza igual. Con `memoryStorage` el
+  archivo vive en la RAM del contenedor, que en Railway es acotada.
+- **2026-09** Alternativas evaluadas y descartadas: ImageKit (20 GB de ancho de
+  banda, transformaciones ilimitadas) y Cloudflare R2 (10 GB, sin transformaciones).
