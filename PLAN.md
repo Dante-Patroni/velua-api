@@ -111,13 +111,22 @@ Así, si el proveedor de mail está caído, el cliente igual completa su compra.
 
 ### 2.7 Imágenes fuera del servidor
 
-El backend no guarda archivos. Firma una subida directa a Cloudinary y persiste la URL.
+Las fotos viven en Cloudinary. En la base se guardan `url` y `public_id`; el
+segundo es el que permite borrar el archivo remoto cuando se elimina una imagen,
+sin él quedan huérfanas consumiendo cuota.
 
-Este es el punto donde **no** se hereda de El Buen Sabor: allá `multer` escribe al disco local y funciona bien, pero el disco de Render es efímero y se borra en cada deploy. Las fotos de producto desaparecerían.
+Este es el punto donde **no** se hereda de El Buen Sabor: allá `multer` escribe
+al disco local y funciona bien, pero el filesystem del contenedor en Railway es
+efímero y se pierde en cada deploy. Las fotos de producto desaparecerían.
+
+La subida usa `multer` con `memoryStorage`, nunca `diskStorage`, con tope de 5 MB
+por archivo y formatos jpg, png y webp. El archivo pasa por la RAM del contenedor
+camino a Cloudinary, así que el límite no es opcional.
 
 ### 2.8 Autenticación del panel
 
 JWT de vida corta en cookie `httpOnly`, más refresh. Para que la cookie funcione entre frontend y API conviene desplegar en subdominios del mismo dominio: `velua.com.ar` y `api.velua.com.ar`. CORS con `credentials: true` y origen explícito, nunca comodín.
+| Hosting | API y MySQL en Railway, frontend en Vercel. `velua.com.ar` y `api.velua.com.ar` bajo el mismo dominio registrable |
 
 ### 2.9 Migraciones desde el día uno
 
@@ -198,7 +207,7 @@ Los textos legibles viven en el frontend, mapeando código a mensaje. Para una t
 
 **JSDoc.** Obligatorio en toda función, pública o privada, en cualquier capa. Mismo formato que el proyecto anterior.
 
-**Validación. express-validator en el borde de la API, con DATOS_INVALIDOS más details. Si un dato llegó al service, ya está validado.
+**Validación.** express-validator en el borde de la API, con DATOS_INVALIDOS más details. Si un dato llegó al service, ya está validado.
 
 **Bajas.** Lógicas, nunca físicas. Un producto discontinuado sigue estando referenciado en pedidos viejos.
 
@@ -230,7 +239,7 @@ Endpoints de lectura de categorías y productos con filtros y paginación. Home,
 
 ### H2 · Panel de administración
 
-Login, CRUD de categorías, productos, variantes e imágenes, con subida directa a Cloudinary.
+Login, CRUD de categorías, productos, variantes e imágenes, con subida a Cloudinary.
 
 *Terminado cuando:* la dueña de la marca carga un producto completo sin ayuda de nadie.
 
