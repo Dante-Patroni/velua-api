@@ -36,6 +36,17 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Cookie de sesión del panel: `velua_sesion`, httpOnly, SameSite lax, path /api/v1.
 - **2026-09** Override de `uuid` a ^11 para resolver el aviso de seguridad que arrastra Sequelize 6.
 - **2026-09** Prefijo de rutas `/api/v1`. El `base_url` de Newman ya lo incluye.
+- - **2026-09** Los secretos viven en las variables de entorno de Railway y Vercel.
+  `.env` es solo para desarrollo local y está en `.gitignore`. `.env.example` se
+  commitea con las claves vacías.
+- **2026-09** Se evaluó pasar a PostgreSQL y se sostuvo MySQL. Motivo: el esquema,
+  seis migraciones y el CI ya están en MySQL, y varias migraciones usan
+  construcciones propias (`ON UPDATE CURRENT_TIMESTAMP`, enteros sin signo, ENUM
+  en columna). Además los dos conocemos MySQL. Railway soporta ambos, así que el
+  hosting no inclina la balanza.
+- **2026-09** Railway conectado a `velua-api`. Trial de 30 días con USD 5 de
+  crédito, sin tarjeta. Pasar a Hobby antes de que se agote: al agotarse los
+  servicios se pausan, los datos se conservan.
 
 ## Pendientes de decidir
 
@@ -87,3 +98,8 @@ nivel 2. Arancel verificado: $8.500 de alta y $8.500 de renovación anual.
   archivo vive en la RAM del contenedor, que en Railway es acotada.
 - **2026-09** Alternativas evaluadas y descartadas: ImageKit (20 GB de ancho de
   banda, transformaciones ilimitadas) y Cloudflare R2 (10 GB, sin transformaciones).
+
+  ## Código
+- **2026-09** Los modelos no llevan `defaultScope`. El filtro por `activo` lo hace
+  el repositorio de forma explícita, para que el panel pueda ver los inactivos sin
+  tener que usar `unscoped()`.
