@@ -37,8 +37,8 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Override de `uuid` a ^11 para resolver el aviso de seguridad que arrastra Sequelize 6.
 - **2026-09** Prefijo de rutas `/api/v1`. El `base_url` de Newman ya lo incluye.
 - - **2026-09** Los secretos viven en las variables de entorno de Railway y Vercel.
-  `.env` es solo para desarrollo local y está en `.gitignore`. `.env.example` se
-  commitea con las claves vacías.
+    `.env` es solo para desarrollo local y está en `.gitignore`. `.env.example` se
+    commitea con las claves vacías.
 - **2026-09** Se evaluó pasar a PostgreSQL y se sostuvo MySQL. Motivo: el esquema,
   seis migraciones y el CI ya están en MySQL, y varias migraciones usan
   construcciones propias (`ON UPDATE CURRENT_TIMESTAMP`, enteros sin signo, ENUM
@@ -100,6 +100,7 @@ nivel 2. Arancel verificado: $8.500 de alta y $8.500 de renovación anual.
   banda, transformaciones ilimitadas) y Cloudflare R2 (10 GB, sin transformaciones).
 
   ## Código
+
 - **2026-09** Los modelos no llevan `defaultScope`. El filtro por `activo` lo hace
   el repositorio de forma explícita, para que el panel pueda ver los inactivos sin
   tener que usar `unscoped()`.

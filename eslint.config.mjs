@@ -60,5 +60,11 @@ export default [
       "jsdoc/check-param-names": "error",
     },
   },
+  {
+    files: ["src/repositories/*Repository.js"],
+    rules: {
+      "require-await": "off",
+    },
+  },
   prettier,
 ];
