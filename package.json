@@ -10,7 +10,7 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "test": "newman run tests/tests.json -e tests/entorno.json",
-    "test:unit": "jest --passWithNoTests",
+    "test:unit": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "seed": "npx sequelize-cli db:seed:all",
