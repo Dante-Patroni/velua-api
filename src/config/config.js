@@ -32,7 +32,7 @@ module.exports = {
     use_env_variable: "DATABASE_URL",
     logging: false,
     dialectOptions: {
-      ssl: { rejectUnauthorized: true },
+      ssl: { rejectUnauthorized: false },
     },
     pool: { max: 5, min: 0, acquire: 30000, idle: 10000 },
   },
