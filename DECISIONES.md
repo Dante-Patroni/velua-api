@@ -83,6 +83,10 @@ nivel 2. Arancel verificado: $8.500 de alta y $8.500 de renovación anual.
   que no puede fallar.
 - **2026-09** El backend debe estar siempre encendido; el frontend no. De ahí la
   separación: se paga solo por la pieza que lo necesita.
+  - **2026-09** En producción, `rejectUnauthorized: false` en la conexión a MySQL.
+    Railway usa certificado autofirmado y la comunicación va por su red privada.
+    Si la base se mudara a un proveedor con tráfico por internet, hay que cargar
+    su certificado en vez de desactivar la verificación.
 
 ## Imágenes
 

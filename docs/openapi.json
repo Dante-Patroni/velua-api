@@ -76,18 +76,10 @@
           },
           "baseDatos": {
             "type": "string",
-            "enum": [
-              "conectada",
-              "desconectada"
-            ]
+            "enum": ["conectada", "desconectada"]
           }
         },
-        "required": [
-          "estado",
-          "version",
-          "entorno",
-          "baseDatos"
-        ]
+        "required": ["estado", "version", "entorno", "baseDatos"]
       },
       "Error": {
         "type": "object",
@@ -106,9 +98,7 @@
             }
           }
         },
-        "required": [
-          "error"
-        ]
+        "required": ["error"]
       },
       "Meta": {
         "type": "object",
@@ -127,11 +117,7 @@
             "example": 47
           }
         },
-        "required": [
-          "pagina",
-          "limite",
-          "total"
-        ]
+        "required": ["pagina", "limite", "total"]
       },
       "Categoria": {
         "type": "object",
@@ -159,11 +145,7 @@
             "format": "uri"
           }
         },
-        "required": [
-          "id",
-          "nombre",
-          "slug"
-        ]
+        "required": ["id", "nombre", "slug"]
       },
       "Imagen": {
         "type": "object",
@@ -177,9 +159,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "url"
-        ]
+        "required": ["url"]
       },
       "Variante": {
         "type": "object",
@@ -214,12 +194,7 @@
             "description": "Si la variante tiene unidades disponibles."
           }
         },
-        "required": [
-          "id",
-          "nombre",
-          "precio",
-          "hayStock"
-        ]
+        "required": ["id", "nombre", "precio", "hayStock"]
       },
       "ProductoListado": {
         "type": "object",
@@ -271,15 +246,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "id",
-          "nombre",
-          "slug",
-          "categoria",
-          "precioDesde",
-          "hayStock",
-          "destacado"
-        ]
+        "required": ["id", "nombre", "slug", "categoria", "precioDesde", "hayStock", "destacado"]
       },
       "ProductoDetalle": {
         "type": "object",
@@ -336,24 +303,14 @@
             "minItems": 1
           }
         },
-        "required": [
-          "id",
-          "nombre",
-          "slug",
-          "categoria",
-          "imagenes",
-          "variantes",
-          "destacado"
-        ]
+        "required": ["id", "nombre", "slug", "categoria", "imagenes", "variantes", "destacado"]
       }
     }
   },
   "paths": {
     "/categorias": {
       "get": {
-        "tags": [
-          "Catalogo"
-        ],
+        "tags": ["Catalogo"],
         "summary": "Listar categorias activas",
         "description": "Devuelve las categorias activas ordenadas por su campo de orden. Sin paginacion: son pocas y se usan para armar el menu.\n",
         "responses": {
@@ -363,9 +320,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "datos"
-                  ],
+                  "required": ["datos"],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -383,9 +338,7 @@
     },
     "/productos": {
       "get": {
-        "tags": [
-          "Catalogo"
-        ],
+        "tags": ["Catalogo"],
         "summary": "Listar productos",
         "description": "Listado paginado y liviano, pensado para la grilla del catalogo. Incluye el precio minimo entre las variantes activas, si hay stock, y solo la imagen principal.\n\nPara los datos completos de un producto, usar el detalle por slug.\n",
         "parameters": [
@@ -431,12 +384,7 @@
             "description": "Criterio de ordenamiento. `defecto`: orden de categoria y despues alfabetico. `precio_asc` / `precio_desc`: por precio minimo de variante activa. `mas_vendidos`: declarado en el contrato pero no implementado todavia; hasta que existan ventas reales devuelve el orden por defecto.\n",
             "schema": {
               "type": "string",
-              "enum": [
-                "defecto",
-                "precio_asc",
-                "precio_desc",
-                "mas_vendidos"
-              ],
+              "enum": ["defecto", "precio_asc", "precio_desc", "mas_vendidos"],
               "default": "defecto"
             }
           }
@@ -448,10 +396,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "datos",
-                    "meta"
-                  ],
+                  "required": ["datos", "meta"],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -488,9 +433,7 @@
     },
     "/productos/{slug}": {
       "get": {
-        "tags": [
-          "Catalogo"
-        ],
+        "tags": ["Catalogo"],
         "summary": "Detalle de un producto",
         "description": "Ficha completa: todas las variantes activas, todas las imagenes, ingredientes y modo de uso.\n\nSe busca por slug y no por id porque el slug es lo que va en la URL publica y en los links que se comparten.\n",
         "parameters": [
@@ -534,9 +477,7 @@
     },
     "/salud": {
       "get": {
-        "tags": [
-          "Sistema"
-        ],
+        "tags": ["Sistema"],
         "summary": "Estado del servicio",
         "description": "Informa version, entorno y estado de la conexion a la base. Responde 200 aunque la base este caida; el estado va en el cuerpo.\n",
         "responses": {
