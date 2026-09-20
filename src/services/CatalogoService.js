@@ -1,4 +1,21 @@
 /**
+ * @description Recorta una categoría a los campos que expone el contrato.
+ * @param {Object} categoria - Categoría cruda del repositorio.
+ * @returns {Object} Categoría con los campos del contrato.
+ */
+const mapearCategoria = (categoria) => ({
+  id: categoria.id,
+  nombre: categoria.nombre,
+  slug: categoria.slug,
+  descripcion: categoria.descripcion,
+  imagenUrl: categoria.imagenUrl,
+});
+
+/**
+ * @description Servicio para la lectura del catálogo público.
+ */
+
+/**
  * @description Servicio para la lectura del catálogo público.
  */
 class CatalogoService {
@@ -51,7 +68,7 @@ class CatalogoService {
         nombre: json.nombre,
         slug: json.slug,
         descripcionCorta: json.descripcionCorta,
-        categoria: json.categoria,
+        categoria: mapearCategoria(json.categoria),
         // Toma la primera imagen disponible (ya vienen ordenadas por orden de BD)
         imagen:
           json.imagenes && json.imagenes.length > 0
@@ -93,7 +110,7 @@ class CatalogoService {
       ingredientes: json.ingredientes,
       modoUso: json.modoUso,
       destacado: json.destacado,
-      categoria: json.categoria,
+      categoria: mapearCategoria(json.categoria),
       imagenes: json.imagenes.map((img) => ({ url: img.url, alt: img.alt })),
       variantes: json.variantes.map((v) => ({
         id: v.id,

@@ -1,5 +1,5 @@
-const { Op } = require("sequelize");
-const CatalogoRepository = require("./CatalogoRepository");
+const { Op, literal } = require("sequelize");
+const CatalogoRepository = require("../CatalogoRepository");
 
 /**
  * @description Implementación en Sequelize de la interfaz CatalogoRepository.
@@ -51,12 +51,33 @@ class SequelizeCatalogoRepository extends CatalogoRepository {
       model: this.models.Categoria,
       as: "categoria",
       where: { activa: true },
-      attributes: ["id", "nombre", "slug", "descripcion", "imagenUrl"],
+      attributes: ["id", "nombre", "slug", "descripcion", "imagenUrl", "orden"],
     };
 
     if (filtros.categoria) {
       includeCategoria.where.slug = filtros.categoria;
     }
+
+    const precioMinimo = literal(
+      "(SELECT MIN(v.precio) FROM variantes v " +
+        "WHERE v.producto_id = Producto.id AND v.activa = 1)"
+    );
+
+    const ordenCategoria = literal(
+      "(SELECT c.orden FROM categorias c WHERE c.id = `Producto`.`categoria_id`)"
+    );
+
+    const ordenes = {
+      precio_asc: [[precioMinimo, "ASC"]],
+      precio_desc: [[precioMinimo, "DESC"]],
+      defecto: [
+        [ordenCategoria, "ASC"],
+        ["nombre", "ASC"],
+      ],
+    };
+
+    // mas_vendidos todavia no esta implementado: cae al orden por defecto
+    const orden = ordenes[filtros.orden] || ordenes.defecto;
 
     const { rows, count } = await this.models.Producto.findAndCountAll({
       where: whereProducto,
@@ -78,11 +99,7 @@ class SequelizeCatalogoRepository extends CatalogoRepository {
           attributes: ["url", "alt", "orden"],
         },
       ],
-      order: [
-        [{ model: this.models.Categoria, as: "categoria" }, "orden", "ASC"],
-        ["nombre", "ASC"],
-        [{ model: this.models.ImagenProducto, as: "imagenes" }, "orden", "ASC"],
-      ],
+      order: [...orden, [{ model: this.models.ImagenProducto, as: "imagenes" }, "orden", "ASC"]],
     });
 
     return {

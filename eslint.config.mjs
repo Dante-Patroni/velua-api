@@ -56,7 +56,7 @@ export default [
       "jsdoc/require-param-description": "error",
       "jsdoc/require-returns": "error",
       "jsdoc/require-returns-description": "error",
-      "jsdoc/check-tag-names": "error",
+      "jsdoc/check-tag-names": ["error", { definedTags: ["openapi"] }],
       "jsdoc/check-param-names": "error",
     },
   },

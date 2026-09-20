@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Velua API",
-    "description": "Coleccion E2E de la API de Velua. Se ejecuta con Newman en CI.",
+    "description": "Coleccion E2E de la API de Velua. Se ejecuta con Newman en CI contra la base con el seed cargado.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -18,7 +18,7 @@
               "host": ["{{base_url}}"],
               "path": ["salud"]
             },
-            "description": "Verifica que la API responde y que la base de datos esta conectada."
+            "description": "Verifica que la API responde y que la base esta conectada."
           },
           "event": [
             {
@@ -26,32 +26,672 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Responde 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "pm.test('Responde JSON', function () {",
-                  "    pm.response.to.be.json;",
-                  "});",
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Responde JSON', () => pm.response.to.be.json);",
                   "",
                   "const cuerpo = pm.response.json();",
                   "",
-                  "pm.test('El estado es ok', function () {",
-                  "    pm.expect(cuerpo.estado).to.eql('ok');",
-                  "});",
-                  "",
-                  "pm.test('La base de datos esta conectada', function () {",
-                  "    pm.expect(cuerpo.baseDatos).to.eql('conectada');",
-                  "});",
-                  "",
-                  "pm.test('Informa version y entorno', function () {",
+                  "pm.test('El estado es ok', () => pm.expect(cuerpo.estado).to.eql('ok'));",
+                  "pm.test('La base de datos esta conectada', () => pm.expect(cuerpo.baseDatos).to.eql('conectada'));",
+                  "pm.test('Informa version y entorno', () => {",
                   "    pm.expect(cuerpo.version).to.be.a('string').and.not.empty;",
                   "    pm.expect(cuerpo.entorno).to.be.a('string').and.not.empty;",
                   "});",
+                  "pm.test('Responde en menos de 2 segundos', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Categorias",
+      "item": [
+        {
+          "name": "GET /categorias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["categorias"]
+            },
+            "description": "Lista las categorias activas del catalogo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
                   "",
-                  "pm.test('Responde en menos de 2 segundos', function () {",
-                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Devuelve la clave datos con un arreglo', () => {",
+                  "    pm.expect(cuerpo).to.have.property('datos');",
+                  "    pm.expect(cuerpo.datos).to.be.an('array');",
+                  "});",
+                  "",
+                  "pm.test('Hay al menos una categoria', () => pm.expect(cuerpo.datos.length).to.be.above(0));",
+                  "",
+                  "pm.test('Cada categoria tiene los campos del contrato', () => {",
+                  "    cuerpo.datos.forEach((c) => {",
+                  "        pm.expect(c).to.have.property('id');",
+                  "        pm.expect(c).to.have.property('nombre');",
+                  "        pm.expect(c).to.have.property('slug');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('No se filtra el campo interno orden', () => {",
+                  "    cuerpo.datos.forEach((c) => pm.expect(c).to.not.have.property('orden'));",
+                  "});",
+                  "",
+                  "pm.test('No se filtra el campo interno activa', () => {",
+                  "    cuerpo.datos.forEach((c) => pm.expect(c).to.not.have.property('activa'));",
+                  "});",
+                  "",
+                  "// Guarda un slug real para los requests siguientes",
+                  "if (cuerpo.datos.length > 0) {",
+                  "    pm.collectionVariables.set('slug_categoria', cuerpo.datos[0].slug);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Productos - listado",
+      "item": [
+        {
+          "name": "GET /productos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos",
+              "host": ["{{base_url}}"],
+              "path": ["productos"]
+            },
+            "description": "Listado paginado de productos con su meta."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Devuelve datos y meta', () => {",
+                  "    pm.expect(cuerpo).to.have.property('datos');",
+                  "    pm.expect(cuerpo).to.have.property('meta');",
+                  "});",
+                  "",
+                  "pm.test('meta trae pagina, limite y total', () => {",
+                  "    pm.expect(cuerpo.meta.pagina).to.be.a('number');",
+                  "    pm.expect(cuerpo.meta.limite).to.be.a('number');",
+                  "    pm.expect(cuerpo.meta.total).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('Hay productos cargados', () => pm.expect(cuerpo.datos.length).to.be.above(0));",
+                  "",
+                  "pm.test('Los precios viajan como cadena, no como numero', () => {",
+                  "    cuerpo.datos.forEach((p) => {",
+                  "        if (p.precioDesde !== null) pm.expect(p.precioDesde).to.be.a('string');",
+                  "        if (p.precioAnteriorDesde !== null) pm.expect(p.precioAnteriorDesde).to.be.a('string');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('Los precios tienen dos decimales', () => {",
+                  "    cuerpo.datos.forEach((p) => {",
+                  "        if (p.precioDesde !== null) pm.expect(p.precioDesde).to.match(/^\\d+\\.\\d{2}$/);",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('hayStock es booleano', () => {",
+                  "    cuerpo.datos.forEach((p) => pm.expect(p.hayStock).to.be.a('boolean'));",
+                  "});",
+                  "",
+                  "pm.test('No se filtran las variantes ni el stock real', () => {",
+                  "    cuerpo.datos.forEach((p) => {",
+                  "        pm.expect(p).to.not.have.property('variantes');",
+                  "        pm.expect(p).to.not.have.property('stock');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('No se filtran campos internos del producto', () => {",
+                  "    cuerpo.datos.forEach((p) => {",
+                  "        pm.expect(p).to.not.have.property('activo');",
+                  "        pm.expect(p).to.not.have.property('creadoEn');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('La imagen es null o trae url', () => {",
+                  "    cuerpo.datos.forEach((p) => {",
+                  "        if (p.imagen !== null) pm.expect(p.imagen).to.have.property('url');",
+                  "    });",
+                  "});",
+                  "",
+                  "// Guarda un slug real para el detalle",
+                  "if (cuerpo.datos.length > 0) {",
+                  "    pm.collectionVariables.set('slug_producto', cuerpo.datos[0].slug);",
+                  "    pm.collectionVariables.set('total_productos', cuerpo.meta.total);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos?limite=5",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?limite=5",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "El limite acota la pagina pero no el total."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Devuelve como maximo 5 productos', () => pm.expect(cuerpo.datos.length).to.be.at.most(5));",
+                  "pm.test('El limite se refleja en meta', () => pm.expect(cuerpo.meta.limite).to.eql(5));",
+                  "",
+                  "pm.test('El total no cambia con el limite', () => {",
+                  "    const total = Number(pm.collectionVariables.get('total_productos'));",
+                  "    pm.expect(cuerpo.meta.total).to.eql(total);",
                   "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos?destacados=true",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?destacados=true",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "destacados",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Filtra solo los productos destacados."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Todos los productos son destacados', () => {",
+                  "    cuerpo.datos.forEach((p) => pm.expect(p.destacado).to.be.true);",
+                  "});",
+                  "",
+                  "pm.test('Devuelve menos productos que el listado completo', () => {",
+                  "    const total = Number(pm.collectionVariables.get('total_productos'));",
+                  "    pm.expect(cuerpo.meta.total).to.be.below(total);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos filtrado por categoria",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?categoria={{slug_categoria}}",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "categoria",
+                  "value": "{{slug_categoria}}"
+                }
+              ]
+            },
+            "description": "Filtra por el slug de categoria."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "const slug = pm.collectionVariables.get('slug_categoria');",
+                  "",
+                  "pm.test('Hay resultados para esa categoria', () => pm.expect(cuerpo.datos.length).to.be.above(0));",
+                  "",
+                  "pm.test('Todos pertenecen a la categoria pedida', () => {",
+                  "    cuerpo.datos.forEach((p) => pm.expect(p.categoria.slug).to.eql(slug));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos con categoria inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?categoria=no-existe-esta-categoria",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "categoria",
+                  "value": "no-existe-esta-categoria"
+                }
+              ]
+            },
+            "description": "Una categoria inexistente devuelve lista vacia, no error."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Devuelve lista vacia', () => pm.expect(cuerpo.datos).to.be.an('array').that.is.empty);",
+                  "pm.test('El total es cero', () => pm.expect(cuerpo.meta.total).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos ordenado por precio ascendente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?orden=precio_asc",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "orden",
+                  "value": "precio_asc"
+                }
+              ]
+            },
+            "description": "Ordena por el precio minimo de las variantes activas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Los precios vienen de menor a mayor', () => {",
+                  "    const precios = cuerpo.datos.filter((p) => p.precioDesde !== null).map((p) => Number(p.precioDesde));",
+                  "    for (let i = 1; i < precios.length; i++) {",
+                  "        pm.expect(precios[i]).to.be.at.least(precios[i - 1]);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos ordenado por precio descendente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?orden=precio_desc",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "orden",
+                  "value": "precio_desc"
+                }
+              ]
+            },
+            "description": "Ordena por el precio minimo de las variantes activas, de mayor a menor."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Los precios vienen de mayor a menor', () => {",
+                  "    const precios = cuerpo.datos.filter((p) => p.precioDesde !== null).map((p) => Number(p.precioDesde));",
+                  "    for (let i = 1; i < precios.length; i++) {",
+                  "        pm.expect(precios[i]).to.be.at.most(precios[i - 1]);",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos con mas_vendidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?orden=mas_vendidos",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "orden",
+                  "value": "mas_vendidos"
+                }
+              ]
+            },
+            "description": "mas_vendidos esta declarado en el contrato pero no implementado: cae al orden por defecto sin fallar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200 y no falla', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve productos', () => pm.expect(pm.response.json().datos.length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Productos - detalle",
+      "item": [
+        {
+          "name": "GET /productos/{slug}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos/{{slug_producto}}",
+              "host": ["{{base_url}}"],
+              "path": ["productos", "{{slug_producto}}"]
+            },
+            "description": "Ficha completa de un producto existente."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "",
+                  "const p = pm.response.json();",
+                  "const slug = pm.collectionVariables.get('slug_producto');",
+                  "",
+                  "pm.test('Devuelve el producto pedido', () => pm.expect(p.slug).to.eql(slug));",
+                  "",
+                  "pm.test('Trae los campos de la ficha completa', () => {",
+                  "    pm.expect(p).to.have.property('descripcion');",
+                  "    pm.expect(p).to.have.property('ingredientes');",
+                  "    pm.expect(p).to.have.property('modoUso');",
+                  "    pm.expect(p).to.have.property('categoria');",
+                  "});",
+                  "",
+                  "pm.test('Tiene al menos una variante', () => {",
+                  "    pm.expect(p.variantes).to.be.an('array');",
+                  "    pm.expect(p.variantes.length).to.be.above(0);",
+                  "});",
+                  "",
+                  "pm.test('Las variantes exponen hayStock y no el stock real', () => {",
+                  "    p.variantes.forEach((v) => {",
+                  "        pm.expect(v.hayStock).to.be.a('boolean');",
+                  "        pm.expect(v).to.not.have.property('stock');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('Los precios de las variantes son cadenas con dos decimales', () => {",
+                  "    p.variantes.forEach((v) => {",
+                  "        pm.expect(v.precio).to.be.a('string');",
+                  "        pm.expect(v.precio).to.match(/^\\d+\\.\\d{2}$/);",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('Las imagenes exponen solo url y alt', () => {",
+                  "    pm.expect(p.imagenes).to.be.an('array');",
+                  "    p.imagenes.forEach((img) => {",
+                  "        pm.expect(img).to.have.property('url');",
+                  "        pm.expect(img).to.not.have.property('orden');",
+                  "        pm.expect(img).to.not.have.property('publicId');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('No se filtran campos internos', () => {",
+                  "    pm.expect(p).to.not.have.property('activo');",
+                  "    pm.expect(p).to.not.have.property('creadoEn');",
+                  "    pm.expect(p).to.not.have.property('categoriaId');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos/{slug} inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos/producto-que-no-existe",
+              "host": ["{{base_url}}"],
+              "path": ["productos", "producto-que-no-existe"]
+            },
+            "description": "Un slug inexistente devuelve 404 con el codigo de dominio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Devuelve el codigo NO_ENCONTRADO', () => pm.expect(cuerpo.error).to.eql('NO_ENCONTRADO'));",
+                  "pm.test('No expone detalles internos', () => pm.expect(cuerpo).to.not.have.property('stack'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Validaciones",
+      "item": [
+        {
+          "name": "GET /productos?limite=999",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?limite=999",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "999"
+                }
+              ]
+            },
+            "description": "El limite tiene tope de 50 segun el contrato."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "",
+                  "const cuerpo = pm.response.json();",
+                  "",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(cuerpo.error).to.eql('DATOS_INVALIDOS'));",
+                  "pm.test('details indica el campo limite', () => {",
+                  "    pm.expect(cuerpo.details).to.have.property('limite');",
+                  "    pm.expect(cuerpo.details.limite).to.be.a('string');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos?pagina=0",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?pagina=0",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "pagina",
+                  "value": "0"
+                }
+              ]
+            },
+            "description": "La pagina minima es 1."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('details indica el campo pagina', () => {",
+                  "    pm.expect(pm.response.json().details).to.have.property('pagina');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos?orden=cualquiera",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?orden=cualquiera",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "orden",
+                  "value": "cualquiera"
+                }
+              ]
+            },
+            "description": "El orden debe estar dentro del enum del contrato."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('details indica el campo orden', () => {",
+                  "    pm.expect(pm.response.json().details).to.have.property('orden');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos?pagina=texto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?pagina=texto",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "pagina",
+                  "value": "texto"
+                }
+              ]
+            },
+            "description": "La pagina tiene que ser numerica."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));"
                 ]
               }
             }
@@ -79,11 +719,7 @@
               "listen": "test",
               "script": {
                 "type": "text/javascript",
-                "exec": [
-                  "pm.test('Responde 404', function () {",
-                  "    pm.response.to.have.status(404);",
-                  "});"
-                ]
+                "exec": ["pm.test('Responde 404', () => pm.response.to.have.status(404));"]
               }
             }
           ]
@@ -91,5 +727,18 @@
       ]
     }
   ],
-  "variable": []
+  "variable": [
+    {
+      "key": "slug_categoria",
+      "value": ""
+    },
+    {
+      "key": "slug_producto",
+      "value": ""
+    },
+    {
+      "key": "total_productos",
+      "value": ""
+    }
+  ]
 }
