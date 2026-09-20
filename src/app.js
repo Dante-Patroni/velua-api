@@ -1,10 +1,8 @@
 require("dotenv").config();
-
+const swaggerUi = require("swagger-ui-express");
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const swaggerUi = require("swagger-ui-express");
-
 const { limitadorGlobal } = require("./middlewares/rateLimitMiddleware");
 
 const app = express();
@@ -34,7 +32,24 @@ const swaggerSpec = require("./docs/swagger");
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api", limitadorGlobal);
-
+app.use("/api/v1", require("./routes/catalogoRoutes"));
+/**
+ * @openapi
+ * /salud:
+ *   get:
+ *     tags: [Sistema]
+ *     summary: Estado del servicio
+ *     description: >
+ *       Informa version, entorno y estado de la conexion a la base.
+ *       Responde 200 aunque la base este caida; el estado va en el cuerpo.
+ *     responses:
+ *       200:
+ *         description: Estado del servicio
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Salud'
+ */
 /**
  * @description Informa el estado de la API y de la conexion a la base de datos.
  * @param {import("express").Request} req - Request de Express.

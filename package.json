@@ -16,7 +16,8 @@
     "seed": "npx sequelize-cli db:seed:all",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "openapi": "node src/docs/generar.js"
   },
   "keywords": [],
   "author": "",
