@@ -24,6 +24,16 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** El carrito del frontend guarda `{ varianteId, cantidad }`. Nunca precios.
 - **2026-09** Descuento por transferencia: porcentaje único y global, no por producto.
 - **2026-09** El badge de oferta se muestra solo si hay precio anterior mayor al actual.
+- **2026-09** Paleta medida del logo real: lavanda #9084AE, rosa #D89CA8,
+  crema #FAF5EA, dorado #DBB261, salvia #8A9C50. El texto usa #4A4066, un violeta
+  oscuro derivado del lavanda: el del logo da 3.04 de contraste sobre crema y no
+  llega al mínimo para leer. Los valores anteriores (#464BB3 y #D985C7) eran
+  incorrectos, salieron de un JPG de muestra.
+- **2026-09** Tipografías: Cormorant Garamond para títulos y precios, Karla para
+  textos y botones.
+- **2026-09** Los combos son cajas fijas armadas de antemano, no configurables.
+  Cada combo es un producto más, con stock propio.
+- **2026-09** Las categorías son colecciones, no tipos de producto.
 
 ## Infraestructura
 
@@ -87,6 +97,8 @@ nivel 2. Arancel verificado: $8.500 de alta y $8.500 de renovación anual.
     Railway usa certificado autofirmado y la comunicación va por su red privada.
     Si la base se mudara a un proveedor con tráfico por internet, hay que cargar
     su certificado en vez de desactivar la verificación.
+- **2026-09** API en producción: https://velua-api-production.up.railway.app
+  Ruta base `/api/v1`. Migraciones y seed corridos desde la consola de Railway.
 
 ## Imágenes
 

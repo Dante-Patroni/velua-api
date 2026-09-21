@@ -700,6 +700,256 @@
       ]
     },
     {
+      "name": "Autenticacion",
+      "item": [
+        {
+          "name": "POST /auth/login sin datos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Sin mail ni contraseña devuelve DATOS_INVALIDOS con el detalle por campo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const c = pm.response.json();",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(c.error).to.eql('DATOS_INVALIDOS'));",
+                  "pm.test('Indica el campo email', () => pm.expect(c.details).to.have.property('email'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login con mail inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Un mail que no existe da el mismo error que una contrasena incorrecta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"nadie@velua.test\", \"password\": \"lo-que-sea-largo\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Devuelve CREDENCIALES_INVALIDAS', () => pm.expect(pm.response.json().error).to.eql('CREDENCIALES_INVALIDAS'));",
+                  "pm.test('No crea sesion', () => pm.expect(pm.cookies.has('velua_sesion')).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login con contraseña incorrecta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Mismo codigo que el mail inexistente: no se puede distinguir cual fallo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{admin_email}}\", \"password\": \"contrasena-equivocada\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Devuelve el mismo codigo que un mail inexistente', () => pm.expect(pm.response.json().error).to.eql('CREDENCIALES_INVALIDAS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login correcto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Credenciales correctas: sesion en cookie httpOnly, sin token en el cuerpo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{admin_email}}\", \"password\": \"{{admin_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const u = pm.response.json();",
+                  "pm.test('Devuelve el usuario', () => pm.expect(u.email).to.eql(pm.environment.get('admin_email')));",
+                  "pm.test('Trae los permisos', () => pm.expect(u.permisos).to.be.an('array').that.is.not.empty);",
+                  "pm.test('El token NO viaja en el cuerpo', () => {",
+                  "    pm.expect(u).to.not.have.property('token');",
+                  "    pm.expect(JSON.stringify(u)).to.not.match(/eyJ[A-Za-z0-9_-]+\\./);",
+                  "});",
+                  "pm.test('Nunca devuelve el hash', () => pm.expect(u).to.not.have.property('passwordHash'));",
+                  "pm.test('Deja la cookie de sesion', () => pm.expect(pm.cookies.has('velua_sesion')).to.be.true);",
+                  "pm.test('La cookie es httpOnly', () => {",
+                  "    const h = pm.response.headers.get('Set-Cookie') || '';",
+                  "    pm.expect(h.toLowerCase()).to.include('httponly');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/yo con sesion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/yo",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "yo"]
+            },
+            "description": "Con la cookie del login devuelve el usuario."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const u = pm.response.json();",
+                  "pm.test('Es el usuario logueado', () => pm.expect(u.email).to.eql(pm.environment.get('admin_email')));",
+                  "pm.test('No filtra el hash', () => pm.expect(u).to.not.have.property('passwordHash'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Cierra la sesion borrando la cookie."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 204', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /auth/yo despues del logout",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/yo",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "yo"]
+            },
+            "description": "Si el logout funciono, la sesion no existe mas. Si esto da 200, clearCookie no uso las mismas opciones que el login."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Devuelve NO_AUTORIZADO', () => pm.expect(pm.response.json().error).to.eql('NO_AUTORIZADO'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Errores",
       "item": [
         {

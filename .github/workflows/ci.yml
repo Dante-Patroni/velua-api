@@ -19,6 +19,9 @@ jobs:
       DB_DATABASE: velua_test
       JWT_SECRET: secreto_solo_para_ci
       PORT: 3000
+      ADMIN_NOMBRE: Admin de prueba
+      ADMIN_EMAIL: admin@velua.test
+      ADMIN_PASSWORD: clave-solo-para-ci
 
     services:
       mysql:

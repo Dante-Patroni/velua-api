@@ -53,11 +53,13 @@ Route → Controller → Service → Repository (interfaz) → Repository (Seque
 
 No saltar capas salvo justificación fuerte. Los controllers no importan modelos ni repositorios.
 
+**El repositorio devuelve datos crudos.** El mapeo al contrato de la API lo hace el service. Así el panel de administración puede usar los mismos métodos aunque necesite otros campos.
+
 ---
 
 ## 4) Reglas de dominio · leer antes de tocar código
 
-Estas cinco reglas se rompen cuando se aplica la solución más obvia. Son de cumplimiento obligatorio.
+Estas seis reglas se rompen cuando se aplica la solución más obvia. Son de cumplimiento obligatorio.
 
 ### 4.1 Los precios se calculan en un solo lugar
 
@@ -76,11 +78,13 @@ total             = base − ajuste_medio_pago + costo_envio
 
 Redondeo al peso una sola vez, sobre el total. Dinero en `DECIMAL`, jamás en punto flotante.
 
+Los importes se devuelven **como cadena**, tal como los entrega Sequelize: `"8500.00"`. Nada de `parseFloat` ni `toFixed`. Para comparar precios sí se convierte, para devolver no.
+
 ### 4.2 Los estados del pedido solo cambian por su máquina
 
 Ninguna transición se hace con un `update` suelto. Todas pasan por `services/pedidoEstado`, que valida si la transición es legal y emite los efectos: stock, mail, bitácora.
 
-Si hace falta un estado nuevo, se agrega a la máquina, no se esquiva.
+Si hace falta un estado nuevo, se agrega a la máquina, no se esquiva. Las transiciones legales están en `docs/maquina-estados.md`.
 
 ### 4.3 El webhook de pagos es idempotente
 
@@ -116,6 +120,7 @@ Nunca loguear el access token del procesador de pagos ni el payload completo de 
 - No tocar archivos no relacionados.
 - `async/await` con manejo claro de errores.
 - Bajas lógicas, nunca físicas.
+- Los modelos no llevan `defaultScope`. El filtro por `activo` lo hace el repositorio de forma explícita, para que el panel pueda ver los inactivos.
 
 ---
 
@@ -134,13 +139,16 @@ Cada función lleva un bloque JSDoc inmediatamente encima. Aplica a funciones p�
 
 En funciones `async`, usar `Promise<Tipo>` en `@returns`.
 
+ESLint valida esto: `npm run lint` falla si falta un bloque, si un parámetro no está documentado o si el nombre no coincide con la firma.
+
 ---
 
 ## 7) Manejo de errores
 
 Principios:
 
-- Códigos de dominio estables: `STOCK_INSUFICIENTE`, `CUPON_VENCIDO`, `PEDIDO_NO_ENCONTRADO`, `TRANSICION_INVALIDA`.
+- Códigos de dominio estables. Los que ya existen en `errorMapper`: `DATOS_INVALIDOS`, `NO_AUTORIZADO`, `TOKEN_INVALIDO`, `TOKEN_EXPIRADO`, `CREDENCIALES_INVALIDAS`, `SIN_PERMISO`, `USUARIO_INACTIVO`, `NO_ENCONTRADO`, `CONFLICTO_DE_DATOS`, `LIMITE_SUPERADO`, `TRANSICION_INVALIDA`, `PAGO_NO_APROBADO`, `SEGUIMIENTO_REQUERIDO`.
+- Antes de inventar un código nuevo, revisar si alguno de los anteriores sirve. Un mapa con ochenta entradas no lo mantiene nadie.
 - Evitar mensajes libres cuando ya existe un código.
 - Mapeo HTTP centralizado en `errorMapper`.
 - Contrato JSON idéntico en todos los módulos, middlewares incluidos.
@@ -149,7 +157,7 @@ Reglas prácticas:
 
 - En `services`: `throw new Error("CODIGO_DOMINIO")`.
 - En `controllers`: delegar en `manejarErrorHttp`.
-- Validaciones de entrada: `DATOS_INVALIDOS` más `details`.
+- Validaciones de entrada: `DATOS_INVALIDOS` más `details`, como objeto plano por campo: `{ "email": "mensaje" }`.
 
 Contrato:
 
@@ -175,13 +183,23 @@ Operaciones que siempre son transaccionales: checkout, confirmación de pago, ca
 
 ---
 
-## 9) Contrato HTTP
+## 9) Contrato HTTP y OpenAPI
 
 - Prefijo `/api/v1`. Recursos en plural.
-- Paginación: `?pagina=1&limite=20`, respuesta `{ datos: [], meta: { pagina, limite, total } }`.
+- Paginación: `?pagina=1&limite=20`, respuesta `{ datos: [], meta: { pagina, limite, total } }`. El límite tiene tope de 50.
+- Los importes viajan como cadena decimal, nunca como número.
 - JSON de éxito claro y estable.
 - No mezclar `message` y `mensaje` sin criterio.
-- Todo endpoint nuevo se documenta en OpenAPI en el mismo PR. Sin documentación, el PR no se aprueba: el frontend trabaja contra el contrato.
+
+### El contrato se genera, no se escribe
+
+**`docs/openapi.json` es un archivo generado. Nunca se edita a mano.**
+
+La documentación de cada endpoint vive en un comentario `@openapi` en su archivo de rutas. Los componentes reutilizables (esquemas, parámetros, seguridad) viven en `src/docs/definicionBase.js`.
+
+El JSON se produce con `npm run openapi` y **se commitea en el mismo PR** que el endpoint, porque es lo que el frontend consume para generar sus tipos con `openapi-typescript`.
+
+Endpoint nuevo o modificado sin OpenAPI actualizado: el PR no se aprueba.
 
 ---
 
@@ -198,6 +216,10 @@ Cobertura obligatoria, sin excepción:
 - Idempotencia del webhook: la misma notificación dos veces produce un solo efecto.
 - Transiciones ilegales de la máquina de estados.
 - Stock insuficiente y compras concurrentes sobre la última unidad.
+- Que los importes salgan como cadena con dos decimales, no como número.
+- Que no se filtren campos internos en las respuestas: `activo`, `creadoEn`, el stock real de las variantes.
+
+**Los mocks devuelven lo que devuelve el repositorio**, con sus campos internos adentro. Un mock que devuelve datos ya mapeados no prueba el mapeo: el test pasa aunque el service no haga nada.
 
 Si cambiás contrato o comportamiento, actualizá los tests. No se cierra una tarea con tests en rojo. Si algo no se pudo correr, declararlo.
 
@@ -213,14 +235,18 @@ Al cambiar colecciones Postman, assets o scripts:
 
 Las migraciones corren en CI antes de los tests. Nunca `sequelize.sync({ alter: true })`.
 
+Antes de cerrar una tarea, la cadena completa: `npm run lint`, `npm run format`, `npm run openapi`, `npm run test:unit`.
+
 ---
 
 ## 12) Git y versionado
 
 - Commits atómicos y con intención clara: qué cambia y por qué.
 - Ramas de feature o chore. `main` protegida y siempre desplegable.
+- Merge con squash, siempre.
 - No mezclar refactor masivo con bugfix puntual.
 - Todo PR lo revisa la otra persona, aunque el equipo sean dos.
+- Nunca hacer rebase de commits ya pusheados.
 
 ---
 
@@ -229,16 +255,20 @@ Las migraciones corren en CI antes de los tests. Nunca `sequelize.sync({ alter: 
 1. Código implementado y coherente con la arquitectura.
 2. Reglas de dominio de la sección 4 respetadas.
 3. JSDoc en todas las funciones nuevas o modificadas.
-4. Manejo de errores homogéneo.
-5. OpenAPI actualizado si cambió algún endpoint.
-6. Tests relevantes en verde.
+4. Manejo de errores homogéneo, con códigos ya existentes cuando aplica.
+5. OpenAPI regenerado y commiteado si cambió algún endpoint.
+6. `npm run lint` limpio y tests en verde.
 7. Resumen final con archivos modificados, validaciones ejecutadas y riesgos o pendientes.
 
 ---
 
 ## 14) Fuera de alcance por ahora
 
-No implementar sin pedido explícito: cuentas de clientes, tienda mayorista, integración con APIs de correo, facturación automática, blog, lista de deseos, notificación de reposición, tiempo real con WebSockets.
+No implementar sin pedido explícito: cuentas de clientes, tienda mayorista, integración con APIs de correo, facturación automática, blog, lista de deseos, informes avanzados, tiempo real con WebSockets.
+
+**Notificación de reposición.** En el diseño, las tarjetas agotadas tienen un link "Avisarme". Por ahora ese link abre WhatsApp: cuando vuelve el stock, se avisa a mano. No hay tabla de suscripciones ni envío automático.
+
+**Combos configurables.** Se descartó. Los combos son cajas fijas armadas de antemano, o sea productos comunes con su propio stock en la categoría Combos. No hay casilleros ni descuento de stock por componente.
 
 Las tablas pueden existir en el esquema. Los endpoints y pantallas, no.
 
