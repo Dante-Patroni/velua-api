@@ -33,6 +33,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 app.use("/api", limitadorGlobal);
 app.use("/api/v1", require("./routes/catalogoRoutes"));
+app.use("/api/v1", require("./routes/authRoutes"));
 /**
  * @openapi
  * /salud:

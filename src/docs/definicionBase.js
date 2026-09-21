@@ -33,6 +33,10 @@ module.exports = {
       name: "Sistema",
       description: "Estado del servicio",
     },
+    {
+      name: "Autenticacion",
+      description: "Sesion del panel de administracion",
+    },
   ],
   components: {
     parameters: {
@@ -317,6 +321,34 @@ module.exports = {
           },
         },
         required: ["id", "nombre", "slug", "categoria", "imagenes", "variantes", "destacado"],
+      },
+      LoginEntrada: {
+        type: "object",
+        required: ["email", "password"],
+        properties: {
+          email: {
+            type: "string",
+            format: "email",
+            maxLength: 180,
+            example: "duena@veluanature.com.ar",
+          },
+          password: { type: "string", minLength: 1, maxLength: 128 },
+        },
+      },
+      Usuario: {
+        type: "object",
+        required: ["id", "nombre", "email", "rol", "permisos"],
+        properties: {
+          id: { type: "integer", example: 1 },
+          nombre: { type: "string", example: "Dueña de la marca" },
+          email: { type: "string", format: "email" },
+          rol: { type: "string", enum: ["admin", "operador"] },
+          permisos: {
+            type: "array",
+            items: { type: "string" },
+            example: ["CATALOGO_VER", "CATALOGO_EDITAR"],
+          },
+        },
       },
     },
   },

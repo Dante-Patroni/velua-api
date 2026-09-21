@@ -23,6 +23,10 @@
     {
       "name": "Sistema",
       "description": "Estado del servicio"
+    },
+    {
+      "name": "Autenticacion",
+      "description": "Sesion del panel de administracion"
     }
   ],
   "components": {
@@ -76,10 +80,18 @@
           },
           "baseDatos": {
             "type": "string",
-            "enum": ["conectada", "desconectada"]
+            "enum": [
+              "conectada",
+              "desconectada"
+            ]
           }
         },
-        "required": ["estado", "version", "entorno", "baseDatos"]
+        "required": [
+          "estado",
+          "version",
+          "entorno",
+          "baseDatos"
+        ]
       },
       "Error": {
         "type": "object",
@@ -98,7 +110,9 @@
             }
           }
         },
-        "required": ["error"]
+        "required": [
+          "error"
+        ]
       },
       "Meta": {
         "type": "object",
@@ -117,7 +131,11 @@
             "example": 47
           }
         },
-        "required": ["pagina", "limite", "total"]
+        "required": [
+          "pagina",
+          "limite",
+          "total"
+        ]
       },
       "Categoria": {
         "type": "object",
@@ -145,7 +163,11 @@
             "format": "uri"
           }
         },
-        "required": ["id", "nombre", "slug"]
+        "required": [
+          "id",
+          "nombre",
+          "slug"
+        ]
       },
       "Imagen": {
         "type": "object",
@@ -159,7 +181,9 @@
             "nullable": true
           }
         },
-        "required": ["url"]
+        "required": [
+          "url"
+        ]
       },
       "Variante": {
         "type": "object",
@@ -194,7 +218,12 @@
             "description": "Si la variante tiene unidades disponibles."
           }
         },
-        "required": ["id", "nombre", "precio", "hayStock"]
+        "required": [
+          "id",
+          "nombre",
+          "precio",
+          "hayStock"
+        ]
       },
       "ProductoListado": {
         "type": "object",
@@ -246,7 +275,15 @@
             "type": "boolean"
           }
         },
-        "required": ["id", "nombre", "slug", "categoria", "precioDesde", "hayStock", "destacado"]
+        "required": [
+          "id",
+          "nombre",
+          "slug",
+          "categoria",
+          "precioDesde",
+          "hayStock",
+          "destacado"
+        ]
       },
       "ProductoDetalle": {
         "type": "object",
@@ -303,14 +340,85 @@
             "minItems": 1
           }
         },
-        "required": ["id", "nombre", "slug", "categoria", "imagenes", "variantes", "destacado"]
+        "required": [
+          "id",
+          "nombre",
+          "slug",
+          "categoria",
+          "imagenes",
+          "variantes",
+          "destacado"
+        ]
+      },
+      "LoginEntrada": {
+        "type": "object",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 180,
+            "example": "duena@veluanature.com.ar"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "Usuario": {
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "email",
+          "rol",
+          "permisos"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Dueña de la marca"
+          },
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "rol": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "operador"
+            ]
+          },
+          "permisos": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "example": [
+              "CATALOGO_VER",
+              "CATALOGO_EDITAR"
+            ]
+          }
+        }
       }
     }
   },
   "paths": {
     "/categorias": {
       "get": {
-        "tags": ["Catalogo"],
+        "tags": [
+          "Catalogo"
+        ],
         "summary": "Listar categorias activas",
         "description": "Devuelve las categorias activas ordenadas por su campo de orden. Sin paginacion: son pocas y se usan para armar el menu.\n",
         "responses": {
@@ -320,7 +428,9 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": ["datos"],
+                  "required": [
+                    "datos"
+                  ],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -338,7 +448,9 @@
     },
     "/productos": {
       "get": {
-        "tags": ["Catalogo"],
+        "tags": [
+          "Catalogo"
+        ],
         "summary": "Listar productos",
         "description": "Listado paginado y liviano, pensado para la grilla del catalogo. Incluye el precio minimo entre las variantes activas, si hay stock, y solo la imagen principal.\n\nPara los datos completos de un producto, usar el detalle por slug.\n",
         "parameters": [
@@ -384,7 +496,12 @@
             "description": "Criterio de ordenamiento. `defecto`: orden de categoria y despues alfabetico. `precio_asc` / `precio_desc`: por precio minimo de variante activa. `mas_vendidos`: declarado en el contrato pero no implementado todavia; hasta que existan ventas reales devuelve el orden por defecto.\n",
             "schema": {
               "type": "string",
-              "enum": ["defecto", "precio_asc", "precio_desc", "mas_vendidos"],
+              "enum": [
+                "defecto",
+                "precio_asc",
+                "precio_desc",
+                "mas_vendidos"
+              ],
               "default": "defecto"
             }
           }
@@ -396,7 +513,10 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": ["datos", "meta"],
+                  "required": [
+                    "datos",
+                    "meta"
+                  ],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -433,7 +553,9 @@
     },
     "/productos/{slug}": {
       "get": {
-        "tags": ["Catalogo"],
+        "tags": [
+          "Catalogo"
+        ],
         "summary": "Detalle de un producto",
         "description": "Ficha completa: todas las variantes activas, todas las imagenes, ingredientes y modo de uso.\n\nSe busca por slug y no por id porque el slug es lo que va en la URL publica y en los links que se comparten.\n",
         "parameters": [
@@ -475,9 +597,144 @@
         }
       }
     },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Autenticacion"
+        ],
+        "summary": "Iniciar sesion en el panel",
+        "description": "Verifica las credenciales y deja la sesion en una cookie httpOnly llamada velua_sesion. El token nunca viaja en el cuerpo de la respuesta. Limitado a 10 intentos cada 15 minutos por IP.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesion iniciada. La cookie viene en el encabezado Set-Cookie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos invalidos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Mail o contraseña incorrectos. No se distingue cual de los dos.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "CREDENCIALES_INVALIDAS"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Usuario desactivado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "USUARIO_INACTIVO"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiados intentos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "LIMITE_SUPERADO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Autenticacion"
+        ],
+        "summary": "Cerrar sesion",
+        "description": "Borra la cookie de sesion. Responde 204 aunque no hubiera sesion.",
+        "responses": {
+          "204": {
+            "description": "Sesion cerrada"
+          }
+        }
+      }
+    },
+    "/auth/yo": {
+      "get": {
+        "tags": [
+          "Autenticacion"
+        ],
+        "summary": "Usuario de la sesion actual",
+        "description": "Devuelve el usuario logueado con sus permisos. El frontend lo usa para saber si hay sesion y que mostrar. Verifica que el usuario siga activo, aunque el token todavia no haya expirado.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Usuario de la sesion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Usuario"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin sesion, token invalido o expirado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "TOKEN_EXPIRADO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/salud": {
       "get": {
-        "tags": ["Sistema"],
+        "tags": [
+          "Sistema"
+        ],
         "summary": "Estado del servicio",
         "description": "Informa version, entorno y estado de la conexion a la base. Responde 200 aunque la base este caida; el estado va en el cuerpo.\n",
         "responses": {
