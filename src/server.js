@@ -11,9 +11,11 @@ const iniciar = async () => {
   try {
     await sequelize.authenticate();
     app.listen(PORT, () => {
+      // eslint-disable-next-line no-console
       console.log(`Velua API escuchando en el puerto ${PORT}`);
     });
   } catch (error) {
+    // eslint-disable-next-line no-console
     console.error("Error fatal al iniciar el servidor:", error.message);
     process.exit(1);
   }

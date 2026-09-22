@@ -11,7 +11,7 @@
       "description": "Desarrollo"
     },
     {
-      "url": "https://api.velua.com.ar/api/v1",
+      "url": "https://velua-api-production.up.railway.app/api/v1",
       "description": "Produccion"
     }
   ],
@@ -27,6 +27,10 @@
     {
       "name": "Autenticacion",
       "description": "Sesion del panel de administracion"
+    },
+    {
+      "name": "Admin - Categorias",
+      "description": "Gestion de categorias desde el panel"
     }
   ],
   "components": {
@@ -40,6 +44,16 @@
           "type": "integer",
           "minimum": 1,
           "default": 1
+        }
+      },
+      "IdRuta": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Id del recurso.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "Limite": {
@@ -227,7 +241,7 @@
       },
       "ProductoListado": {
         "type": "object",
-        "description": "Version liviana para la grilla. No trae variantes ni el resto de las imagenes.",
+        "description": "Imagen principal: la primera segun su orden. Null si el producto todavia no tiene fotos.",
         "properties": {
           "id": {
             "type": "integer",
@@ -408,6 +422,181 @@
               "CATALOGO_VER",
               "CATALOGO_EDITAR"
             ]
+          }
+        }
+      },
+      "CategoriaAdmin": {
+        "type": "object",
+        "description": "Categoria vista desde el panel. Incluye las inactivas.",
+        "required": [
+          "id",
+          "nombre",
+          "slug",
+          "orden",
+          "activa",
+          "cantidadProductos"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 5
+          },
+          "nombre": {
+            "type": "string",
+            "example": "L’Art du Savon"
+          },
+          "slug": {
+            "type": "string",
+            "example": "art-du-savon"
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "imagenUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "orden": {
+            "type": "integer",
+            "example": 2
+          },
+          "activa": {
+            "type": "boolean"
+          },
+          "cantidadProductos": {
+            "type": "integer",
+            "description": "Productos activos de la categoria. Desactivarla los oculta a todos de la tienda.",
+            "example": 6
+          }
+        }
+      },
+      "CategoriaEntrada": {
+        "type": "object",
+        "required": [
+          "nombre"
+        ],
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "example": "Shampoo Sólido"
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true,
+            "description": "Opcional. Si no viene se genera del nombre. Si viene y esta tomado, se rechaza."
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "imagenUrl": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 500,
+            "nullable": true
+          }
+        }
+      },
+      "CategoriaCambios": {
+        "type": "object",
+        "description": "Solo se modifican los campos que vienen. Cambiar el nombre no cambia el slug.",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 80,
+            "nullable": true
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "imagenUrl": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 500,
+            "nullable": true
+          }
+        }
+      }
+    },
+    "responses": {
+      "DatosInvalidos": {
+        "description": "Datos invalidos. details trae un mensaje por campo.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "DATOS_INVALIDOS",
+              "details": {
+                "nombre": "El nombre es obligatorio"
+              }
+            }
+          }
+        }
+      },
+      "NoAutorizado": {
+        "description": "Sin sesion, token invalido o expirado.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "NO_AUTORIZADO"
+            }
+          }
+        }
+      },
+      "SinPermiso": {
+        "description": "La sesion es valida pero el rol no tiene el permiso requerido.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "SIN_PERMISO"
+            }
+          }
+        }
+      },
+      "NoEncontrado": {
+        "description": "No existe un recurso con ese id.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "NO_ENCONTRADO"
+            }
+          }
+        }
+      },
+      "Conflicto": {
+        "description": "El slug ya esta en uso.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "CONFLICTO_DE_DATOS"
+            }
           }
         }
       }
@@ -726,6 +915,318 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/admin/categorias": {
+      "get": {
+        "tags": [
+          "Admin - Categorias"
+        ],
+        "summary": "Listar todas las categorias",
+        "description": "Incluye las inactivas. Cada una trae cuantos productos activos tiene, para poder avisar antes de desactivarla: desactivar una categoria oculta todos sus productos de la tienda.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Categorias ordenadas por su campo orden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "datos"
+                  ],
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CategoriaAdmin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin - Categorias"
+        ],
+        "summary": "Crear una categoria",
+        "description": "Si no se indica slug, se genera del nombre y se le agrega un sufijo si ya existe. Si se indica a mano y esta tomado, se rechaza con CONFLICTO_DE_DATOS. La categoria nueva queda activa y al final del menu.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoriaEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Categoria creada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflicto"
+          }
+        }
+      }
+    },
+    "/admin/categorias/orden": {
+      "put": {
+        "tags": [
+          "Admin - Categorias"
+        ],
+        "summary": "Reordenar el menu",
+        "description": "Recibe los ids de TODAS las categorias en el orden deseado. Se rechaza una lista con faltantes, repetidos o ids desconocidos: un orden parcial dejaria dos categorias en la misma posicion.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "example": [
+                      6,
+                      4,
+                      5
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Categorias en el orden nuevo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CategoriaAdmin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          }
+        }
+      }
+    },
+    "/admin/categorias/{id}": {
+      "get": {
+        "tags": [
+          "Admin - Categorias"
+        ],
+        "summary": "Obtener una categoria",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Categoria",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaAdmin"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin - Categorias"
+        ],
+        "summary": "Editar una categoria",
+        "description": "Solo se modifican los campos que vienen. Cambiar el nombre NO cambia el slug: para cambiar la URL hay que editar el slug a proposito. Si la categoria esta activa, el panel tiene que avisar que los links anteriores dejan de funcionar.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CategoriaCambios"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Categoria actualizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflicto"
+          }
+        }
+      }
+    },
+    "/admin/categorias/{id}/estado": {
+      "patch": {
+        "tags": [
+          "Admin - Categorias"
+        ],
+        "summary": "Activar o desactivar una categoria",
+        "description": "Desactivar una categoria oculta de la tienda TODOS sus productos, aunque cada uno siga activo. La respuesta incluye cantidadProductos, y el panel tiene que informarlo antes de confirmar.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "activa"
+                ],
+                "properties": {
+                  "activa": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Categoria con su estado nuevo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CategoriaAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
           }
         }
       }

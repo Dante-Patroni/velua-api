@@ -20,7 +20,7 @@ module.exports = {
       description: "Desarrollo",
     },
     {
-      url: "https://api.velua.com.ar/api/v1",
+      url: "https://velua-api-production.up.railway.app/api/v1",
       description: "Produccion",
     },
   ],
@@ -37,6 +37,7 @@ module.exports = {
       name: "Autenticacion",
       description: "Sesion del panel de administracion",
     },
+    { name: "Admin - Categorias", description: "Gestion de categorias desde el panel" },
   ],
   components: {
     parameters: {
@@ -50,6 +51,13 @@ module.exports = {
           minimum: 1,
           default: 1,
         },
+      },
+      IdRuta: {
+        name: "id",
+        in: "path",
+        required: true,
+        description: "Id del recurso.",
+        schema: { type: "integer", minimum: 1 },
       },
       Limite: {
         name: "limite",
@@ -214,7 +222,7 @@ module.exports = {
       ProductoListado: {
         type: "object",
         description:
-          "Version liviana para la grilla. No trae variantes ni el resto de las imagenes.",
+          "Imagen principal: la primera segun su orden. Null si el producto todavia no tiene fotos.",
         properties: {
           id: {
             type: "integer",
@@ -347,6 +355,100 @@ module.exports = {
             type: "array",
             items: { type: "string" },
             example: ["CATALOGO_VER", "CATALOGO_EDITAR"],
+          },
+        },
+      },
+      CategoriaAdmin: {
+        type: "object",
+        description: "Categoria vista desde el panel. Incluye las inactivas.",
+        required: ["id", "nombre", "slug", "orden", "activa", "cantidadProductos"],
+        properties: {
+          id: { type: "integer", example: 5 },
+          nombre: { type: "string", example: "L’Art du Savon" },
+          slug: { type: "string", example: "art-du-savon" },
+          descripcion: { type: "string", nullable: true },
+          imagenUrl: { type: "string", format: "uri", nullable: true },
+          orden: { type: "integer", example: 2 },
+          activa: { type: "boolean" },
+          cantidadProductos: {
+            type: "integer",
+            description:
+              "Productos activos de la categoria. Desactivarla los oculta a todos de la tienda.",
+            example: 6,
+          },
+        },
+      },
+      CategoriaEntrada: {
+        type: "object",
+        required: ["nombre"],
+        properties: {
+          nombre: { type: "string", minLength: 1, maxLength: 80, example: "Shampoo Sólido" },
+          slug: {
+            type: "string",
+            maxLength: 80,
+            nullable: true,
+            description:
+              "Opcional. Si no viene se genera del nombre. Si viene y esta tomado, se rechaza.",
+          },
+          descripcion: { type: "string", maxLength: 300, nullable: true },
+          imagenUrl: { type: "string", format: "uri", maxLength: 500, nullable: true },
+        },
+      },
+      CategoriaCambios: {
+        type: "object",
+        description:
+          "Solo se modifican los campos que vienen. Cambiar el nombre no cambia el slug.",
+        properties: {
+          nombre: { type: "string", minLength: 1, maxLength: 80 },
+          slug: { type: "string", maxLength: 80, nullable: true },
+          descripcion: { type: "string", maxLength: 300, nullable: true },
+          imagenUrl: { type: "string", format: "uri", maxLength: 500, nullable: true },
+        },
+      },
+    },
+    responses: {
+      DatosInvalidos: {
+        description: "Datos invalidos. details trae un mensaje por campo.",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/Error" },
+            example: { error: "DATOS_INVALIDOS", details: { nombre: "El nombre es obligatorio" } },
+          },
+        },
+      },
+      NoAutorizado: {
+        description: "Sin sesion, token invalido o expirado.",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/Error" },
+            example: { error: "NO_AUTORIZADO" },
+          },
+        },
+      },
+      SinPermiso: {
+        description: "La sesion es valida pero el rol no tiene el permiso requerido.",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/Error" },
+            example: { error: "SIN_PERMISO" },
+          },
+        },
+      },
+      NoEncontrado: {
+        description: "No existe un recurso con ese id.",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/Error" },
+            example: { error: "NO_ENCONTRADO" },
+          },
+        },
+      },
+      Conflicto: {
+        description: "El slug ya esta en uso.",
+        content: {
+          "application/json": {
+            schema: { $ref: "#/components/schemas/Error" },
+            example: { error: "CONFLICTO_DE_DATOS" },
           },
         },
       },

@@ -34,6 +34,9 @@ export default [
   {
     files: ["tests/**/*.js", "**/*.test.js"],
     languageOptions: { globals: { ...globals.jest } },
+    rules: {
+      "require-await": "off",
+    },
   },
 
   {

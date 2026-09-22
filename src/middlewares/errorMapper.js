@@ -13,6 +13,7 @@ const ERROR_HTTP_MAP = {
   // 403
   SIN_PERMISO: 403,
   USUARIO_INACTIVO: 403,
+  ORIGEN_NO_PERMITIDO: 403,
 
   // 404
   NO_ENCONTRADO: 404,
@@ -53,6 +54,7 @@ function manejarErrorHttp(error, res) {
   if (status === 500) {
     // OJO: nunca loguear el error crudo de un proveedor de pagos.
     // Puede traer el access token o el payload completo. Ver AGENTS.md 4.6.
+    // eslint-disable-next-line no-console
     console.error(error);
     return res.status(500).json({ error: "ERROR_INTERNO" });
   }
