@@ -950,6 +950,514 @@
       ]
     },
     {
+      "name": "Admin - Categorias",
+      "item": [
+        {
+          "name": "POST /auth/login (entrar al panel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "El grupo hace su propio login para no depender del orden de los demas grupos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\": \"{{admin_email}}\", \"password\": \"{{admin_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Tiene permiso de editar catalogo', () => {",
+                  "    pm.expect(pm.response.json().permisos).to.include('CATALOGO_EDITAR');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/categorias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias"]
+            },
+            "description": "El panel ve todas las categorias, tambien las inactivas, con su cantidad de productos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "",
+                  "pm.test('Hay categorias', () => pm.expect(d.length).to.be.above(0));",
+                  "",
+                  "pm.test('Cada una trae los campos del panel', () => {",
+                  "    d.forEach((c) => {",
+                  "        pm.expect(c).to.have.property('orden');",
+                  "        pm.expect(c).to.have.property('activa');",
+                  "        pm.expect(c).to.have.property('cantidadProductos');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('activa es booleano y cantidadProductos numero', () => {",
+                  "    pm.expect(d[0].activa).to.be.a('boolean');",
+                  "    pm.expect(d[0].cantidadProductos).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('Vienen ordenadas por orden', () => {",
+                  "    const ordenes = d.map((c) => c.orden);",
+                  "    for (let i = 1; i < ordenes.length; i++) {",
+                  "        pm.expect(ordenes[i]).to.be.at.least(ordenes[i - 1]);",
+                  "    }",
+                  "});",
+                  "",
+                  "// Guarda un slug existente para probar el conflicto mas adelante",
+                  "pm.collectionVariables.set('slug_ocupado', d[0].slug);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/categorias (crear)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias"]
+            },
+            "description": "Crea una categoria de prueba con nombre unico, para poder correr la coleccion muchas veces.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"{{nombre_prueba}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Nombre unico por corrida: la coleccion se puede repetir sin chocar",
+                  "const marca = Date.now();",
+                  "const nombre = 'Prueba Newman ' + marca;",
+                  "pm.collectionVariables.set('nombre_prueba', nombre);",
+                  "pm.collectionVariables.set('slug_esperado', 'prueba-newman-' + marca);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const c = pm.response.json();",
+                  "",
+                  "pm.test('Genera el slug del nombre', () => {",
+                  "    pm.expect(c.slug).to.eql(pm.collectionVariables.get('slug_esperado'));",
+                  "});",
+                  "pm.test('Queda activa', () => pm.expect(c.activa).to.be.true);",
+                  "pm.test('Arranca sin productos', () => pm.expect(c.cantidadProductos).to.eql(0));",
+                  "pm.test('Queda al final del menu', () => pm.expect(c.orden).to.be.above(0));",
+                  "",
+                  "pm.collectionVariables.set('categoria_id', c.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/categorias/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias/{{categoria_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias", "{{categoria_id}}"]
+            },
+            "description": "Lee la categoria recien creada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Es la que se creo', () => {",
+                  "    pm.expect(pm.response.json().id).to.eql(Number(pm.collectionVariables.get('categoria_id')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /admin/categorias/{id} (editar)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias/{{categoria_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias", "{{categoria_id}}"]
+            },
+            "description": "Cambiar el nombre NO cambia el slug: si se regenerara, se romperian los links publicados.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\": \"Prueba Newman editada\", \"descripcion\": \"Editada por la coleccion\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "",
+                  "pm.test('Cambio el nombre', () => pm.expect(c.nombre).to.eql('Prueba Newman editada'));",
+                  "pm.test('El slug NO cambio', () => {",
+                  "    pm.expect(c.slug).to.eql(pm.collectionVariables.get('slug_esperado'));",
+                  "});",
+                  "pm.test('Guardo la descripcion', () => pm.expect(c.descripcion).to.eql('Editada por la coleccion'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/categorias con slug tomado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias"]
+            },
+            "description": "Un slug elegido a mano que ya existe se rechaza. No se le agrega sufijo: la URL no seria la pedida.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Choque de slug\",\n  \"slug\": \"{{slug_ocupado}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Devuelve CONFLICTO_DE_DATOS', () => {",
+                  "    pm.expect(pm.response.json().error).to.eql('CONFLICTO_DE_DATOS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/categorias sin nombre",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias"]
+            },
+            "description": "El nombre es obligatorio al crear.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"descripcion\": \"Sin nombre\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const c = pm.response.json();",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(c.error).to.eql('DATOS_INVALIDOS'));",
+                  "pm.test('Indica el campo nombre', () => pm.expect(c.details).to.have.property('nombre'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /admin/categorias/orden con lista parcial",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias/orden",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias", "orden"]
+            },
+            "description": "Un orden parcial dejaria dos categorias en la misma posicion: se rechaza.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [{{categoria_id}}]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => {",
+                  "    pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /admin/categorias/{id}/estado (desactivar)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias/{{categoria_id}}/estado",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias", "{{categoria_id}}", "estado"]
+            },
+            "description": "Deja la categoria de prueba desactivada para que no aparezca en la tienda.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"activa\": false}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test('Queda desactivada', () => pm.expect(c.activa).to.be.false);",
+                  "pm.test('Informa cuantos productos se ocultan', () => {",
+                  "    pm.expect(c.cantidadProductos).to.be.a('number');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH estado con valor invalido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias/{{categoria_id}}/estado",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias", "{{categoria_id}}", "estado"]
+            },
+            "description": "El estado tiene que ser un booleano, no un texto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"activa\": \"si\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo activa', () => {",
+                  "    pm.expect(pm.response.json().details).to.have.property('activa');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/categorias/{id} inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias/99999",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias", "99999"]
+            },
+            "description": "Un id que no existe devuelve 404 con el codigo de dominio."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Devuelve NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (salir del panel)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Cierra la sesion para verificar que el panel queda cerrado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 204', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/categorias sin sesion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias"]
+            },
+            "description": "Sin cookie, el panel esta cerrado. Si esto da 200, las rutas quedaron sin proteger."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Devuelve NO_AUTORIZADO', () => pm.expect(pm.response.json().error).to.eql('NO_AUTORIZADO'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Errores",
       "item": [
         {
@@ -988,6 +1496,22 @@
     },
     {
       "key": "total_productos",
+      "value": ""
+    },
+    {
+      "key": "slug_ocupado",
+      "value": ""
+    },
+    {
+      "key": "categoria_id",
+      "value": ""
+    },
+    {
+      "key": "nombre_prueba",
+      "value": ""
+    },
+    {
+      "key": "slug_esperado",
       "value": ""
     }
   ]

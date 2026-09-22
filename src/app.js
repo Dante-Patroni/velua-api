@@ -34,6 +34,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.use("/api", limitadorGlobal);
 app.use("/api/v1", require("./routes/catalogoRoutes"));
 app.use("/api/v1", require("./routes/authRoutes"));
+app.use("/api/v1", require("./routes/adminCategoriasRoutes"));
 /**
  * @openapi
  * /salud:
@@ -77,5 +78,31 @@ const salud = async (req, res) => {
 };
 
 app.get("/api/v1/salud", salud);
+
+const { manejarErrorHttp } = require("./middlewares/errorMapper");
+
+/**
+ * @description Responde NO_ENCONTRADO en el contrato del proyecto para
+ * cualquier ruta que no exista, en vez de la página HTML de Express.
+ * @param {import("express").Request} req - Request de Express.
+ * @param {import("express").Response} res - Response de Express.
+ * @returns {import("express").Response} Respuesta 404.
+ */
+const rutaInexistente = (req, res) => res.status(404).json({ error: "NO_ENCONTRADO" });
+
+/**
+ * @description Manejador final de errores. Captura lo que falla fuera de los
+ * controllers, como el rechazo de CORS, y lo traduce al contrato del proyecto.
+ * Sin esto, Express responde HTML con la traza completa.
+ * @param {Error} error - Error propagado.
+ * @param {import("express").Request} req - Request de Express.
+ * @param {import("express").Response} res - Response de Express.
+ * @param {import("express").NextFunction} _next - Requerido por Express para reconocerlo como manejador de errores.
+ * @returns {import("express").Response} Respuesta con el contrato de error.
+ */
+const manejadorFinal = (error, req, res, _next) => manejarErrorHttp(error, res);
+
+app.use(rutaInexistente);
+app.use(manejadorFinal);
 
 module.exports = app;
