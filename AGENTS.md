@@ -147,7 +147,7 @@ ESLint valida esto: `npm run lint` falla si falta un bloque, si un parámetro no
 
 Principios:
 
-- Códigos de dominio estables. Los que ya existen en `errorMapper`: `DATOS_INVALIDOS`, `NO_AUTORIZADO`, `TOKEN_INVALIDO`, `TOKEN_EXPIRADO`, `CREDENCIALES_INVALIDAS`, `SIN_PERMISO`, `USUARIO_INACTIVO`, `NO_ENCONTRADO`, `CONFLICTO_DE_DATOS`, `LIMITE_SUPERADO`, `TRANSICION_INVALIDA`, `PAGO_NO_APROBADO`, `SEGUIMIENTO_REQUERIDO`.
+- Códigos de dominio estables. Los que ya existen en `errorMapper`: `DATOS_INVALIDOS`, `NO_AUTORIZADO`, `TOKEN_INVALIDO`, `TOKEN_EXPIRADO`, `CREDENCIALES_INVALIDAS`, `SIN_PERMISO`, `USUARIO_INACTIVO`, `NO_ENCONTRADO`, `CONFLICTO_DE_DATOS`, `LIMITE_SUPERADO`, `TRANSICION_INVALIDA`, `PAGO_NO_APROBADO`, `SEGUIMIENTO_REQUERIDO`, `SIN_VARIANTES`, `ULTIMA_VARIANTE_ACTIVA`.
 - Antes de inventar un código nuevo, revisar si alguno de los anteriores sirve. Un mapa con ochenta entradas no lo mantiene nadie.
 - Evitar mensajes libres cuando ya existe un código.
 - Mapeo HTTP centralizado en `errorMapper`.

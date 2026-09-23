@@ -4,6 +4,9 @@ const ERROR_HTTP_MAP = {
   TRANSICION_INVALIDA: 400,
   PAGO_NO_APROBADO: 400,
   SEGUIMIENTO_REQUERIDO: 400,
+  SIN_VARIANTES: 400,
+  ULTIMA_VARIANTE_ACTIVA: 400,
+  JSON_INVALIDO: 400,
 
   // 401
   NO_AUTORIZADO: 401,
@@ -36,6 +39,10 @@ function obtenerCodigoError(error) {
 
   if (typeof error.message === "string" && error.message.trim()) {
     return error.message.trim();
+  }
+
+  if (error.type === "entity.parse.failed") {
+    return "JSON_INVALIDO";
   }
 
   return "ERROR_INTERNO";

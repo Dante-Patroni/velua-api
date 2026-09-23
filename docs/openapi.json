@@ -31,6 +31,10 @@
     {
       "name": "Admin - Categorias",
       "description": "Gestion de categorias desde el panel"
+    },
+    {
+      "name": "Admin - Productos",
+      "description": "Gestion de productos y variantes desde el panel"
     }
   ],
   "components": {
@@ -51,6 +55,16 @@
         "in": "path",
         "required": true,
         "description": "Id del recurso.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "VarianteIdRuta": {
+        "name": "varianteId",
+        "in": "path",
+        "required": true,
+        "description": "Id de la variante dentro del producto.",
         "schema": {
           "type": "integer",
           "minimum": 1
@@ -529,6 +543,397 @@
             "nullable": true
           }
         }
+      },
+      "VarianteAdmin": {
+        "type": "object",
+        "description": "Variante vista desde el panel. A diferencia de la tienda, expone el stock real.",
+        "required": [
+          "id",
+          "nombre",
+          "precio",
+          "stock",
+          "activa"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 10
+          },
+          "nombre": {
+            "type": "string",
+            "example": "100 g"
+          },
+          "sku": {
+            "type": "string",
+            "nullable": true,
+            "example": "VEL-ECLAT-NOIR"
+          },
+          "precio": {
+            "type": "string",
+            "description": "Cadena decimal.",
+            "example": "8500.00"
+          },
+          "precioAnterior": {
+            "type": "string",
+            "nullable": true,
+            "example": "9900.00"
+          },
+          "stock": {
+            "type": "integer",
+            "example": 12
+          },
+          "pesoGramos": {
+            "type": "integer",
+            "nullable": true,
+            "example": 100
+          },
+          "activa": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ImagenAdmin": {
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "orden"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 3
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "alt": {
+            "type": "string",
+            "nullable": true
+          },
+          "orden": {
+            "type": "integer",
+            "example": 0
+          }
+        }
+      },
+      "ProductoAdminFila": {
+        "type": "object",
+        "description": "Fila de la grilla del panel, con los totales resumidos.",
+        "required": [
+          "id",
+          "nombre",
+          "slug",
+          "activo",
+          "destacado",
+          "cantidadVariantes",
+          "stockTotal",
+          "cantidadImagenes"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 7
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Éclat Noir"
+          },
+          "slug": {
+            "type": "string",
+            "example": "eclat-noir"
+          },
+          "descripcionCorta": {
+            "type": "string",
+            "nullable": true
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "destacado": {
+            "type": "boolean"
+          },
+          "categoria": {
+            "$ref": "#/components/schemas/Categoria"
+          },
+          "cantidadVariantes": {
+            "type": "integer",
+            "description": "Variantes activas.",
+            "example": 2
+          },
+          "precioDesde": {
+            "type": "string",
+            "nullable": true,
+            "example": "8500.00"
+          },
+          "stockTotal": {
+            "type": "integer",
+            "description": "Suma del stock de las variantes activas.",
+            "example": 20
+          },
+          "cantidadImagenes": {
+            "type": "integer",
+            "example": 3
+          }
+        }
+      },
+      "ProductoAdmin": {
+        "type": "object",
+        "description": "Ficha completa del producto en el panel, con todas sus variantes e imagenes.",
+        "required": [
+          "id",
+          "nombre",
+          "slug",
+          "activo",
+          "destacado",
+          "variantes",
+          "imagenes"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 7
+          },
+          "nombre": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "descripcionCorta": {
+            "type": "string",
+            "nullable": true
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "ingredientes": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoUso": {
+            "type": "string",
+            "nullable": true
+          },
+          "activo": {
+            "type": "boolean"
+          },
+          "destacado": {
+            "type": "boolean"
+          },
+          "categoria": {
+            "$ref": "#/components/schemas/Categoria"
+          },
+          "variantes": {
+            "type": "array",
+            "description": "Todas, activas e inactivas.",
+            "items": {
+              "$ref": "#/components/schemas/VarianteAdmin"
+            }
+          },
+          "imagenes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ImagenAdmin"
+            }
+          }
+        }
+      },
+      "VarianteEntrada": {
+        "type": "object",
+        "required": [
+          "nombre",
+          "precio"
+        ],
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 80,
+            "example": "100 g"
+          },
+          "sku": {
+            "type": "string",
+            "maxLength": 60,
+            "nullable": true
+          },
+          "precio": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "description": "Se acepta con punto o coma. Se guarda con dos decimales.",
+            "example": "8500"
+          },
+          "precioAnterior": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "nullable": true,
+            "description": "Tiene que ser MAYOR que precio. Si fuera igual o menor, la oferta seria de cero por ciento.",
+            "example": "9900"
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 0
+          },
+          "pesoGramos": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          }
+        }
+      },
+      "VarianteCambios": {
+        "type": "object",
+        "description": "Solo se modifican los campos que vienen.",
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "sku": {
+            "type": "string",
+            "maxLength": 60,
+            "nullable": true
+          },
+          "precio": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "precioAnterior": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "nullable": true,
+            "description": "En null quita la oferta."
+          },
+          "stock": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "pesoGramos": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true
+          }
+        }
+      },
+      "ProductoEntrada": {
+        "type": "object",
+        "required": [
+          "categoriaId",
+          "nombre",
+          "variantes"
+        ],
+        "properties": {
+          "categoriaId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 160,
+            "nullable": true,
+            "description": "Opcional. Si no viene se genera del nombre. Si viene y esta tomado, se rechaza."
+          },
+          "descripcionCorta": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "ingredientes": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoUso": {
+            "type": "string",
+            "nullable": true
+          },
+          "destacado": {
+            "type": "boolean",
+            "default": false
+          },
+          "variantes": {
+            "type": "array",
+            "minItems": 1,
+            "description": "Al menos una. El esquema no admite productos sin variantes.",
+            "items": {
+              "$ref": "#/components/schemas/VarianteEntrada"
+            }
+          }
+        }
+      },
+      "ProductoCambios": {
+        "type": "object",
+        "description": "Solo se modifican los campos que vienen. No toca las variantes.",
+        "properties": {
+          "categoriaId": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 140
+          },
+          "slug": {
+            "type": "string",
+            "maxLength": 160,
+            "nullable": true
+          },
+          "descripcionCorta": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "descripcion": {
+            "type": "string",
+            "nullable": true
+          },
+          "ingredientes": {
+            "type": "string",
+            "nullable": true
+          },
+          "modoUso": {
+            "type": "string",
+            "nullable": true
+          },
+          "destacado": {
+            "type": "boolean"
+          }
+        }
       }
     },
     "responses": {
@@ -915,6 +1320,529 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/admin/productos": {
+      "get": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Listar productos para la grilla del panel",
+        "description": "Incluye los inactivos. Cada fila trae cuantas variantes activas tiene, el precio minimo, el stock total y cuantas imagenes cargadas, para poder ver de un vistazo que falta completar.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Pagina"
+          },
+          {
+            "$ref": "#/components/parameters/Limite"
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "description": "Busca en nombre y slug.",
+            "schema": {
+              "type": "string",
+              "maxLength": 80
+            }
+          },
+          {
+            "in": "query",
+            "name": "categoriaId",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "todos",
+                "activos",
+                "inactivos"
+              ],
+              "default": "todos"
+            }
+          },
+          {
+            "in": "query",
+            "name": "orden",
+            "description": "`recientes` es el orden por defecto. `stock` ordena de menor a mayor stock total, que es lo util para ver que hay que reponer.\n",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recientes",
+                "nombre",
+                "stock"
+              ],
+              "default": "recientes"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Productos paginados",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "datos",
+                    "meta"
+                  ],
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ProductoAdminFila"
+                      }
+                    },
+                    "meta": {
+                      "$ref": "#/components/schemas/Meta"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Crear un producto con sus variantes",
+        "description": "El producto y sus variantes se crean juntos en una transaccion: el esquema exige al menos una variante, asi que un producto sin ellas quedaria invalido.\n\nReglas de importes: se aceptan con punto o coma y se guardan con dos decimales. `precioAnterior` tiene que ser MAYOR que `precio`; si fuera igual o menor, la tienda mostraria un descuento de cero por ciento.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductoEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Producto creado, con su ficha completa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos invalidos, o SIN_VARIANTES si no se cargo ninguna. En DATOS_INVALIDOS, details indica el campo con la posicion dentro de la lista, por ejemplo \"variantes[1].precio\".\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "DATOS_INVALIDOS",
+                  "details": {
+                    "variantes[1].precioAnterior": "Tiene que ser mayor que el precio actual"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflicto"
+          }
+        }
+      }
+    },
+    "/admin/productos/{id}": {
+      "get": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Ficha completa de un producto",
+        "description": "Incluye TODAS las variantes, activas e inactivas, con su stock real, y todas las imagenes con su id, que el panel necesita para borrarlas.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Producto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoAdmin"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Editar un producto",
+        "description": "Solo se modifican los campos que vienen. NO toca las variantes: cada una tiene sus propios endpoints. Cambiar el nombre no cambia el slug.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProductoCambios"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Producto actualizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflicto"
+          }
+        }
+      }
+    },
+    "/admin/productos/{id}/estado": {
+      "patch": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Publicar o despublicar un producto",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "activo"
+                ],
+                "properties": {
+                  "activo": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Producto con su estado nuevo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      }
+    },
+    "/admin/productos/{id}/variantes": {
+      "post": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Agregar una variante",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VarianteEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Producto con la variante agregada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          },
+          "409": {
+            "description": "El SKU ya lo usa otra variante",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "CONFLICTO_DE_DATOS"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/productos/{id}/variantes/{varianteId}": {
+      "patch": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Editar una variante",
+        "description": "Si se cambia `precioAnterior` sin cambiar `precio`, se valida contra el precio que ya tiene la variante. Enviar `precioAnterior` en null quita la oferta.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          },
+          {
+            "$ref": "#/components/parameters/VarianteIdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VarianteCambios"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Producto con la variante actualizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "description": "No existe el producto, o la variante no es de ese producto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "NO_ENCONTRADO"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflicto"
+          }
+        }
+      }
+    },
+    "/admin/productos/{id}/variantes/{varianteId}/estado": {
+      "patch": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Activar o desactivar una variante",
+        "description": "Las variantes no se borran nunca: los pedidos historicos las referencian. Desactivada desaparece de la tienda sin perder el vinculo.\n\nNo se puede desactivar la ultima variante activa: quedaria un producto visible que no se puede comprar. En ese caso responde ULTIMA_VARIANTE_ACTIVA.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          },
+          {
+            "$ref": "#/components/parameters/VarianteIdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "activa"
+                ],
+                "properties": {
+                  "activa": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Producto con la variante actualizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProductoAdmin"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos invalidos, o ULTIMA_VARIANTE_ACTIVA",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "ULTIMA_VARIANTE_ACTIVA"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
           }
         }
       }

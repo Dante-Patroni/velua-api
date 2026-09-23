@@ -34,6 +34,12 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Los combos son cajas fijas armadas de antemano, no configurables.
   Cada combo es un producto más, con stock propio.
 - **2026-09** Las categorías son colecciones, no tipos de producto.
+- - **2026-09** Desactivar una categoría oculta de la tienda todos sus productos,
+    aunque cada uno siga activo. El listado del panel trae `cantidadProductos`
+    para poder avisarlo antes de confirmar.
+- **2026-09** Cambiar el nombre de una categoría o producto no cambia su slug.
+  Para cambiar la URL hay que editar el slug a propósito, y el panel avisa que
+  los links anteriores dejan de funcionar.
 
 ## Infraestructura
 
