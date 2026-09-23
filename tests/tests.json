@@ -1458,6 +1458,755 @@
       ]
     },
     {
+      "name": "Admin - Productos",
+      "item": [
+        {
+          "name": "POST /auth/login (entrar al panel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "El grupo hace su propio login para no depender del orden de los demas grupos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/categorias (tomar una)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/categorias",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "categorias"]
+            },
+            "description": "Guarda el id de una categoria real para crear productos contra ella."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test('Hay categorias', () => pm.expect(d.length).to.be.above(0));",
+                  "pm.collectionVariables.set('categoria_id', d[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/productos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos"]
+            },
+            "description": "Grilla del panel: incluye inactivos y trae los totales de cada producto."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "",
+                  "pm.test('Devuelve datos y meta', () => {",
+                  "    pm.expect(c).to.have.property('datos');",
+                  "    pm.expect(c.meta.total).to.be.a('number');",
+                  "});",
+                  "",
+                  "pm.test('Cada fila trae los totales', () => {",
+                  "    c.datos.forEach((f) => {",
+                  "        pm.expect(f.cantidadVariantes).to.be.a('number');",
+                  "        pm.expect(f.stockTotal).to.be.a('number');",
+                  "        pm.expect(f.cantidadImagenes).to.be.a('number');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('El precio sigue siendo cadena', () => {",
+                  "    c.datos.forEach((f) => {",
+                  "        if (f.precioDesde !== null) pm.expect(f.precioDesde).to.be.a('string');",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('La grilla no trae variantes ni imagenes', () => {",
+                  "    pm.expect(c.datos[0]).to.not.have.property('variantes');",
+                  "    pm.expect(c.datos[0]).to.not.have.property('imagenes');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/productos?orden=stock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos?orden=stock&limite=50",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos?orden=stock&limite=50"]
+            },
+            "description": "Orden por stock ascendente: es el que sirve para ver que hay que reponer."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test('Viene de menor a mayor stock', () => {",
+                  "    const s = d.map((f) => f.stockTotal);",
+                  "    for (let i = 1; i < s.length; i++) pm.expect(s[i]).to.be.at.least(s[i - 1]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/productos con orden invalido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos?orden=cualquiera",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos?orden=cualquiera"]
+            },
+            "description": "El orden tiene que estar dentro del enum del contrato."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo orden', () => pm.expect(pm.response.json().details).to.have.property('orden'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/productos (crear con dos variantes)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos"]
+            },
+            "description": "Producto y variantes se crean juntos en una transaccion.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoriaId\": {{categoria_id}},\n  \"nombre\": \"{{nombre_producto}}\",\n  \"descripcionCorta\": \"Creado por la coleccion\",\n  \"variantes\": [\n    { \"nombre\": \"100 g\", \"precio\": \"8500\", \"stock\": 5 },\n    { \"nombre\": \"60 g\", \"precio\": \"5500\", \"precioAnterior\": \"6500\", \"stock\": 3 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Nombre unico por corrida para poder repetir la coleccion",
+                  "const marca = Date.now();",
+                  "pm.collectionVariables.set('nombre_producto', 'Producto Newman ' + marca);",
+                  "pm.collectionVariables.set('slug_esperado', 'producto-newman-' + marca);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const pr = pm.response.json();",
+                  "",
+                  "pm.test('Genera el slug del nombre', () => {",
+                  "    pm.expect(pr.slug).to.eql(pm.collectionVariables.get('slug_esperado'));",
+                  "});",
+                  "pm.test('Crea las dos variantes activas', () => {",
+                  "    pm.expect(pr.variantes).to.have.lengthOf(2);",
+                  "    pr.variantes.forEach((v) => pm.expect(v.activa).to.be.true);",
+                  "});",
+                  "pm.test('Normaliza los importes a dos decimales', () => {",
+                  "    pm.expect(pr.variantes[0].precio).to.eql('8500.00');",
+                  "    pm.expect(pr.variantes[1].precio).to.eql('5500.00');",
+                  "    pm.expect(pr.variantes[1].precioAnterior).to.eql('6500.00');",
+                  "});",
+                  "pm.test('El panel ve el stock real', () => pm.expect(pr.variantes[0].stock).to.eql(5));",
+                  "pm.test('pesoGramos ausente queda en null, no NaN', () => {",
+                  "    pm.expect(pr.variantes[0].pesoGramos).to.be.null;",
+                  "});",
+                  "pm.test('Arranca sin imagenes', () => pm.expect(pr.imagenes).to.be.an('array').that.is.empty);",
+                  "",
+                  "pm.collectionVariables.set('producto_id', pr.id);",
+                  "pm.collectionVariables.set('variante_a', pr.variantes[0].id);",
+                  "pm.collectionVariables.set('variante_b', pr.variantes[1].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/productos sin variantes",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos"]
+            },
+            "description": "El esquema exige al menos una variante: un producto sin ellas quedaria invalido.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoriaId\": {{categoria_id}},\n  \"nombre\": \"Sin variantes\",\n  \"variantes\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve SIN_VARIANTES', () => {",
+                  "    pm.expect(pm.response.json().error).to.be.oneOf(['SIN_VARIANTES', 'DATOS_INVALIDOS']);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/productos con precio anterior menor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos"]
+            },
+            "description": "Un precio anterior igual o menor daria un descuento de cero por ciento en la tienda.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoriaId\": {{categoria_id}},\n  \"nombre\": \"Oferta mal cargada\",\n  \"variantes\": [\n    { \"nombre\": \"100 g\", \"precio\": \"8500\", \"precioAnterior\": \"8000\", \"stock\": 1 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const c = pm.response.json();",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(c.error).to.eql('DATOS_INVALIDOS'));",
+                  "pm.test('Indica la variante y el campo exactos', () => {",
+                  "    pm.expect(c.details).to.have.property('variantes[0].precioAnterior');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/productos con categoria inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos"]
+            },
+            "description": "La categoria tiene que existir.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categoriaId\": 99999,\n  \"nombre\": \"Categoria fantasma\",\n  \"variantes\": [\n    { \"nombre\": \"U\", \"precio\": \"1000\", \"stock\": 1 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo categoriaId', () => {",
+                  "    pm.expect(pm.response.json().details).to.have.property('categoriaId');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/productos/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_id}}"]
+            },
+            "description": "Ficha completa con todas las variantes y el stock real."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const pr = pm.response.json();",
+                  "pm.test('Es el producto creado', () => {",
+                  "    pm.expect(pr.id).to.eql(Number(pm.collectionVariables.get('producto_id')));",
+                  "});",
+                  "pm.test('Trae la categoria', () => pm.expect(pr.categoria).to.have.property('slug'));",
+                  "pm.test('No filtra campos internos', () => {",
+                  "    pm.expect(pr).to.not.have.property('categoriaId');",
+                  "    pm.expect(pr).to.not.have.property('creadoEn');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /admin/productos/{id} (editar)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_id}}"]
+            },
+            "description": "Cambiar el nombre no cambia el slug.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Producto Newman editado\",\n  \"ingredientes\": \"Aceite de oliva\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const pr = pm.response.json();",
+                  "pm.test('Cambio el nombre', () => pm.expect(pr.nombre).to.eql('Producto Newman editado'));",
+                  "pm.test('El slug NO cambio', () => {",
+                  "    pm.expect(pr.slug).to.eql(pm.collectionVariables.get('slug_esperado'));",
+                  "});",
+                  "pm.test('Guardo los ingredientes', () => pm.expect(pr.ingredientes).to.eql('Aceite de oliva'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH variante (cambiar stock)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}/variantes/{{variante_a}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_id}}", "variantes", "{{variante_a}}"]
+            },
+            "description": "Edita solo el stock de una variante.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 42\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === Number(pm.collectionVariables.get('variante_a')));",
+                  "pm.test('Actualizo el stock', () => pm.expect(v.stock).to.eql(42));",
+                  "pm.test('No toco el precio', () => pm.expect(v.precio).to.eql('8500.00'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH variante de otro producto",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}/variantes/999999",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_id}}", "variantes", "999999"]
+            },
+            "description": "Una variante que no pertenece al producto no se puede editar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Devuelve NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH desactivar una variante",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}/variantes/{{variante_b}}/estado",
+              "host": ["{{base_url}}"],
+              "path": [
+                "admin",
+                "productos",
+                "{{producto_id}}",
+                "variantes",
+                "{{variante_b}}",
+                "estado"
+              ]
+            },
+            "description": "Con dos variantes activas, desactivar una es valido.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activa\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === Number(pm.collectionVariables.get('variante_b')));",
+                  "pm.test('Quedo desactivada', () => pm.expect(v.activa).to.be.false);",
+                  "pm.test('Sigue visible en el panel', () => pm.expect(v).to.not.be.undefined);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH desactivar la ultima variante activa",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}/variantes/{{variante_a}}/estado",
+              "host": ["{{base_url}}"],
+              "path": [
+                "admin",
+                "productos",
+                "{{producto_id}}",
+                "variantes",
+                "{{variante_a}}",
+                "estado"
+              ]
+            },
+            "description": "Quedaria un producto visible que no se puede comprar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activa\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve ULTIMA_VARIANTE_ACTIVA', () => {",
+                  "    pm.expect(pm.response.json().error).to.eql('ULTIMA_VARIANTE_ACTIVA');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST agregar una variante",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}/variantes",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_id}}", "variantes"]
+            },
+            "description": "Agrega una variante a un producto existente.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"200 g\",\n  \"precio\": \"15000\",\n  \"stock\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Ahora tiene tres variantes', () => {",
+                  "    pm.expect(pm.response.json().variantes).to.have.lengthOf(3);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH /admin/productos/{id}/estado (despublicar)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}/estado",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_id}}", "estado"]
+            },
+            "description": "Deja el producto de prueba fuera de la tienda.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activo\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Quedo despublicado', () => pm.expect(pm.response.json().activo).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Cierra la sesion para verificar que el panel queda cerrado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 204', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/productos sin sesion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos"]
+            },
+            "description": "Si esto da 200, alguna ruta del panel quedo sin proteger."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Devuelve NO_AUTORIZADO', () => pm.expect(pm.response.json().error).to.eql('NO_AUTORIZADO'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Errores",
       "item": [
         {
@@ -1512,6 +2261,22 @@
     },
     {
       "key": "slug_esperado",
+      "value": ""
+    },
+    {
+      "key": "producto_id",
+      "value": ""
+    },
+    {
+      "key": "variante_a",
+      "value": ""
+    },
+    {
+      "key": "variante_b",
+      "value": ""
+    },
+    {
+      "key": "nombre_producto",
       "value": ""
     }
   ]

@@ -35,6 +35,7 @@ app.use("/api", limitadorGlobal);
 app.use("/api/v1", require("./routes/catalogoRoutes"));
 app.use("/api/v1", require("./routes/authRoutes"));
 app.use("/api/v1", require("./routes/adminCategoriasRoutes"));
+app.use("/api/v1", require("./routes/adminProductosRoutes"));
 /**
  * @openapi
  * /salud:
