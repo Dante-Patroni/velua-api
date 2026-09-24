@@ -64,7 +64,7 @@ export default [
     },
   },
   {
-    files: ["src/repositories/*Repository.js"],
+    files: ["src/repositories/*Repository.js", "src/almacenamiento/ImagenStorage.js"],
     rules: {
       "require-await": "off",
     },
