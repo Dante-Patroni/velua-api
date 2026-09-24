@@ -35,6 +35,10 @@
     {
       "name": "Admin - Productos",
       "description": "Gestion de productos y variantes desde el panel"
+    },
+    {
+      "name": "Admin - Imagenes",
+      "description": "Fotos de producto: subida, orden y borrado"
     }
   ],
   "components": {
@@ -65,6 +69,16 @@
         "in": "path",
         "required": true,
         "description": "Id de la variante dentro del producto.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "ImagenIdRuta": {
+        "name": "imagenId",
+        "in": "path",
+        "required": true,
+        "description": "Id de la imagen dentro del producto.",
         "schema": {
           "type": "integer",
           "minimum": 1
@@ -1843,6 +1857,358 @@
           },
           "404": {
             "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      }
+    },
+    "/admin/productos/{id}/imagenes": {
+      "get": {
+        "tags": [
+          "Admin - Imagenes"
+        ],
+        "summary": "Listar las imagenes de un producto",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Imagenes ordenadas. La primera es la principal.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "datos"
+                  ],
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ImagenAdmin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Admin - Imagenes"
+        ],
+        "summary": "Subir una imagen",
+        "description": "Se envia como multipart/form-data, con el archivo en el campo `imagen` y opcionalmente un texto alternativo en `alt`.\n\nFormatos aceptados: jpg, png y webp. Tope de 5 MB. El contenido se verifica mirando los primeros bytes del archivo, no el tipo que declara el navegador, que se puede falsear.\n\nLa imagen se guarda en el proveedor achicada a 1600 px de lado mayor. Los tamanos para cada pantalla salen transformando la URL, sin subir nada adicional. Maximo 8 imagenes por producto.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "imagen"
+                ],
+                "properties": {
+                  "imagen": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "alt": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "Texto alternativo para accesibilidad."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Galeria actualizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ImagenAdmin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ARCHIVO_REQUERIDO, TIPO_ARCHIVO_INVALIDO, ARCHIVO_DEMASIADO_GRANDE o LIMITE_IMAGENES.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "ARCHIVO_DEMASIADO_GRANDE"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          },
+          "502": {
+            "description": "El proveedor de imagenes rechazo la subida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "ERROR_AL_SUBIR"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/productos/{id}/imagenes/orden": {
+      "put": {
+        "tags": [
+          "Admin - Imagenes"
+        ],
+        "summary": "Reordenar la galeria",
+        "description": "La primera imagen es la principal: es la que se ve en la grilla de la tienda. Recibe los ids de TODAS las imagenes del producto en el orden deseado; un orden parcial dejaria dos en la misma posicion y la principal seria impredecible.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "integer"
+                    },
+                    "example": [
+                      5,
+                      3,
+                      4
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Galeria en el orden nuevo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ImagenAdmin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      }
+    },
+    "/admin/productos/{id}/imagenes/{imagenId}": {
+      "patch": {
+        "tags": [
+          "Admin - Imagenes"
+        ],
+        "summary": "Cambiar el texto alternativo",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          },
+          {
+            "$ref": "#/components/parameters/ImagenIdRuta"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "alt": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Galeria actualizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ImagenAdmin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Imagenes"
+        ],
+        "summary": "Borrar una imagen",
+        "description": "Borra el archivo del proveedor y despues la fila. Si el borrado remoto falla, la fila se borra igual: un archivo huerfano molesta menos que una fila apuntando a una imagen que ya no existe, que dejaria la tienda con una foto rota.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          },
+          {
+            "$ref": "#/components/parameters/ImagenIdRuta"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Galeria sin la imagen borrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/ImagenAdmin"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "description": "No existe el producto, o la imagen no es de ese producto",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "NO_ENCONTRADO"
+                }
+              }
+            }
           }
         }
       }

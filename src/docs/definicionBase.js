@@ -39,6 +39,7 @@ module.exports = {
     },
     { name: "Admin - Categorias", description: "Gestion de categorias desde el panel" },
     { name: "Admin - Productos", description: "Gestion de productos y variantes desde el panel" },
+    { name: "Admin - Imagenes", description: "Fotos de producto: subida, orden y borrado" },
   ],
   components: {
     parameters: {
@@ -65,6 +66,13 @@ module.exports = {
         in: "path",
         required: true,
         description: "Id de la variante dentro del producto.",
+        schema: { type: "integer", minimum: 1 },
+      },
+      ImagenIdRuta: {
+        name: "imagenId",
+        in: "path",
+        required: true,
+        description: "Id de la imagen dentro del producto.",
         schema: { type: "integer", minimum: 1 },
       },
       Limite: {

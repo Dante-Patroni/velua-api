@@ -2207,6 +2207,350 @@
       ]
     },
     {
+      "name": "Admin - Imagenes",
+      "item": [
+        {
+          "name": "POST /auth/login (entrar al panel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "El grupo hace su propio login para no depender del orden de los demas.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/productos (tomar uno)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos?limite=1",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos?limite=1"]
+            },
+            "description": "Guarda el id de un producto real para probar su galeria."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test('Hay productos', () => pm.expect(d.length).to.be.above(0));",
+                  "pm.collectionVariables.set('producto_imagenes', d[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET imagenes de un producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_imagenes}}/imagenes",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_imagenes}}", "imagenes"]
+            },
+            "description": "La galeria puede estar vacia: los productos del seed todavia no tienen fotos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "pm.test('Devuelve un arreglo', () => pm.expect(d).to.be.an('array'));",
+                  "",
+                  "pm.test('No expone el publicId ni el productoId', () => {",
+                  "    d.forEach((i) => {",
+                  "        pm.expect(i).to.not.have.property('publicId');",
+                  "        pm.expect(i).to.not.have.property('productoId');",
+                  "    });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET imagenes de un producto inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/999999/imagenes",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "999999", "imagenes"]
+            },
+            "description": "Un producto que no existe devuelve 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Devuelve NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET imagenes con id invalido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/abc/imagenes",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "abc", "imagenes"]
+            },
+            "description": "El id se valida antes de tocar la base o de recibir un archivo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo id', () => pm.expect(pm.response.json().details).to.have.property('id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST imagen sin archivo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_imagenes}}/imagenes",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_imagenes}}", "imagenes"]
+            },
+            "description": "Sin archivo en el campo imagen, se rechaza. La subida real no se prueba en CI: dependeria de un servicio externo y consumiria cuota.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve un codigo de archivo', () => {",
+                  "    pm.expect(pm.response.json().error).to.be.oneOf([",
+                  "        'ARCHIVO_REQUERIDO', 'TIPO_ARCHIVO_INVALIDO', 'JSON_INVALIDO', 'DATOS_INVALIDOS'",
+                  "    ]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT orden con lista parcial",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_imagenes}}/imagenes/orden",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_imagenes}}", "imagenes", "orden"]
+            },
+            "description": "Un orden parcial dejaria dos imagenes en la misma posicion y la principal seria impredecible.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": [\n    999999\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT orden con lista vacia",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_imagenes}}/imagenes/orden",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_imagenes}}", "imagenes", "orden"]
+            },
+            "description": "La lista de ids no puede venir vacia.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"ids\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo ids', () => pm.expect(pm.response.json().details).to.have.property('ids'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE imagen inexistente",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_imagenes}}/imagenes/999999",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_imagenes}}", "imagenes", "999999"]
+            },
+            "description": "Una imagen que no existe, o que no es de ese producto, devuelve 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Devuelve NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Cierra la sesion para verificar que las rutas de imagenes quedan cerradas."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 204', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET imagenes sin sesion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_imagenes}}/imagenes",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_imagenes}}", "imagenes"]
+            },
+            "description": "Si esto da 200, las rutas de imagenes quedaron sin proteger."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Devuelve NO_AUTORIZADO', () => pm.expect(pm.response.json().error).to.eql('NO_AUTORIZADO'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Errores",
       "item": [
         {
@@ -2277,6 +2621,10 @@
     },
     {
       "key": "nombre_producto",
+      "value": ""
+    },
+    {
+      "key": "producto_imagenes",
       "value": ""
     }
   ]
