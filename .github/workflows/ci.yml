@@ -22,6 +22,9 @@ jobs:
       ADMIN_NOMBRE: Admin de prueba
       ADMIN_EMAIL: admin@velua.test
       ADMIN_PASSWORD: clave-solo-para-ci
+      CLOUDINARY_CLOUD_NAME: cuenta_de_prueba
+      CLOUDINARY_API_KEY: clave_de_prueba
+      CLOUDINARY_API_SECRET: secreto_de_prueba
 
     services:
       mysql:
