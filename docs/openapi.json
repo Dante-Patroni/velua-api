@@ -1591,6 +1591,50 @@
             "$ref": "#/components/responses/Conflicto"
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Admin - Productos"
+        ],
+        "summary": "Borrar un producto",
+        "description": "Borra el producto con sus variantes e imagenes, incluidos los archivos en el proveedor.\n\nSolo funciona con productos que NUNCA se vendieron. Si alguna variante figura en un pedido, responde 409 con PRODUCTO_CON_VENTAS: borrarlo dejaria ese pedido apuntando a un producto que ya no existe. Para ese caso esta despublicar, que lo saca de la tienda y conserva el historial.\n\nRequiere el permiso CATALOGO_BORRAR, que solo tiene el rol admin: el operador puede despublicar, que cubre casi todos los casos.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdRuta"
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Producto borrado"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          },
+          "409": {
+            "description": "El producto tiene ventas registradas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "PRODUCTO_CON_VENTAS"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/admin/productos/{id}/estado": {

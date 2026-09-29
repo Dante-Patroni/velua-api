@@ -355,6 +355,72 @@ describe("ProductoAdminService", () => {
     });
   });
 
+  describe("borrar", () => {
+    let imagenes;
+
+    beforeEach(() => {
+      imagenes = { borrarArchivoRemoto: jest.fn().mockResolvedValue(true) };
+      repositorio.tieneVentas = jest.fn().mockResolvedValue(false);
+      repositorio.borrar = jest.fn().mockResolvedValue(undefined);
+      servicio = new ProductoAdminService(repositorio, imagenes);
+    });
+
+    it("lanza NO_ENCONTRADO si el producto no existe", async () => {
+      repositorio.buscarPorId.mockResolvedValue(null);
+
+      await expect(servicio.borrar(99)).rejects.toThrow("NO_ENCONTRADO");
+      expect(repositorio.borrar).not.toHaveBeenCalled();
+    });
+
+    it("rechaza borrar un producto que se vendió", async () => {
+      // Borrarlo dejaria pedidos apuntando a un producto que ya no existe
+      repositorio.tieneVentas.mockResolvedValue(true);
+
+      await expect(servicio.borrar(1)).rejects.toThrow("PRODUCTO_CON_VENTAS");
+      expect(repositorio.borrar).not.toHaveBeenCalled();
+      expect(imagenes.borrarArchivoRemoto).not.toHaveBeenCalled();
+    });
+
+    it("borra los archivos remotos antes que el producto", async () => {
+      // Las filas se van en cascada, los archivos en Cloudinary no
+      repositorio.buscarPorId.mockResolvedValue(
+        productoCrudo({
+          imagenes: [
+            { id: 3, url: "u1", publicId: "velua/productos/a", alt: null, orden: 0 },
+            { id: 4, url: "u2", publicId: "velua/productos/b", alt: null, orden: 1 },
+          ],
+        })
+      );
+
+      await servicio.borrar(1);
+
+      expect(imagenes.borrarArchivoRemoto).toHaveBeenCalledWith("velua/productos/a");
+      expect(imagenes.borrarArchivoRemoto).toHaveBeenCalledWith("velua/productos/b");
+      expect(repositorio.borrar).toHaveBeenCalledWith(1);
+    });
+
+    it("no intenta borrar archivos de imágenes sin publicId", async () => {
+      repositorio.buscarPorId.mockResolvedValue(
+        productoCrudo({
+          imagenes: [{ id: 3, url: "u", publicId: null, alt: null, orden: 0 }],
+        })
+      );
+
+      await servicio.borrar(1);
+
+      expect(imagenes.borrarArchivoRemoto).not.toHaveBeenCalled();
+      expect(repositorio.borrar).toHaveBeenCalledWith(1);
+    });
+
+    it("borra un producto sin imágenes", async () => {
+      repositorio.buscarPorId.mockResolvedValue(productoCrudo({ imagenes: [] }));
+
+      await servicio.borrar(1);
+
+      expect(repositorio.borrar).toHaveBeenCalledWith(1);
+    });
+  });
+
   describe("agregarVariante", () => {
     it("rechaza un SKU que ya usa otra variante", async () => {
       repositorio.existeSku.mockResolvedValue(true);

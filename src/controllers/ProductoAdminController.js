@@ -141,6 +141,21 @@ class ProductoAdminController {
       manejarErrorHttp(error, res);
     }
   };
+
+  /**
+   * @description Borra un producto que nunca se vendió.
+   * @param {import("express").Request} req - Request con el id en los parámetros.
+   * @param {import("express").Response} res - Response de Express.
+   * @returns {Promise<void>}
+   */
+  borrar = async (req, res) => {
+    try {
+      await this.servicio.borrar(req.params.id);
+      res.status(204).end();
+    } catch (error) {
+      manejarErrorHttp(error, res);
+    }
+  };
 }
 
 module.exports = ProductoAdminController;

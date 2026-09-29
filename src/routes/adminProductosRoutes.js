@@ -12,8 +12,15 @@ const { PERMISOS } = require("../config/permisos");
 
 const router = express.Router();
 
+const SequelizeImagenRepository = require("../repositories/sequelize/SequelizeImagenRepository");
+const CloudinaryStorage = require("../almacenamiento/CloudinaryStorage");
+const { ImagenAdminService } = require("../services/ImagenAdminService");
+
 const controller = new ProductoAdminController(
-  new ProductoAdminService(new SequelizeProductoRepository(db))
+  new ProductoAdminService(
+    new SequelizeProductoRepository(db),
+    new ImagenAdminService(new SequelizeImagenRepository(db), new CloudinaryStorage())
+  )
 );
 
 /**
@@ -531,6 +538,54 @@ router.patch(
     manejarErroresValidacion,
   ],
   controller.cambiarEstadoVariante
+);
+
+/**
+ * @openapi
+ * /admin/productos/{id}:
+ *   delete:
+ *     tags: [Admin - Productos]
+ *     summary: Borrar un producto
+ *     description: >
+ *       Borra el producto con sus variantes e imagenes, incluidos los archivos
+ *       en el proveedor.
+ *
+ *
+ *       Solo funciona con productos que NUNCA se vendieron. Si alguna variante
+ *       figura en un pedido, responde 409 con PRODUCTO_CON_VENTAS: borrarlo
+ *       dejaria ese pedido apuntando a un producto que ya no existe. Para ese
+ *       caso esta despublicar, que lo saca de la tienda y conserva el historial.
+ *
+ *
+ *       Requiere el permiso CATALOGO_BORRAR, que solo tiene el rol admin: el
+ *       operador puede despublicar, que cubre casi todos los casos.
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/IdRuta'
+ *     responses:
+ *       204:
+ *         description: Producto borrado
+ *       401:
+ *         $ref: '#/components/responses/NoAutorizado'
+ *       403:
+ *         $ref: '#/components/responses/SinPermiso'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ *       409:
+ *         description: El producto tiene ventas registradas
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: PRODUCTO_CON_VENTAS
+ */
+router.delete(
+  "/admin/productos/:id",
+  proteger(PERMISOS.CATALOGO_BORRAR),
+  [validarId(), manejarErroresValidacion],
+  controller.borrar
 );
 
 module.exports = router;

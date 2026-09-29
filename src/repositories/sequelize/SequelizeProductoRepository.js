@@ -213,6 +213,38 @@ class SequelizeProductoRepository extends ProductoRepository {
     }
     return (await this.models.Variante.count({ where })) > 0;
   }
+
+  /**
+   * @description Indica si alguna variante del producto figura en un pedido.
+   * Se consulta por las variantes y no por el producto porque `pedido_items`
+   * referencia la variante, no el producto.
+   * @param {number} productoId - Id del producto.
+   * @returns {Promise<boolean>} true si tiene ventas registradas.
+   */
+  async tieneVentas(productoId) {
+    const [fila] = await this.models.sequelize.query(
+      `SELECT COUNT(*) AS cantidad
+         FROM pedido_items pi
+         JOIN variantes v ON v.id = pi.variante_id
+        WHERE v.producto_id = :productoId`,
+      {
+        replacements: { productoId },
+        type: this.models.sequelize.QueryTypes.SELECT,
+      }
+    );
+    return Number(fila.cantidad) > 0;
+  }
+
+  /**
+   * @description Borra un producto. Las variantes y las imágenes se van con él
+   * por la clave foránea en cascada; los archivos remotos los borra el service
+   * antes de llamar acá.
+   * @param {number} productoId - Id del producto.
+   * @returns {Promise<void>}
+   */
+  async borrar(productoId) {
+    await this.models.Producto.destroy({ where: { id: productoId } });
+  }
 }
 
 module.exports = SequelizeProductoRepository;
