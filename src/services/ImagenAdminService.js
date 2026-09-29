@@ -180,6 +180,16 @@ class ImagenAdminService {
     }
     return imagen;
   }
+
+  /**
+   * @description Borra solo el archivo en el proveedor, sin tocar la base.
+   * Lo usa el borrado de un producto, donde las filas se van en cascada.
+   * @param {string} publicId - Identificador remoto del archivo.
+   * @returns {Promise<boolean>} true si se borró, false si ya no estaba.
+   */
+  borrarArchivoRemoto(publicId) {
+    return this.imagenStorage.borrar(publicId);
+  }
 }
 
 module.exports = { ImagenAdminService, MAXIMO_IMAGENES, CARPETA };

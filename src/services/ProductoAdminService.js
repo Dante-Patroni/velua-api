@@ -129,9 +129,12 @@ class ProductoAdminService {
   /**
    * @description Instancia el servicio inyectando el repositorio.
    * @param {Object} productoRepository - Implementación de ProductoRepository.
+   * @param {Object} [imagenAdminService] - Servicio de imágenes, para poder
+   *   borrar los archivos remotos al eliminar un producto.
    */
-  constructor(productoRepository) {
+  constructor(productoRepository, imagenAdminService) {
     this.productoRepository = productoRepository;
+    this.imagenAdminService = imagenAdminService;
   }
 
   /**
@@ -293,6 +296,41 @@ class ProductoAdminService {
       await this.productoRepository.actualizar(id, { activo });
     }
     return this.obtener(id);
+  }
+
+  /**
+   * @description Borra un producto de verdad, con sus variantes e imágenes.
+   *
+   * Solo se puede borrar un producto que nunca se vendió. Si alguna de sus
+   * variantes figura en un pedido, borrarlo dejaría ese pedido apuntando a un
+   * producto que ya no existe: para ese caso está despublicar, que lo saca de
+   * la tienda y conserva el historial.
+   *
+   * Las variantes y las filas de imágenes se van en cascada por la clave
+   * foránea. Los archivos en el proveedor no: esos se borran acá antes, o
+   * quedan huérfanos consumiendo cuota para siempre.
+   *
+   * @param {number} id - Id del producto.
+   * @returns {Promise<void>}
+   * @throws {Error} NO_ENCONTRADO, PRODUCTO_CON_VENTAS
+   */
+  async borrar(id) {
+    const producto = await this.productoRepository.buscarPorId(id);
+    if (!producto) {
+      throw new Error("NO_ENCONTRADO");
+    }
+
+    if (await this.productoRepository.tieneVentas(id)) {
+      throw new Error("PRODUCTO_CON_VENTAS");
+    }
+
+    for (const imagen of producto.imagenes ?? []) {
+      if (imagen.publicId) {
+        await this.imagenAdminService.borrarArchivoRemoto(imagen.publicId);
+      }
+    }
+
+    await this.productoRepository.borrar(id);
   }
 
   /**

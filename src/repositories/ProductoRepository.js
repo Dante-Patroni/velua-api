@@ -92,6 +92,24 @@ class ProductoRepository {
   async existeSku(_sku, _excluirVarianteId) {
     throw new Error("Metodo existeSku no implementado");
   }
+
+  /**
+   * @description Indica si alguna variante del producto figura en un pedido.
+   * @param {number} _productoId - Id del producto.
+   * @returns {Promise<boolean>} true si tiene ventas registradas.
+   */
+  async tieneVentas(_productoId) {
+    throw new Error("Metodo tieneVentas no implementado");
+  }
+
+  /**
+   * @description Borra un producto con sus variantes e imágenes.
+   * @param {number} _productoId - Id del producto.
+   * @returns {Promise<void>}
+   */
+  async borrar(_productoId) {
+    throw new Error("Metodo borrar no implementado");
+  }
 }
 
 module.exports = ProductoRepository;

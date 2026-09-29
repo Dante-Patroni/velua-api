@@ -2158,6 +2158,81 @@
           ]
         },
         {
+          "name": "DELETE producto inexistente",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/999999",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "999999"]
+            },
+            "description": "Un id que no existe devuelve 404."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Devuelve NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /admin/productos/{id} (limpiar)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_id}}"]
+            },
+            "description": "Borra el producto de prueba con sus variantes e imagenes. Solo funciona porque nunca se vendio: un producto con ventas responderia 409 con PRODUCTO_CON_VENTAS, y ese caso lo cubren los tests unitarios porque aca no hay pedidos todavia."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));",
+                  "pm.test('No devuelve cuerpo', () => pm.expect(pm.response.text()).to.be.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET el producto borrado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{producto_id}}"]
+            },
+            "description": "Despues de borrarlo, ya no existe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Devuelve NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "POST /auth/logout",
           "request": {
             "method": "POST",
@@ -2175,6 +2250,31 @@
               "script": {
                 "type": "text/javascript",
                 "exec": ["pm.test('Responde 204', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE sin sesion",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/1",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "1"]
+            },
+            "description": "Si esto no da 401, la ruta de borrado quedo sin proteger."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Devuelve NO_AUTORIZADO', () => pm.expect(pm.response.json().error).to.eql('NO_AUTORIZADO'));"
+                ]
               }
             }
           ]
