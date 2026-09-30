@@ -2,6 +2,9 @@
 
 Copia idéntica en `velua-api` y `velua-web`. Cambiar algo de acá se habla entre los dos
 antes de tocar código. Cada línea lleva fecha.
+- **2026-09** En `velua-api`, el PR es obligatorio pero no requiere aprobación:
+  es el repo de Dante y esperar revisión frena todo. En `velua-web` la
+  aprobación sí se mantiene, porque los dos tocan los mismos archivos.
 
 ## Contrato
 
@@ -63,6 +66,12 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Railway conectado a `velua-api`. Trial de 30 días con USD 5 de
   crédito, sin tarjeta. Pasar a Hobby antes de que se agote: al agotarse los
   servicios se pausan, los datos se conservan.
+  - **2026-09** MySQL 9 en producción y en CI. Las dos tienen que coincidir: una
+  diferencia de versión entre lo que se prueba y lo que corre es de las cosas
+  que aparecen en el peor momento.
+  - **2026-09** El acceso público a MySQL en Railway queda desactivado. La API se
+  conecta por la red interna con DATABASE_URL. Si hace falta entrar con un
+  cliente externo, se activa, se usa y se vuelve a desactivar.
 
 ## Pendientes de decidir
 
