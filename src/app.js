@@ -12,7 +12,8 @@ app.set("trust proxy", 1);
 const ORIGENES = (process.env.CORS_ORIGENES || "http://localhost:5173")
   .split(",")
   .map((o) => o.trim());
-
+// eslint-disable-next-line no-console
+console.log("Origenes permitidos:", JSON.stringify(ORIGENES));
 /**
  * @description Decide si un origen tiene permitido consumir la API.
  * @param {string|undefined} origin - Origen de la peticion. Indefinido en llamadas sin navegador.
