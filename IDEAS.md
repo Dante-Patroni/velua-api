@@ -3,6 +3,10 @@
 Cosas que se nos ocurren mientras trabajamos y que no entran en el hito en curso.
 Se revisan entre hito e hito. Nada de acá se implementa sin acordarlo antes.
 
+- `categorias.imagen_url` existe en el esquema pero no se usa: la portada muestra
+  las colecciones con la ilustración botánica, no con fotos propias. Si alguna
+  vez se quieren fotos por colección, hay que agregar la subida en el panel.
+
 ## Infraestructura
 
 - Extraer el andamiaje a un repositorio plantilla (`plantilla-api-node`) una vez
