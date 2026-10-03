@@ -44,6 +44,14 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Cambiar el nombre de una categoría o producto no cambia su slug.
   Para cambiar la URL hay que editar el slug a propósito, y el panel avisa que
   los links anteriores dejan de funcionar.
+  - **2026-10** Dominio delegado a Vercel. El sitio en veluanature.com.ar y la API
+  en api.veluanature.com.ar. La cookie de sesión lleva `domain` con punto
+  adelante para valer en todos los subdominios: con dominios distintos, el
+  navegador la guarda para la API y no la manda desde el panel. Se descartó
+  SameSite=none, que habría obligado a verificar el origen en cada escritura.
+- **2026-10** En Railway, una variable nueva o modificada no llega al contenedor
+  hasta que se redespliega. Verificar con `echo "[$VARIABLE]"` desde la consola
+  antes de dar por hecho que se aplicó.
 
 ## Infraestructura
 
