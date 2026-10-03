@@ -700,6 +700,635 @@
       ]
     },
     {
+      "name": "Carrito",
+      "item": [
+        {
+          "name": "GET /zonas-envio",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/zonas-envio",
+              "host": ["{{base_url}}"],
+              "path": ["zonas-envio"]
+            },
+            "description": "Zonas activas para el checkout. Guarda un id real para las cotizaciones siguientes."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "",
+                  "pm.test('Hay zonas cargadas', () => pm.expect(d.length).to.be.above(0));",
+                  "",
+                  "pm.test('Los costos viajan como cadena', () => {",
+                  "    d.forEach((z) => pm.expect(z.costo).to.be.a('string'));",
+                  "});",
+                  "",
+                  "pm.test('No expone campos internos', () => {",
+                  "    d.forEach((z) => {",
+                  "        pm.expect(z).to.not.have.property('activa');",
+                  "        pm.expect(z).to.not.have.property('orden');",
+                  "    });",
+                  "});",
+                  "",
+                  "// Se busca una zona con costo mayor a cero: con una gratis no se podria",
+                  "// comprobar que el envio se suma al total",
+                  "const conCosto = d.find((z) => Number(z.costo) > 0) || d[0];",
+                  "pm.collectionVariables.set('zona_id', conCosto.id);",
+                  "pm.collectionVariables.set('zona_costo', conCosto.costo);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos (tomar una variante)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?limite=50",
+              "host": ["{{base_url}}"],
+              "path": ["productos?limite=50"]
+            },
+            "description": "Toma del catalogo publico una variante con stock, para no depender de ids fijos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().datos;",
+                  "",
+                  "const conStock = d.find((p) => p.hayStock);",
+                  "pm.test('Hay al menos un producto con stock', () => pm.expect(conStock).to.not.be.undefined);",
+                  "",
+                  "pm.collectionVariables.set('slug_con_stock', conStock.slug);",
+                  "",
+                  "// Si hay alguno agotado se guarda tambien: sirve para el caso de SIN_STOCK",
+                  "const agotado = d.find((p) => !p.hayStock);",
+                  "pm.collectionVariables.set('slug_agotado', agotado ? agotado.slug : '');"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos/{slug} (id de variante)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos/{{slug_con_stock}}",
+              "host": ["{{base_url}}"],
+              "path": ["productos", "{{slug_con_stock}}"]
+            },
+            "description": "De la ficha se saca el id de una variante con stock."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "",
+                  "const v = p.variantes.find((x) => x.hayStock);",
+                  "pm.test('La variante tiene stock', () => pm.expect(v).to.not.be.undefined);",
+                  "",
+                  "pm.collectionVariables.set('variante_con_stock', v.id);",
+                  "pm.collectionVariables.set('precio_variante', v.precio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar basico",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "Dos unidades de una variante con stock, sin envio ni medio de pago.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{variante_con_stock}}, \"cantidad\": 2 }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "",
+                  "pm.test('Devuelve items, avisos, totales y envio', () => {",
+                  "    pm.expect(c).to.have.property('items');",
+                  "    pm.expect(c).to.have.property('avisos');",
+                  "    pm.expect(c).to.have.property('totales');",
+                  "    pm.expect(c).to.have.property('envio');",
+                  "});",
+                  "",
+                  "pm.test('El precio sale de la base, no del carrito', () => {",
+                  "    pm.expect(c.items[0].precioUnitario).to.eql(pm.collectionVariables.get('precio_variante'));",
+                  "});",
+                  "",
+                  "pm.test('El subtotal es precio por cantidad', () => {",
+                  "    const unitario = Number(pm.collectionVariables.get('precio_variante'));",
+                  "    pm.expect(Number(c.items[0].subtotal)).to.eql(unitario * 2);",
+                  "});",
+                  "",
+                  "pm.test('Todos los importes son cadenas con dos decimales', () => {",
+                  "    Object.values(c.totales).forEach((v) => {",
+                  "        pm.expect(v).to.be.a('string');",
+                  "        pm.expect(v).to.match(/^-?\\d+\\.\\d{2}$/);",
+                  "    });",
+                  "});",
+                  "",
+                  "pm.test('Sin zona es retiro y el envio es cero', () => {",
+                  "    pm.expect(c.envio.modo).to.eql('retiro');",
+                  "    pm.expect(c.totales.costoEnvio).to.eql('0.00');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('subtotal_base', c.totales.subtotal);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con envio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "El costo de la zona se suma al total, salvo que se alcance el umbral de envio gratis.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{variante_con_stock}}, \"cantidad\": 2 }],\n  \"zonaEnvioId\": {{zona_id}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "",
+                  "pm.test('El modo es envio y nombra la zona', () => {",
+                  "    pm.expect(c.envio.modo).to.eql('envio');",
+                  "    pm.expect(c.envio.nombre).to.be.a('string');",
+                  "});",
+                  "",
+                  "pm.test('El envio cobra la tarifa, o es gratis por umbral', () => {",
+                  "    const tarifa = pm.collectionVariables.get('zona_costo');",
+                  "    if (c.envio.gratis) {",
+                  "        pm.expect(c.totales.costoEnvio).to.eql('0.00');",
+                  "    } else {",
+                  "        pm.expect(c.totales.costoEnvio).to.eql(tarifa);",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('El total cierra: subtotal menos ajuste mas envio', () => {",
+                  "    const t = c.totales;",
+                  "    const esperado = Number(t.subtotal) - Number(t.descuentoCupon) - Number(t.ajusteMedioPago) + Number(t.costoEnvio);",
+                  "    // El total viene redondeado al peso, asi que se compara contra el redondeo",
+                  "    pm.expect(Number(t.total)).to.eql(Math.round(esperado));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con transferencia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "El descuento por transferencia depende de DESCUENTO_TRANSFERENCIA. Si no esta configurado, el ajuste es cero y tambien es correcto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{variante_con_stock}}, \"cantidad\": 2 }],\n  \"medioPago\": \"transferencia\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json().totales;",
+                  "",
+                  "pm.test('El ajuste nunca es negativo', () => {",
+                  "    pm.expect(Number(t.ajusteMedioPago)).to.be.at.least(0);",
+                  "});",
+                  "",
+                  "pm.test('El ajuste se RESTA del subtotal', () => {",
+                  "    const esperado = Number(t.subtotal) - Number(t.ajusteMedioPago) + Number(t.costoEnvio);",
+                  "    pm.expect(Number(t.total)).to.eql(Math.round(esperado));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con cantidad excesiva",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "Pedir 99 unidades recorta la cantidad y avisa UNA sola vez, aunque los dos limites (stock y tope) apliquen.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{variante_con_stock}}, \"cantidad\": 99 }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "",
+                  "pm.test('La cantidad se recorto', () => pm.expect(c.items[0].cantidad).to.be.below(99));",
+                  "",
+                  "pm.test('Avisa una sola vez', () => {",
+                  "    const delItem = c.avisos.filter((a) => a.varianteId === Number(pm.collectionVariables.get('variante_con_stock')));",
+                  "    pm.expect(delItem).to.have.lengthOf(1);",
+                  "});",
+                  "",
+                  "pm.test('El motivo es uno de los dos ajustes', () => {",
+                  "    pm.expect(c.avisos[0].motivo).to.be.oneOf(['AJUSTADO_POR_STOCK', 'AJUSTADO_POR_TOPE']);",
+                  "});",
+                  "",
+                  "pm.test('El subtotal usa la cantidad ajustada', () => {",
+                  "    const unitario = Number(pm.collectionVariables.get('precio_variante'));",
+                  "    pm.expect(Number(c.items[0].subtotal)).to.eql(unitario * c.items[0].cantidad);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con carrito vacio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "Un carrito vacio es un error del cliente, no una situacion de quien compra.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con cantidad cero",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "La cantidad tiene que ser un entero mayor que cero.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{variante_con_stock}}, \"cantidad\": 0 }]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con variante repetida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "La misma variante dos veces daria un subtotal correcto pero un carrito confuso.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"varianteId\": {{variante_con_stock}}, \"cantidad\": 1 },\n    { \"varianteId\": {{variante_con_stock}}, \"cantidad\": 2 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con variante inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "Si ningun producto del carrito se puede vender, no hay nada que cotizar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"varianteId\": 999999,\n      \"cantidad\": 1\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve CARRITO_SIN_ITEMS_VALIDOS', () => {",
+                  "    pm.expect(pm.response.json().error).to.eql('CARRITO_SIN_ITEMS_VALIDOS');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con una variante inexistente y una valida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "El caso real de una clienta con el carrito viejo: no se le vacia todo, se le avisa que se saco.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"varianteId\": {{variante_con_stock}}, \"cantidad\": 1 },\n    { \"varianteId\": 999999, \"cantidad\": 1 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "",
+                  "pm.test('Cotiza solo el producto valido', () => pm.expect(c.items).to.have.lengthOf(1));",
+                  "pm.test('Avisa por el que no existe', () => {",
+                  "    pm.expect(c.avisos[0].varianteId).to.eql(999999);",
+                  "    pm.expect(c.avisos[0].motivo).to.eql('VARIANTE_INEXISTENTE');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con zona inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "Una zona que no existe o esta inactiva se rechaza: no se puede cotizar un envio sin tarifa.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{variante_con_stock}}, \"cantidad\": 1 }],\n  \"zonaEnvioId\": 999999\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve ZONA_INVALIDA', () => pm.expect(pm.response.json().error).to.eql('ZONA_INVALIDA'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con medio de pago invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "El medio de pago tiene que estar dentro del enum del contrato.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{variante_con_stock}}, \"cantidad\": 1 }],\n  \"medioPago\": \"efectivo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo medioPago', () => {",
+                  "    pm.expect(pm.response.json().details).to.have.property('medioPago');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Autenticacion",
       "item": [
         {
@@ -2725,6 +3354,34 @@
     },
     {
       "key": "producto_imagenes",
+      "value": ""
+    },
+    {
+      "key": "zona_id",
+      "value": ""
+    },
+    {
+      "key": "zona_costo",
+      "value": ""
+    },
+    {
+      "key": "slug_con_stock",
+      "value": ""
+    },
+    {
+      "key": "slug_agotado",
+      "value": ""
+    },
+    {
+      "key": "variante_con_stock",
+      "value": ""
+    },
+    {
+      "key": "precio_variante",
+      "value": ""
+    },
+    {
+      "key": "subtotal_base",
       "value": ""
     }
   ]
