@@ -40,6 +40,7 @@ module.exports = {
     { name: "Admin - Categorias", description: "Gestion de categorias desde el panel" },
     { name: "Admin - Productos", description: "Gestion de productos y variantes desde el panel" },
     { name: "Admin - Imagenes", description: "Fotos de producto: subida, orden y borrado" },
+    { name: "Carrito", description: "Cotizacion del carrito y zonas de envio" },
   ],
   components: {
     parameters: {
@@ -580,6 +581,134 @@ module.exports = {
           ingredientes: { type: "string", nullable: true },
           modoUso: { type: "string", nullable: true },
           destacado: { type: "boolean" },
+        },
+      },
+
+      ZonaEnvio: {
+        type: "object",
+        required: ["id", "nombre", "costo"],
+        properties: {
+          id: { type: "integer", example: 2 },
+          nombre: { type: "string", example: "Provincia de Córdoba" },
+          costo: { type: "string", description: "Cadena decimal.", example: "6500.00" },
+          demora: { type: "string", nullable: true, example: "2 a 4 días hábiles" },
+        },
+      },
+      CotizacionEntrada: {
+        type: "object",
+        required: ["items"],
+        properties: {
+          items: {
+            type: "array",
+            minItems: 1,
+            maxItems: 30,
+            description: "El carrito. Solo que y cuanto: los precios los pone el servidor.",
+            items: {
+              type: "object",
+              required: ["varianteId", "cantidad"],
+              properties: {
+                varianteId: { type: "integer", minimum: 1 },
+                cantidad: { type: "integer", minimum: 1, example: 2 },
+              },
+            },
+          },
+          zonaEnvioId: {
+            type: "integer",
+            nullable: true,
+            description: "Sin zona, se cotiza como retiro en persona y el envio es cero.",
+          },
+          medioPago: {
+            type: "string",
+            nullable: true,
+            enum: ["transferencia", "mercadopago"],
+            description: "El descuento por transferencia se aplica solo con ese medio.",
+          },
+        },
+      },
+      ItemCotizado: {
+        type: "object",
+        required: ["varianteId", "cantidad", "precioUnitario", "subtotal"],
+        properties: {
+          varianteId: { type: "integer" },
+          productoNombre: { type: "string", example: "Éclat Noir" },
+          productoSlug: { type: "string", nullable: true, example: "eclat-noir" },
+          varianteNombre: { type: "string", example: "100 g" },
+          cantidad: {
+            type: "integer",
+            description: "Puede ser MENOR que la pedida si se ajusto por stock o por tope.",
+            example: 2,
+          },
+          precioUnitario: { type: "string", example: "8500.00" },
+          subtotal: { type: "string", example: "17000.00" },
+        },
+      },
+      AvisoCotizacion: {
+        type: "object",
+        description: "Algo que cambio respecto de lo que la persona tenia en el carrito.",
+        required: ["varianteId", "motivo"],
+        properties: {
+          varianteId: { type: "integer" },
+          motivo: {
+            type: "string",
+            enum: [
+              "VARIANTE_INEXISTENTE",
+              "VARIANTE_INACTIVA",
+              "PRODUCTO_INACTIVO",
+              "SIN_STOCK",
+              "AJUSTADO_POR_STOCK",
+              "AJUSTADO_POR_TOPE",
+            ],
+            description:
+              "Los cuatro primeros sacan el producto del carrito. Los dos ultimos reducen la cantidad: AJUSTADO_POR_STOCK es un limite fisico, AJUSTADO_POR_TOPE es comercial y conviene invitar a escribir por WhatsApp.",
+          },
+          producto: { type: "string", description: "Nombre, para poder nombrarlo en el aviso." },
+          pedida: { type: "integer", description: "Cantidad que habia en el carrito." },
+          disponible: { type: "integer", description: "Solo en AJUSTADO_POR_STOCK." },
+          maximo: { type: "integer", description: "Solo en AJUSTADO_POR_TOPE." },
+        },
+      },
+      TotalesCotizacion: {
+        type: "object",
+        description: "Todos como cadena decimal. El total ya viene redondeado al peso.",
+        required: ["subtotal", "total"],
+        properties: {
+          subtotal: { type: "string", example: "36500.00" },
+          descuentoCupon: { type: "string", example: "0.00" },
+          ajusteMedioPago: {
+            type: "string",
+            description: "Descuento por el medio de pago. Se RESTA del subtotal.",
+            example: "3650.00",
+          },
+          costoEnvio: { type: "string", example: "6500.00" },
+          total: { type: "string", example: "39350.00" },
+        },
+      },
+      DetalleEnvio: {
+        type: "object",
+        required: ["modo"],
+        properties: {
+          modo: { type: "string", enum: ["retiro", "envio"] },
+          zonaId: { type: "integer", nullable: true },
+          nombre: { type: "string", nullable: true },
+          demora: { type: "string", nullable: true },
+          gratis: {
+            type: "boolean",
+            description: "Si se alcanzo el umbral DESPUES de aplicar los descuentos.",
+          },
+        },
+      },
+      Cotizacion: {
+        type: "object",
+        required: ["items", "avisos", "totales", "envio"],
+        properties: {
+          items: { type: "array", items: { $ref: "#/components/schemas/ItemCotizado" } },
+          avisos: {
+            type: "array",
+            description: "Vacio si el carrito quedo tal como lo mandaron.",
+            items: { $ref: "#/components/schemas/AvisoCotizacion" },
+          },
+          totales: { $ref: "#/components/schemas/TotalesCotizacion" },
+          envio: { $ref: "#/components/schemas/DetalleEnvio" },
         },
       },
     },
