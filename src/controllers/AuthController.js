@@ -6,14 +6,30 @@ const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 /**
  * @description Opciones de la cookie de sesión. Las mismas se usan para
  * emitirla y para borrarla: si no coinciden, el navegador no la borra.
+ *
+ * En producción lleva `domain` con un punto adelante, para que valga en todo el
+ * dominio y no solo en el subdominio que la emite. El panel vive en
+ * veluanature.com.ar y la API en api.veluanature.com.ar: sin esto, el navegador
+ * guardaría la cookie para la API y no la mandaría desde el panel.
+ *
+ * En desarrollo no se declara: `localhost` no admite dominios con punto.
+ *
  * @returns {Object} Opciones para res.cookie y res.clearCookie.
  */
-const opcionesCookie = () => ({
-  httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
-  path: "/api/v1",
-});
+const opcionesCookie = () => {
+  const opciones = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/api/v1",
+  };
+
+  if (process.env.COOKIE_DOMINIO) {
+    opciones.domain = process.env.COOKIE_DOMINIO;
+  }
+
+  return opciones;
+};
 
 /**
  * @description Controlador de autenticación del panel.

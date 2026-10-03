@@ -122,18 +122,10 @@
           },
           "baseDatos": {
             "type": "string",
-            "enum": [
-              "conectada",
-              "desconectada"
-            ]
+            "enum": ["conectada", "desconectada"]
           }
         },
-        "required": [
-          "estado",
-          "version",
-          "entorno",
-          "baseDatos"
-        ]
+        "required": ["estado", "version", "entorno", "baseDatos"]
       },
       "Error": {
         "type": "object",
@@ -152,9 +144,7 @@
             }
           }
         },
-        "required": [
-          "error"
-        ]
+        "required": ["error"]
       },
       "Meta": {
         "type": "object",
@@ -173,11 +163,7 @@
             "example": 47
           }
         },
-        "required": [
-          "pagina",
-          "limite",
-          "total"
-        ]
+        "required": ["pagina", "limite", "total"]
       },
       "Categoria": {
         "type": "object",
@@ -205,11 +191,7 @@
             "format": "uri"
           }
         },
-        "required": [
-          "id",
-          "nombre",
-          "slug"
-        ]
+        "required": ["id", "nombre", "slug"]
       },
       "Imagen": {
         "type": "object",
@@ -223,9 +205,7 @@
             "nullable": true
           }
         },
-        "required": [
-          "url"
-        ]
+        "required": ["url"]
       },
       "Variante": {
         "type": "object",
@@ -260,12 +240,7 @@
             "description": "Si la variante tiene unidades disponibles."
           }
         },
-        "required": [
-          "id",
-          "nombre",
-          "precio",
-          "hayStock"
-        ]
+        "required": ["id", "nombre", "precio", "hayStock"]
       },
       "ProductoListado": {
         "type": "object",
@@ -317,15 +292,7 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "id",
-          "nombre",
-          "slug",
-          "categoria",
-          "precioDesde",
-          "hayStock",
-          "destacado"
-        ]
+        "required": ["id", "nombre", "slug", "categoria", "precioDesde", "hayStock", "destacado"]
       },
       "ProductoDetalle": {
         "type": "object",
@@ -382,22 +349,11 @@
             "minItems": 1
           }
         },
-        "required": [
-          "id",
-          "nombre",
-          "slug",
-          "categoria",
-          "imagenes",
-          "variantes",
-          "destacado"
-        ]
+        "required": ["id", "nombre", "slug", "categoria", "imagenes", "variantes", "destacado"]
       },
       "LoginEntrada": {
         "type": "object",
-        "required": [
-          "email",
-          "password"
-        ],
+        "required": ["email", "password"],
         "properties": {
           "email": {
             "type": "string",
@@ -414,13 +370,7 @@
       },
       "Usuario": {
         "type": "object",
-        "required": [
-          "id",
-          "nombre",
-          "email",
-          "rol",
-          "permisos"
-        ],
+        "required": ["id", "nombre", "email", "rol", "permisos"],
         "properties": {
           "id": {
             "type": "integer",
@@ -436,34 +386,21 @@
           },
           "rol": {
             "type": "string",
-            "enum": [
-              "admin",
-              "operador"
-            ]
+            "enum": ["admin", "operador"]
           },
           "permisos": {
             "type": "array",
             "items": {
               "type": "string"
             },
-            "example": [
-              "CATALOGO_VER",
-              "CATALOGO_EDITAR"
-            ]
+            "example": ["CATALOGO_VER", "CATALOGO_EDITAR"]
           }
         }
       },
       "CategoriaAdmin": {
         "type": "object",
         "description": "Categoria vista desde el panel. Incluye las inactivas.",
-        "required": [
-          "id",
-          "nombre",
-          "slug",
-          "orden",
-          "activa",
-          "cantidadProductos"
-        ],
+        "required": ["id", "nombre", "slug", "orden", "activa", "cantidadProductos"],
         "properties": {
           "id": {
             "type": "integer",
@@ -502,9 +439,7 @@
       },
       "CategoriaEntrada": {
         "type": "object",
-        "required": [
-          "nombre"
-        ],
+        "required": ["nombre"],
         "properties": {
           "nombre": {
             "type": "string",
@@ -561,13 +496,7 @@
       "VarianteAdmin": {
         "type": "object",
         "description": "Variante vista desde el panel. A diferencia de la tienda, expone el stock real.",
-        "required": [
-          "id",
-          "nombre",
-          "precio",
-          "stock",
-          "activa"
-        ],
+        "required": ["id", "nombre", "precio", "stock", "activa"],
         "properties": {
           "id": {
             "type": "integer",
@@ -608,11 +537,7 @@
       },
       "ImagenAdmin": {
         "type": "object",
-        "required": [
-          "id",
-          "url",
-          "orden"
-        ],
+        "required": ["id", "url", "orden"],
         "properties": {
           "id": {
             "type": "integer",
@@ -695,15 +620,7 @@
       "ProductoAdmin": {
         "type": "object",
         "description": "Ficha completa del producto en el panel, con todas sus variantes e imagenes.",
-        "required": [
-          "id",
-          "nombre",
-          "slug",
-          "activo",
-          "destacado",
-          "variantes",
-          "imagenes"
-        ],
+        "required": ["id", "nombre", "slug", "activo", "destacado", "variantes", "imagenes"],
         "properties": {
           "id": {
             "type": "integer",
@@ -757,10 +674,7 @@
       },
       "VarianteEntrada": {
         "type": "object",
-        "required": [
-          "nombre",
-          "precio"
-        ],
+        "required": ["nombre", "precio"],
         "properties": {
           "nombre": {
             "type": "string",
@@ -857,11 +771,7 @@
       },
       "ProductoEntrada": {
         "type": "object",
-        "required": [
-          "categoriaId",
-          "nombre",
-          "variantes"
-        ],
+        "required": ["categoriaId", "nombre", "variantes"],
         "properties": {
           "categoriaId": {
             "type": "integer",
@@ -1024,9 +934,7 @@
   "paths": {
     "/categorias": {
       "get": {
-        "tags": [
-          "Catalogo"
-        ],
+        "tags": ["Catalogo"],
         "summary": "Listar categorias activas",
         "description": "Devuelve las categorias activas ordenadas por su campo de orden. Sin paginacion: son pocas y se usan para armar el menu.\n",
         "responses": {
@@ -1036,9 +944,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "datos"
-                  ],
+                  "required": ["datos"],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -1056,9 +962,7 @@
     },
     "/productos": {
       "get": {
-        "tags": [
-          "Catalogo"
-        ],
+        "tags": ["Catalogo"],
         "summary": "Listar productos",
         "description": "Listado paginado y liviano, pensado para la grilla del catalogo. Incluye el precio minimo entre las variantes activas, si hay stock, y solo la imagen principal.\n\nPara los datos completos de un producto, usar el detalle por slug.\n",
         "parameters": [
@@ -1104,12 +1008,7 @@
             "description": "Criterio de ordenamiento. `defecto`: orden de categoria y despues alfabetico. `precio_asc` / `precio_desc`: por precio minimo de variante activa. `mas_vendidos`: declarado en el contrato pero no implementado todavia; hasta que existan ventas reales devuelve el orden por defecto.\n",
             "schema": {
               "type": "string",
-              "enum": [
-                "defecto",
-                "precio_asc",
-                "precio_desc",
-                "mas_vendidos"
-              ],
+              "enum": ["defecto", "precio_asc", "precio_desc", "mas_vendidos"],
               "default": "defecto"
             }
           }
@@ -1121,10 +1020,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "datos",
-                    "meta"
-                  ],
+                  "required": ["datos", "meta"],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -1161,9 +1057,7 @@
     },
     "/productos/{slug}": {
       "get": {
-        "tags": [
-          "Catalogo"
-        ],
+        "tags": ["Catalogo"],
         "summary": "Detalle de un producto",
         "description": "Ficha completa: todas las variantes activas, todas las imagenes, ingredientes y modo de uso.\n\nSe busca por slug y no por id porque el slug es lo que va en la URL publica y en los links que se comparten.\n",
         "parameters": [
@@ -1207,9 +1101,7 @@
     },
     "/auth/login": {
       "post": {
-        "tags": [
-          "Autenticacion"
-        ],
+        "tags": ["Autenticacion"],
         "summary": "Iniciar sesion en el panel",
         "description": "Verifica las credenciales y deja la sesion en una cookie httpOnly llamada velua_sesion. El token nunca viaja en el cuerpo de la respuesta. Limitado a 10 intentos cada 15 minutos por IP.\n",
         "requestBody": {
@@ -1287,9 +1179,7 @@
     },
     "/auth/logout": {
       "post": {
-        "tags": [
-          "Autenticacion"
-        ],
+        "tags": ["Autenticacion"],
         "summary": "Cerrar sesion",
         "description": "Borra la cookie de sesion. Responde 204 aunque no hubiera sesion.",
         "responses": {
@@ -1301,9 +1191,7 @@
     },
     "/auth/yo": {
       "get": {
-        "tags": [
-          "Autenticacion"
-        ],
+        "tags": ["Autenticacion"],
         "summary": "Usuario de la sesion actual",
         "description": "Devuelve el usuario logueado con sus permisos. El frontend lo usa para saber si hay sesion y que mostrar. Verifica que el usuario siga activo, aunque el token todavia no haya expirado.\n",
         "security": [
@@ -1340,9 +1228,7 @@
     },
     "/admin/productos": {
       "get": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Listar productos para la grilla del panel",
         "description": "Incluye los inactivos. Cada fila trae cuantas variantes activas tiene, el precio minimo, el stock total y cuantas imagenes cargadas, para poder ver de un vistazo que falta completar.\n",
         "security": [
@@ -1379,11 +1265,7 @@
             "name": "estado",
             "schema": {
               "type": "string",
-              "enum": [
-                "todos",
-                "activos",
-                "inactivos"
-              ],
+              "enum": ["todos", "activos", "inactivos"],
               "default": "todos"
             }
           },
@@ -1393,11 +1275,7 @@
             "description": "`recientes` es el orden por defecto. `stock` ordena de menor a mayor stock total, que es lo util para ver que hay que reponer.\n",
             "schema": {
               "type": "string",
-              "enum": [
-                "recientes",
-                "nombre",
-                "stock"
-              ],
+              "enum": ["recientes", "nombre", "stock"],
               "default": "recientes"
             }
           }
@@ -1409,10 +1287,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "datos",
-                    "meta"
-                  ],
+                  "required": ["datos", "meta"],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -1440,9 +1315,7 @@
         }
       },
       "post": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Crear un producto con sus variantes",
         "description": "El producto y sus variantes se crean juntos en una transaccion: el esquema exige al menos una variante, asi que un producto sin ellas quedaria invalido.\n\nReglas de importes: se aceptan con punto o coma y se guardan con dos decimales. `precioAnterior` tiene que ser MAYOR que `precio`; si fuera igual o menor, la tienda mostraria un descuento de cero por ciento.\n",
         "security": [
@@ -1501,9 +1374,7 @@
     },
     "/admin/productos/{id}": {
       "get": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Ficha completa de un producto",
         "description": "Incluye TODAS las variantes, activas e inactivas, con su stock real, y todas las imagenes con su id, que el panel necesita para borrarlas.\n",
         "security": [
@@ -1539,9 +1410,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Editar un producto",
         "description": "Solo se modifican los campos que vienen. NO toca las variantes: cada una tiene sus propios endpoints. Cambiar el nombre no cambia el slug.\n",
         "security": [
@@ -1593,9 +1462,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Borrar un producto",
         "description": "Borra el producto con sus variantes e imagenes, incluidos los archivos en el proveedor.\n\nSolo funciona con productos que NUNCA se vendieron. Si alguna variante figura en un pedido, responde 409 con PRODUCTO_CON_VENTAS: borrarlo dejaria ese pedido apuntando a un producto que ya no existe. Para ese caso esta despublicar, que lo saca de la tienda y conserva el historial.\n\nRequiere el permiso CATALOGO_BORRAR, que solo tiene el rol admin: el operador puede despublicar, que cubre casi todos los casos.\n",
         "security": [
@@ -1639,9 +1506,7 @@
     },
     "/admin/productos/{id}/estado": {
       "patch": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Publicar o despublicar un producto",
         "security": [
           {
@@ -1659,9 +1524,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "activo"
-                ],
+                "required": ["activo"],
                 "properties": {
                   "activo": {
                     "type": "boolean"
@@ -1699,9 +1562,7 @@
     },
     "/admin/productos/{id}/variantes": {
       "post": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Agregar una variante",
         "security": [
           {
@@ -1764,9 +1625,7 @@
     },
     "/admin/productos/{id}/variantes/{varianteId}": {
       "patch": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Editar una variante",
         "description": "Si se cambia `precioAnterior` sin cambiar `precio`, se valida contra el precio que ya tiene la variante. Enviar `precioAnterior` en null quita la oferta.\n",
         "security": [
@@ -1833,9 +1692,7 @@
     },
     "/admin/productos/{id}/variantes/{varianteId}/estado": {
       "patch": {
-        "tags": [
-          "Admin - Productos"
-        ],
+        "tags": ["Admin - Productos"],
         "summary": "Activar o desactivar una variante",
         "description": "Las variantes no se borran nunca: los pedidos historicos las referencian. Desactivada desaparece de la tienda sin perder el vinculo.\n\nNo se puede desactivar la ultima variante activa: quedaria un producto visible que no se puede comprar. En ese caso responde ULTIMA_VARIANTE_ACTIVA.\n",
         "security": [
@@ -1857,9 +1714,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "activa"
-                ],
+                "required": ["activa"],
                 "properties": {
                   "activa": {
                     "type": "boolean"
@@ -1907,9 +1762,7 @@
     },
     "/admin/productos/{id}/imagenes": {
       "get": {
-        "tags": [
-          "Admin - Imagenes"
-        ],
+        "tags": ["Admin - Imagenes"],
         "summary": "Listar las imagenes de un producto",
         "security": [
           {
@@ -1928,9 +1781,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "datos"
-                  ],
+                  "required": ["datos"],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -1955,9 +1806,7 @@
         }
       },
       "post": {
-        "tags": [
-          "Admin - Imagenes"
-        ],
+        "tags": ["Admin - Imagenes"],
         "summary": "Subir una imagen",
         "description": "Se envia como multipart/form-data, con el archivo en el campo `imagen` y opcionalmente un texto alternativo en `alt`.\n\nFormatos aceptados: jpg, png y webp. Tope de 5 MB. El contenido se verifica mirando los primeros bytes del archivo, no el tipo que declara el navegador, que se puede falsear.\n\nLa imagen se guarda en el proveedor achicada a 1600 px de lado mayor. Los tamanos para cada pantalla salen transformando la URL, sin subir nada adicional. Maximo 8 imagenes por producto.\n",
         "security": [
@@ -1976,9 +1825,7 @@
             "multipart/form-data": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "imagen"
-                ],
+                "required": ["imagen"],
                 "properties": {
                   "imagen": {
                     "type": "string",
@@ -2053,9 +1900,7 @@
     },
     "/admin/productos/{id}/imagenes/orden": {
       "put": {
-        "tags": [
-          "Admin - Imagenes"
-        ],
+        "tags": ["Admin - Imagenes"],
         "summary": "Reordenar la galeria",
         "description": "La primera imagen es la principal: es la que se ve en la grilla de la tienda. Recibe los ids de TODAS las imagenes del producto en el orden deseado; un orden parcial dejaria dos en la misma posicion y la principal seria impredecible.\n",
         "security": [
@@ -2074,20 +1919,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "ids"
-                ],
+                "required": ["ids"],
                 "properties": {
                   "ids": {
                     "type": "array",
                     "items": {
                       "type": "integer"
                     },
-                    "example": [
-                      5,
-                      3,
-                      4
-                    ]
+                    "example": [5, 3, 4]
                   }
                 }
               }
@@ -2130,9 +1969,7 @@
     },
     "/admin/productos/{id}/imagenes/{imagenId}": {
       "patch": {
-        "tags": [
-          "Admin - Imagenes"
-        ],
+        "tags": ["Admin - Imagenes"],
         "summary": "Cambiar el texto alternativo",
         "security": [
           {
@@ -2198,9 +2035,7 @@
         }
       },
       "delete": {
-        "tags": [
-          "Admin - Imagenes"
-        ],
+        "tags": ["Admin - Imagenes"],
         "summary": "Borrar una imagen",
         "description": "Borra el archivo del proveedor y despues la fila. Si el borrado remoto falla, la fila se borra igual: un archivo huerfano molesta menos que una fila apuntando a una imagen que ya no existe, que dejaria la tienda con una foto rota.\n",
         "security": [
@@ -2259,9 +2094,7 @@
     },
     "/admin/categorias": {
       "get": {
-        "tags": [
-          "Admin - Categorias"
-        ],
+        "tags": ["Admin - Categorias"],
         "summary": "Listar todas las categorias",
         "description": "Incluye las inactivas. Cada una trae cuantos productos activos tiene, para poder avisar antes de desactivarla: desactivar una categoria oculta todos sus productos de la tienda.\n",
         "security": [
@@ -2276,9 +2109,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "required": [
-                    "datos"
-                  ],
+                  "required": ["datos"],
                   "properties": {
                     "datos": {
                       "type": "array",
@@ -2300,9 +2131,7 @@
         }
       },
       "post": {
-        "tags": [
-          "Admin - Categorias"
-        ],
+        "tags": ["Admin - Categorias"],
         "summary": "Crear una categoria",
         "description": "Si no se indica slug, se genera del nombre y se le agrega un sufijo si ya existe. Si se indica a mano y esta tomado, se rechaza con CONFLICTO_DE_DATOS. La categoria nueva queda activa y al final del menu.\n",
         "security": [
@@ -2348,9 +2177,7 @@
     },
     "/admin/categorias/orden": {
       "put": {
-        "tags": [
-          "Admin - Categorias"
-        ],
+        "tags": ["Admin - Categorias"],
         "summary": "Reordenar el menu",
         "description": "Recibe los ids de TODAS las categorias en el orden deseado. Se rechaza una lista con faltantes, repetidos o ids desconocidos: un orden parcial dejaria dos categorias en la misma posicion.\n",
         "security": [
@@ -2364,20 +2191,14 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "ids"
-                ],
+                "required": ["ids"],
                 "properties": {
                   "ids": {
                     "type": "array",
                     "items": {
                       "type": "integer"
                     },
-                    "example": [
-                      6,
-                      4,
-                      5
-                    ]
+                    "example": [6, 4, 5]
                   }
                 }
               }
@@ -2417,9 +2238,7 @@
     },
     "/admin/categorias/{id}": {
       "get": {
-        "tags": [
-          "Admin - Categorias"
-        ],
+        "tags": ["Admin - Categorias"],
         "summary": "Obtener una categoria",
         "security": [
           {
@@ -2454,9 +2273,7 @@
         }
       },
       "patch": {
-        "tags": [
-          "Admin - Categorias"
-        ],
+        "tags": ["Admin - Categorias"],
         "summary": "Editar una categoria",
         "description": "Solo se modifican los campos que vienen. Cambiar el nombre NO cambia el slug: para cambiar la URL hay que editar el slug a proposito. Si la categoria esta activa, el panel tiene que avisar que los links anteriores dejan de funcionar.\n",
         "security": [
@@ -2510,9 +2327,7 @@
     },
     "/admin/categorias/{id}/estado": {
       "patch": {
-        "tags": [
-          "Admin - Categorias"
-        ],
+        "tags": ["Admin - Categorias"],
         "summary": "Activar o desactivar una categoria",
         "description": "Desactivar una categoria oculta de la tienda TODOS sus productos, aunque cada uno siga activo. La respuesta incluye cantidadProductos, y el panel tiene que informarlo antes de confirmar.\n",
         "security": [
@@ -2531,9 +2346,7 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": [
-                  "activa"
-                ],
+                "required": ["activa"],
                 "properties": {
                   "activa": {
                     "type": "boolean"
@@ -2571,9 +2384,7 @@
     },
     "/salud": {
       "get": {
-        "tags": [
-          "Sistema"
-        ],
+        "tags": ["Sistema"],
         "summary": "Estado del servicio",
         "description": "Informa version, entorno y estado de la conexion a la base. Responde 200 aunque la base este caida; el estado va en el cuerpo.\n",
         "responses": {

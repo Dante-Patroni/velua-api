@@ -38,15 +38,15 @@ Reglas:
 
 ## 3) Stack
 
-| Herramienta | Propósito |
-|---|---|
-| React 19 | UI |
-| TypeScript | Tipado estático |
-| Vite | Bundler y dev server |
-| React Router v7 (Data Mode) | Enrutamiento, loaders y actions |
-| Tailwind CSS v4 | Estilos utility-first |
-| `@base-ui/react` | Componentes base accesibles |
-| `openapi-typescript` | Genera los tipos de la API desde el OpenAPI |
+| Herramienta                 | Propósito                                   |
+| --------------------------- | ------------------------------------------- |
+| React 19                    | UI                                          |
+| TypeScript                  | Tipado estático                             |
+| Vite                        | Bundler y dev server                        |
+| React Router v7 (Data Mode) | Enrutamiento, loaders y actions             |
+| Tailwind CSS v4             | Estilos utility-first                       |
+| `@base-ui/react`            | Componentes base accesibles                 |
+| `openapi-typescript`        | Genera los tipos de la API desde el OpenAPI |
 
 No se agregan dependencias sin justificar. En particular: no hace falta una librería de estado global, ni `socket.io-client`, ni un cliente HTTP externo.
 
@@ -126,8 +126,7 @@ La API devuelve importes como cadena decimal. Se convierten a número **solo par
 ```ts
 // lib/formato.ts
 export const formatearPrecio = (valor: string) =>
-  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" })
-    .format(Number(valor));
+  new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS" }).format(Number(valor));
 ```
 
 Nunca aritmética en punto flotante sobre importes. Si hace falta una cuenta, la hace el backend.
@@ -140,9 +139,9 @@ El texto legible lo arma el frontend desde `lib/mappings.ts`, con un diccionario
 
 ```ts
 export const MENSAJES_ERROR = {
-  ficha:    { STOCK_INSUFICIENTE: "Nos quedan menos unidades de las que pediste." },
+  ficha: { STOCK_INSUFICIENTE: "Nos quedan menos unidades de las que pediste." },
   checkout: { STOCK_INSUFICIENTE: "Alguien se adelantó. Revisá tu carrito antes de pagar." },
-  general:  { STOCK_INSUFICIENTE: "No hay stock suficiente." },
+  general: { STOCK_INSUFICIENTE: "No hay stock suficiente." },
 } as const;
 ```
 
@@ -305,12 +304,12 @@ recarga deja de funcionar en ese archivo y ESLint lo marca.
 
 Lo que no es componente va al lado, con el sufijo que corresponda:
 
-| Archivo | Qué contiene |
-|---|---|
-| `Pagina.tsx` | El componente de la página |
-| `Pagina.action.ts` | Su loader, su action y las funciones que usan |
-| `Componente.tsx` | El componente |
-| `Componente.utils.ts` | Tipos y funciones auxiliares del componente |
+| Archivo               | Qué contiene                                  |
+| --------------------- | --------------------------------------------- |
+| `Pagina.tsx`          | El componente de la página                    |
+| `Pagina.action.ts`    | Su loader, su action y las funciones que usan |
+| `Componente.tsx`      | El componente                                 |
+| `Componente.utils.ts` | Tipos y funciones auxiliares del componente   |
 
 El test acompaña al archivo que prueba: `Pagina.action.test.ts`,
 `Componente.utils.test.ts`.
@@ -328,33 +327,33 @@ usan siempre por nombre:
 ```css
 @theme {
   /* superficies */
-  --color-crema: #FAF5EA;          /* fondo de página. Nunca blanco puro */
-  --color-crema-clara: #FFFDF8;    /* tarjetas */
-  --color-crema-calida: #F2EADA;   /* bloques editoriales y avisos */
-  --color-borde: #E8DCC8;          /* bordes de tarjeta */
-  --color-borde-frio: #C9BFD8;     /* separadores del encabezado */
+  --color-crema: #faf5ea; /* fondo de página. Nunca blanco puro */
+  --color-crema-clara: #fffdf8; /* tarjetas */
+  --color-crema-calida: #f2eada; /* bloques editoriales y avisos */
+  --color-borde: #e8dcc8; /* bordes de tarjeta */
+  --color-borde-frio: #c9bfd8; /* separadores del encabezado */
 
   /* marca */
-  --color-lavanda: #9084AE;        /* logo, bordes de control, seleccionados */
-  --color-rosa: #D89CA8;           /* acentos decorativos */
+  --color-lavanda: #9084ae; /* logo, bordes de control, seleccionados */
+  --color-rosa: #d89ca8; /* acentos decorativos */
 
   /* texto y acción */
-  --color-tinta: #4A4066;          /* TEXTO, botones, pie */
-  --color-texto-suave: #5B5178;    /* párrafos */
-  --color-texto-tenue: #6B6188;    /* datos secundarios, deshabilitado */
-  --color-etiqueta: #6F6036;       /* versalitas y etiquetas. 5.16 sobre crema cálida */
+  --color-tinta: #4a4066; /* TEXTO, botones, pie */
+  --color-texto-suave: #5b5178; /* párrafos */
+  --color-texto-tenue: #6b6188; /* datos secundarios, deshabilitado */
+  --color-etiqueta: #6f6036; /* versalitas y etiquetas. 5.16 sobre crema cálida */
 
   /* cálidos */
-  --color-dorado: #DBB261;         /* acentos */
-  --color-dorado-hondo: #CA821F;   /* superficies, subrayados, badges. NO texto: 2.87 */
-  --color-dorado-texto: #985C14;   /* links de acción y énfasis. 4.98 sobre crema */
+  --color-dorado: #dbb261; /* acentos */
+  --color-dorado-hondo: #ca821f; /* superficies, subrayados, badges. NO texto: 2.87 */
+  --color-dorado-texto: #985c14; /* links de acción y énfasis. 4.98 sobre crema */
 
   /* estados */
-  --color-error: #B03A2E;          /* campos inválidos y mensajes. 5.53 sobre crema */
+  --color-error: #b03a2e; /* campos inválidos y mensajes. 5.53 sobre crema */
 
   /* verdes */
-  --color-salvia: #7A8C44;         /* íconos. 3.41, mínimo para no-texto */
-  --color-salvia-hondo: #47562B;   /* confirmaciones, stock disponible */
+  --color-salvia: #7a8c44; /* íconos. 3.41, mínimo para no-texto */
+  --color-salvia-hondo: #47562b; /* confirmaciones, stock disponible */
 
   /* tipografía */
   --font-display: "Cormorant Garamond", Georgia, serif;
