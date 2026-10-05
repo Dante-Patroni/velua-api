@@ -41,6 +41,7 @@ module.exports = {
     { name: "Admin - Productos", description: "Gestion de productos y variantes desde el panel" },
     { name: "Admin - Imagenes", description: "Fotos de producto: subida, orden y borrado" },
     { name: "Carrito", description: "Cotizacion del carrito y zonas de envio" },
+    { name: "Pedidos", description: "Creacion de pedidos y consulta publica de su estado" },
   ],
   components: {
     parameters: {
@@ -710,6 +711,120 @@ module.exports = {
           totales: { $ref: "#/components/schemas/TotalesCotizacion" },
           envio: { $ref: "#/components/schemas/DetalleEnvio" },
         },
+      },
+    },
+
+    PedidoEntrada: {
+      type: "object",
+      required: ["items", "cliente", "entrega", "medioPago", "totalEsperado"],
+      properties: {
+        items: {
+          type: "array",
+          minItems: 1,
+          maxItems: 30,
+          items: {
+            type: "object",
+            required: ["varianteId", "cantidad"],
+            properties: {
+              varianteId: { type: "integer", minimum: 1 },
+              cantidad: { type: "integer", minimum: 1 },
+            },
+          },
+        },
+        cliente: {
+          type: "object",
+          required: ["nombre", "email", "telefono"],
+          properties: {
+            nombre: { type: "string", maxLength: 140, example: "Lucía Fernández" },
+            email: { type: "string", format: "email", maxLength: 180 },
+            telefono: { type: "string", maxLength: 40, example: "358 412-3344" },
+            documento: { type: "string", nullable: true, maxLength: 20 },
+          },
+        },
+        entrega: {
+          type: "object",
+          required: ["metodo"],
+          description: "Con envio, zonaEnvioId y la direccion completa son obligatorios.",
+          properties: {
+            metodo: { type: "string", enum: ["envio", "retiro"] },
+            zonaEnvioId: { type: "integer", nullable: true },
+            direccion: {
+              type: "object",
+              nullable: true,
+              properties: {
+                calle: { type: "string", maxLength: 180 },
+                numero: { type: "string", maxLength: 20 },
+                extra: {
+                  type: "string",
+                  nullable: true,
+                  maxLength: 120,
+                  example: "Piso 2, depto B",
+                },
+                ciudad: { type: "string", maxLength: 120 },
+                provincia: { type: "string", maxLength: 80 },
+                cp: { type: "string", maxLength: 20 },
+              },
+            },
+          },
+        },
+        medioPago: { type: "string", enum: ["mercadopago", "transferencia"] },
+        totalEsperado: {
+          type: "string",
+          description:
+            "El total que la clienta vio en pantalla. Si no coincide con el real, se rechaza con TOTAL_CAMBIO.",
+          example: "23500.00",
+        },
+        notas: { type: "string", nullable: true, maxLength: 500 },
+      },
+    },
+    PedidoCreado: {
+      type: "object",
+      required: ["numero", "estadoPago", "medioPago", "total", "expiraEn"],
+      properties: {
+        numero: { type: "string", example: "VEL-4K7Q2X" },
+        estadoPago: { type: "string", example: "pendiente" },
+        medioPago: { type: "string", enum: ["mercadopago", "transferencia"] },
+        total: { type: "string", example: "23500.00" },
+        expiraEn: {
+          type: "string",
+          format: "date-time",
+          description: "Hasta cuando queda apartado el stock si no se paga.",
+        },
+      },
+    },
+    PedidoPublico: {
+      type: "object",
+      description: "Estado de un pedido sin ningun dato personal.",
+      properties: {
+        numero: { type: "string", example: "VEL-4K7Q2X" },
+        estadoPago: {
+          type: "string",
+          enum: ["pendiente", "aprobado", "rechazado", "devuelto", "cancelado"],
+        },
+        estadoPedido: {
+          type: "string",
+          enum: ["nuevo", "en_preparacion", "enviado", "entregado", "cancelado"],
+        },
+        medioPago: { type: "string", enum: ["mercadopago", "transferencia"] },
+        metodoEntrega: { type: "string", enum: ["envio", "retiro"] },
+        expiraEn: { type: "string", format: "date-time", nullable: true },
+        comprobanteInformado: { type: "boolean" },
+        seguimiento: { type: "string", nullable: true },
+        creadoEn: { type: "string", format: "date-time" },
+        items: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              producto: { type: "string" },
+              variante: { type: "string" },
+              cantidad: { type: "integer" },
+              precioUnitario: { type: "string" },
+              subtotal: { type: "string" },
+            },
+          },
+        },
+        totales: { $ref: "#/components/schemas/TotalesCotizacion" },
       },
     },
     responses: {

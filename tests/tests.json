@@ -1329,6 +1329,586 @@
       ]
     },
     {
+      "name": "Pedidos",
+      "item": [
+        {
+          "name": "GET /productos (elegir uno)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?limite=50",
+              "host": ["{{base_url}}"],
+              "path": ["productos?limite=50"]
+            },
+            "description": "Toma un producto con stock del catalogo publico, para no depender de ids fijos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json().datos.find((x) => x.hayStock);",
+                  "pm.test('Hay un producto con stock', () => pm.expect(p).to.not.be.undefined);",
+                  "pm.collectionVariables.set('ped_slug', p.slug);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos/{slug} (variante)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos/{{ped_slug}}",
+              "host": ["{{base_url}}"],
+              "path": ["productos", "{{ped_slug}}"]
+            },
+            "description": "De la ficha publica salen el id del producto y el de una variante con stock."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "const v = p.variantes.find((x) => x.hayStock);",
+                  "pm.collectionVariables.set('ped_producto_id', p.id);",
+                  "pm.collectionVariables.set('ped_variante_id', v.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login (para el stock)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "Cada corrida crea pedidos reales que descuentan stock, y sin el job de vencimientos ese stock no vuelve. El grupo entra al panel para anotar el stock original y restaurarlo al final.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 200', () => pm.response.to.have.status(200));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock original",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{ped_producto_id}}"]
+            },
+            "description": "Anota el stock real de la variante antes de crear pedidos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "pm.collectionVariables.set('ped_stock_original', v.stock);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar (total a mostrar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "El mismo recorrido que hace la tienda: primero se cotiza y se muestra el total.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"medioPago\": \"transferencia\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('ped_total', pm.response.json().totales.total);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "Crea el pedido con el total que se mostro.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman\", \"email\": \"newman@ejemplo.test\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const p = pm.response.json();",
+                  "",
+                  "pm.test('El numero tiene el formato acordado, sin caracteres confundibles', () => {",
+                  "    pm.expect(p.numero).to.match(/^VEL-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6}$/);",
+                  "});",
+                  "pm.test('Queda con el pago pendiente', () => pm.expect(p.estadoPago).to.eql('pendiente'));",
+                  "pm.test('El total es el que se mostro', () => {",
+                  "    pm.expect(p.total).to.eql(pm.collectionVariables.get('ped_total'));",
+                  "});",
+                  "pm.test('Informa hasta cuando queda apartado el stock', () => pm.expect(p.expiraEn).to.be.a('string'));",
+                  "",
+                  "pm.collectionVariables.set('ped_numero', p.numero);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pedidos/{numero}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos/{{ped_numero}}",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "{{ped_numero}}"]
+            },
+            "description": "La consulta publica que usa la pagina de resultado."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "",
+                  "pm.test('Trae el estado y el medio de pago', () => {",
+                  "    pm.expect(p.estadoPago).to.eql('pendiente');",
+                  "    pm.expect(p.medioPago).to.eql('transferencia');",
+                  "    pm.expect(p.comprobanteInformado).to.eql(false);",
+                  "});",
+                  "",
+                  "pm.test('NO expone ningun dato personal', () => {",
+                  "    const texto = pm.response.text();",
+                  "    pm.expect(texto).to.not.include('Prueba Newman');",
+                  "    pm.expect(texto).to.not.include('newman@');",
+                  "    pm.expect(texto).to.not.include('358 400');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock despues del pedido",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{ped_producto_id}}"]
+            },
+            "description": "El pedido aparto una unidad."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "const original = Number(pm.collectionVariables.get('ped_stock_original'));",
+                  "pm.test('El stock bajo una unidad', () => pm.expect(v.stock).to.eql(original - 1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos con total distinto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "Nunca cobrar algo distinto de lo que la clienta vio: si el total no coincide, se rechaza.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman\", \"email\": \"newman@ejemplo.test\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"1.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Devuelve TOTAL_CAMBIO', () => pm.expect(pm.response.json().error).to.eql('TOTAL_CAMBIO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock despues del rechazo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{ped_producto_id}}"]
+            },
+            "description": "Un rechazo no deja nada: el stock sigue igual que despues del primer pedido."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "const original = Number(pm.collectionVariables.get('ped_stock_original'));",
+                  "pm.test('El rechazo no toco el stock', () => pm.expect(v.stock).to.eql(original - 1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos con envio sin direccion",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "Con envio, la direccion completa es obligatoria, y el error dice que falta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman\", \"email\": \"newman@ejemplo.test\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"envio\", \"zonaEnvioId\": 1, \"direccion\": {} },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(r.error).to.eql('DATOS_INVALIDOS'));",
+                  "pm.test('Indica el campo que falta', () => pm.expect(r.details).to.have.property('entrega.direccion.calle'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos con mail invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "El formato de cada campo lo valida la ruta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman\", \"email\": \"no-es-un-mail\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo del mail', () => pm.expect(pm.response.json().details).to.have.property('cliente.email'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos con medio de pago invalido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "Solo Mercado Pago o transferencia.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman\", \"email\": \"newman@ejemplo.test\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"efectivo\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo medioPago', () => pm.expect(pm.response.json().details).to.have.property('medioPago'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pedidos con numero inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos/VEL-ZZZZZZ",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "VEL-ZZZZZZ"]
+            },
+            "description": "Un numero con buen formato que no existe."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Devuelve NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pedidos con numero mal formado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos/cualquier-cosa",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos", "cualquier-cosa"]
+            },
+            "description": "Se rechaza sin consultar la base."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 404', () => pm.response.to.have.status(404));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH stock (restaurar)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}/variantes/{{ped_variante_id}}",
+              "host": ["{{base_url}}"],
+              "path": [
+                "admin",
+                "productos",
+                "{{ped_producto_id}}",
+                "variantes",
+                "{{ped_variante_id}}"
+              ]
+            },
+            "description": "Devuelve el stock a como estaba, para que correr Newman muchas veces no vacie el catalogo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": {{ped_stock_original}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "pm.test('El stock volvio al original', () => {",
+                  "    pm.expect(v.stock).to.eql(Number(pm.collectionVariables.get('ped_stock_original')));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (pedidos)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            },
+            "description": "Cierra la sesion que abrio el grupo."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 204', () => pm.response.to.have.status(204));"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Autenticacion",
       "item": [
         {
@@ -3382,6 +3962,30 @@
     },
     {
       "key": "subtotal_base",
+      "value": ""
+    },
+    {
+      "key": "ped_slug",
+      "value": ""
+    },
+    {
+      "key": "ped_producto_id",
+      "value": ""
+    },
+    {
+      "key": "ped_variante_id",
+      "value": ""
+    },
+    {
+      "key": "ped_stock_original",
+      "value": ""
+    },
+    {
+      "key": "ped_total",
+      "value": ""
+    },
+    {
+      "key": "ped_numero",
       "value": ""
     }
   ]

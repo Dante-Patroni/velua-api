@@ -79,6 +79,9 @@ jobs:
       - name: Tests E2E (Newman)
         run: npm test
 
+      - name: Prueba de concurrencia del checkout
+        run: node scripts/probar-concurrencia.js
+
       - name: Mostrar logs del servidor si falló
         if: failure()
         run: cat server.log
