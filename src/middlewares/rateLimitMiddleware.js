@@ -25,11 +25,26 @@ const limitadorLogin = rateLimit({
  * @description Limite general para toda la API. Segunda capa contra scrapers.
  */
 const limitadorGlobal = rateLimit({
-  windowMs: 60 * 1000,
-  max: 100,
+  limit: process.env.NODE_ENV === "production" ? 100 : 10000,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   handler: handlerLimiteSuperado,
 });
 
-module.exports = { limitadorLogin, limitadorGlobal };
+/**
+ * @description Límite para crear pedidos. Crear un pedido aparta stock: sin límite,
+ * alguien podría crear cien pedidos falsos y dejar el catálogo agotado durante una
+ * hora. Una clienta real nunca llega a diez por hora.
+ *
+ * Fuera de producción el límite es alto, para que correr Newman varias veces
+ * seguidas no se bloquee solo.
+ */
+const limitadorPedidos = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: process.env.NODE_ENV === "production" ? 10 : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: handlerLimiteSuperado,
+});
+
+module.exports = { limitadorLogin, limitadorGlobal, limitadorPedidos };
