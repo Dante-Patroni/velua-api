@@ -43,8 +43,6 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Cada aroma o fórmula es un producto propio, con su slug. El eje de
   variante es el tamaño.
 - **2026-09** Las categorías son colecciones, no tipos de producto.
-- **2026-09** Los combos son cajas fijas armadas de antemano, no configurables. Cada
-  combo es un producto más, con stock propio.
 - **2026-09** Édition Unique: lo irrepetible es el diseño de cada pieza, no la
   fórmula. Se repone y se produce como cualquier otra colección.
 - **2026-09** Los totales los calcula únicamente el backend, en `services/cotizador`.
@@ -66,7 +64,7 @@ antes de tocar código. Cada línea lleva fecha.
   referencian. Y no se puede desactivar la última activa de un producto.
 - **2026-10** Un producto se puede borrar de verdad **solo si nunca se vendió**. Si
   tiene ventas, se despublica. Permiso `CATALOGO_BORRAR`, que solo tiene el admin.
-  - **2026-10** Combos configurables. La clienta elige los jabones de la caja.
+- **2026-10** Combos configurables. La clienta elige los jabones de la caja.
   Cada combo define cuántos jabones lleva y de qué precio se pueden elegir; entran
   los de cualquier colección con ese precio normal, incluidos los que estén en
   oferta, que entran a su precio normal porque el combo tiene precio fijo. Se
@@ -186,8 +184,7 @@ antes de tocar código. Cada línea lleva fecha.
 
 - **2026-09** Notificación de reposición. El link "Avisarme" de las tarjetas agotadas
   abre WhatsApp: cuando vuelve el stock se avisa a mano.
-- **2026-09** Combos configurables con casilleros. Descartado.
-
+  
 ---
 
 ## Pendientes de decidir
