@@ -95,7 +95,7 @@ Cada uno es una rama y un PR. Lo que no depende de servicios externos va primero
 
 _Terminado cuando:_ las migraciones van y vuelven, y el seed deja pedidos para ver.
 
-### 2. Servicio de checkout
+### 2. Servicio de checkout ✅
 
 `feat/checkout`
 

@@ -18,7 +18,7 @@ Estas decisiones ya están tomadas. Cambiarlas implica revisar el plan entero.
 | Aromas             | Cada aroma o fórmula es un producto propio, con su slug y su ficha                                         |
 | Variantes          | Un solo eje, usado para tamaño. Todo producto tiene al menos una                                           |
 | Categorías         | Son colecciones, no tipos de producto                                                                      |
-| Combos             | Producto fijo con stock propio. Las cajas se arman de antemano, no hay configurador                        |
+| | Combos | Configurables: la clienta elige los jabones. Se construyen en H8; hasta entonces, cajas fijas |                      |
 | Precios            | Un único precio de lista. El ajuste por medio de pago es global                                            |
 | Pagos              | Mercado Pago para tarjeta. Transferencia como segundo medio                                                |
 | Cuentas de cliente | No hay. Se compra como invitado                                                                            |
@@ -306,6 +306,15 @@ _Terminado cuando:_ el checklist legal está completo y verificado contra la nor
 Rate limit, cabeceras de seguridad, revisión de validaciones, backups automáticos de la base, monitoreo de caídas, carga del catálogo real, prueba con tres clientas reales.
 
 _Terminado cuando:_ la tienda está abierta.
+
+### H8 · Combos configurables
+
+Selector de jabones en la tienda, configuración de cada combo en el panel,
+stock de la caja más el de cada jabón elegido, y los componentes congelados en
+el pedido para que la dueña sepa qué armar.
+
+_Terminado cuando:_ una clienta arma una caja eligiendo sus jabones, la paga, y
+el pedido muestra qué va adentro.
 
 ---
 

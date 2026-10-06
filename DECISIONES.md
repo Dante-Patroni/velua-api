@@ -66,6 +66,15 @@ antes de tocar código. Cada línea lleva fecha.
   referencian. Y no se puede desactivar la última activa de un producto.
 - **2026-10** Un producto se puede borrar de verdad **solo si nunca se vendió**. Si
   tiene ventas, se despublica. Permiso `CATALOGO_BORRAR`, que solo tiene el admin.
+  - **2026-10** Combos configurables. La clienta elige los jabones de la caja.
+  Cada combo define cuántos jabones lleva y de qué precio se pueden elegir; entran
+  los de cualquier colección con ese precio normal, incluidos los que estén en
+  oferta, que entran a su precio normal porque el combo tiene precio fijo. Se
+  puede repetir el mismo. Los agotados no se ofrecen, y si uno se agota durante
+  la compra, se le pide reelegir: nunca se reemplaza sin preguntar. La caja tiene
+  stock propio: sin cajas, el combo no está disponible.
+- **2026-10** Se construye al final, después de probar todo lo demás. Mientras
+  tanto, los combos son cajas fijas cargadas como productos comunes.
 
 ---
 

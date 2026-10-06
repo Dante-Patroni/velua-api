@@ -1,0 +1,10 @@
+extends:
+  - recommended
+rules:
+  security-defined: off
+  operation-operationId: off
+  operation-4xx-response: off
+  info-license: off
+  no-server-example.com: off
+  nullable-type-sibling: warn
+  no-invalid-schema-examples: warn
