@@ -479,9 +479,10 @@ No implementar sin pedido explícito: cuentas de clientas con historial, lista d
 "Avisarme". Por ahora ese link abre WhatsApp: cuando vuelve el stock se avisa a
 mano. No hay endpoint de suscripción ni lo va a haber por ahora.
 
-**Combos configurables.** Los combos son cajas fijas armadas de antemano, o sea
-productos comunes con su propio stock en la categoría Combos. No hay configurador
-ni casilleros: se descartó.
+**Combos configurables.** Decididos, pero se construyen en el hito 8. Hasta
+entonces, un combo es un producto común con su propio stock, en la categoría
+Combos. No implementes selector, casilleros ni descuento de stock por
+componente antes del H8: las reglas están en `DECISIONES.md`.
 
 ---
 
