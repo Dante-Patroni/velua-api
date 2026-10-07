@@ -44,6 +44,7 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING(500),
         allowNull: true,
         field: "imagen_url",
+        imagenPublicId: { type: DataTypes.STRING(255), allowNull: true },
       },
       orden: {
         type: DataTypes.SMALLINT,
