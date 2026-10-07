@@ -16,6 +16,7 @@ const ATRIBUTOS = [
   "slug",
   "descripcion",
   "imagenUrl",
+  "imagenPublicId",
   "orden",
   "activa",
   [CANTIDAD_PRODUCTOS, "cantidadProductos"],

@@ -3,6 +3,12 @@ const { generarSlug, generarSlugUnico } = require("../utils/slug");
 const LARGO_SLUG = 80;
 
 /**
+ * @description Carpeta donde se guardan las imágenes de las colecciones en el
+ * proveedor. Separada de la de productos para poder revisarlas por separado.
+ */
+const CARPETA_IMAGENES = "velua/categorias";
+
+/**
  * @description Recorta una categoría al formato que expone el panel.
  * @param {Object} categoria - Categoría cruda del repositorio.
  * @returns {Object} Categoría con los campos del contrato del panel.
@@ -23,11 +29,14 @@ const mapearCategoriaAdmin = (categoria) => ({
  */
 class CategoriaAdminService {
   /**
-   * @description Instancia el servicio inyectando el repositorio.
+   * @description Instancia el servicio inyectando sus dependencias.
    * @param {Object} categoriaRepository - Implementación de CategoriaRepository.
+   * @param {Object} [imagenStorage] - Implementación de ImagenStorage. Solo la usan
+   *   subirImagen y quitarImagen.
    */
-  constructor(categoriaRepository) {
+  constructor(categoriaRepository, imagenStorage = null) {
     this.categoriaRepository = categoriaRepository;
+    this.imagenStorage = imagenStorage;
   }
 
   /**
@@ -164,6 +173,81 @@ class CategoriaAdminService {
 
     await this.categoriaRepository.reordenar(idsEnOrden);
     return this.listar();
+  }
+
+  /**
+   * @description Sube la imagen de una categoría, reemplazando la anterior si había.
+   *
+   * La subida al proveedor no entra en la base, así que el orden importa: primero
+   * se sube la nueva, después se guarda, y recién al final se borra la vieja. Si
+   * guardar falla, se borra la recién subida para no dejar un huérfano. Si borrar
+   * la vieja falla, no se informa error: la categoría ya quedó bien y un archivo
+   * huérfano molesta menos que una operación que parece fallida y no lo fue.
+   *
+   * @param {number} id - Id de la categoría.
+   * @param {Buffer} archivo - Contenido del archivo ya validado.
+   * @returns {Promise<Object>} Categoría con la imagen nueva.
+   * @throws {Error} NO_ENCONTRADO, ERROR_AL_SUBIR
+   */
+  async subirImagen(id, archivo) {
+    const actual = await this.categoriaRepository.buscarPorId(id);
+    if (!actual) {
+      throw new Error("NO_ENCONTRADO");
+    }
+
+    const { url, publicId } = await this.imagenStorage.subir(archivo, CARPETA_IMAGENES);
+
+    try {
+      await this.categoriaRepository.actualizar(id, {
+        imagenUrl: url,
+        imagenPublicId: publicId,
+      });
+    } catch (error) {
+      await this.#borrarRemotoSinFallar(publicId);
+      throw error;
+    }
+
+    if (actual.imagenPublicId) {
+      await this.#borrarRemotoSinFallar(actual.imagenPublicId);
+    }
+
+    return this.obtener(id);
+  }
+
+  /**
+   * @description Quita la imagen de una categoría. Primero la base, después el
+   * proveedor: si el borrado remoto falla, queda un huérfano, pero nunca una
+   * colección apuntando a una imagen que ya no existe.
+   * @param {number} id - Id de la categoría.
+   * @returns {Promise<Object>} Categoría sin imagen.
+   * @throws {Error} NO_ENCONTRADO
+   */
+  async quitarImagen(id) {
+    const actual = await this.categoriaRepository.buscarPorId(id);
+    if (!actual) {
+      throw new Error("NO_ENCONTRADO");
+    }
+
+    await this.categoriaRepository.actualizar(id, { imagenUrl: null, imagenPublicId: null });
+
+    if (actual.imagenPublicId) {
+      await this.#borrarRemotoSinFallar(actual.imagenPublicId);
+    }
+
+    return this.obtener(id);
+  }
+
+  /**
+   * @description Borra un archivo del proveedor sin propagar errores.
+   * @param {string} publicId - Identificador remoto.
+   * @returns {Promise<void>}
+   */
+  async #borrarRemotoSinFallar(publicId) {
+    try {
+      await this.imagenStorage.borrar(publicId);
+    } catch {
+      // Queda un archivo huérfano en el proveedor: se acepta antes que fallar
+    }
   }
 
   /**
