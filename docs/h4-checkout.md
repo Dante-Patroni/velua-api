@@ -121,6 +121,8 @@ máquina de estados y devuelve el stock.
 
 _Terminado cuando:_ un pedido vencido a propósito vuelve su stock solo.
 
+**Hecho:** 2026-10-07. Probado contra MySQL: 5 pedidos vencidos cancelados con su stock devuelto, el pedido con comprobante intacto, y la segunda vuelta sin efecto.
+
 ### 4. Adaptador de pagos y Mercado Pago
 
 `feat/pagos-mercadopago`
