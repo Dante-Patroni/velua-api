@@ -69,8 +69,8 @@ class PedidoEstadoService {
       // En orden de variante, igual que el checkout, para que dos transacciones
       // que tocan las mismas variantes no se traben entre sí.
       const items = (await tx.listarItems(pedido.id))
-        .filter((i) => Number.isInteger(i.varianteId)
-        .sort((a, b) => a.varianteId - b.varianteId));
+        .filter((i) => Number.isInteger(i.varianteId))
+        .sort((a, b) => a.varianteId - b.varianteId);
       for (const item of items) {
         await tx.reponerStock(item.varianteId, item.cantidad);
       }
