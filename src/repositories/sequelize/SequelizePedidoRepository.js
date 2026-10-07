@@ -1,4 +1,7 @@
+const { Op } = require("sequelize");
+
 const { PedidoRepository, PedidoTransaccion } = require("../PedidoRepository");
+const { ESTADOS_PAGO_VENCIBLES } = require("../../services/transicionesPedido");
 
 /**
  * @description Repositorio atado a una transacción de Sequelize. Todas sus
@@ -164,6 +167,60 @@ class SequelizePedidoTransaccion extends PedidoTransaccion {
       { transaction: this.t }
     );
   }
+
+  /**
+   * @description Lee un pedido con FOR UPDATE. Mientras dure la transacción, nadie
+   * más puede cambiarlo: si el webhook quiere aprobarlo al mismo tiempo, espera.
+   * @param {number} id - Id del pedido.
+   * @returns {Promise<Object|null>} Pedido crudo, o null.
+   */
+  async bloquearPedido(id) {
+    const pedido = await this.models.Pedido.findByPk(id, {
+      transaction: this.t,
+      lock: this.t.LOCK.UPDATE,
+    });
+    return pedido ? pedido.toJSON() : null;
+  }
+
+  /**
+   * @description Lista los ítems de un pedido.
+   * @param {number} pedidoId - Id del pedido.
+   * @returns {Promise<Array<{varianteId: number|null, cantidad: number}>>} Ítems.
+   */
+  async listarItems(pedidoId) {
+    const items = await this.models.PedidoItem.findAll({
+      where: { pedidoId },
+      attributes: ["varianteId", "cantidad"],
+      transaction: this.t,
+    });
+    return items.map((i) => i.toJSON());
+  }
+
+  /**
+   * @description Devuelve unidades al stock de una variante.
+   * @param {number} varianteId - Id de la variante.
+   * @param {number} cantidad - Unidades a devolver.
+   * @returns {Promise<void>}
+   */
+  async reponerStock(varianteId, cantidad) {
+    await this.models.sequelize.query(
+      "UPDATE variantes SET stock = stock + :cantidad WHERE id = :id",
+      { replacements: { id: varianteId, cantidad }, transaction: this.t }
+    );
+  }
+
+  /**
+   * @description Guarda los estados nuevos del pedido.
+   * @param {number} pedidoId - Id del pedido.
+   * @param {{estadoPago?: string, estadoPedido?: string}} estados - Estados nuevos.
+   * @returns {Promise<void>}
+   */
+  async actualizarEstados(pedidoId, estados) {
+    await this.models.Pedido.update(estados, {
+      where: { id: pedidoId },
+      transaction: this.t,
+    });
+  }
 }
 
 /**
@@ -203,6 +260,26 @@ class SequelizePedidoRepository extends PedidoRepository {
       order: [[{ model: this.models.PedidoItem, as: "items" }, "id", "ASC"]],
     });
     return pedido ? pedido.toJSON() : null;
+  }
+
+  /**
+   * @description Lista los ids de los pedidos con la reserva vencida.
+   * @param {Date} ahora - Momento de referencia.
+   * @param {number} limite - Máximo de pedidos por vuelta.
+   * @returns {Promise<number[]>} Ids, los más viejos primero.
+   */
+  async listarVencidos(ahora, limite) {
+    const pedidos = await this.models.Pedido.findAll({
+      attributes: ["id"],
+      where: {
+        estadoPago: { [Op.in]: ESTADOS_PAGO_VENCIBLES },
+        expiraEn: { [Op.lte]: ahora },
+        comprobanteInformadoEn: null,
+      },
+      order: [["expiraEn", "ASC"]],
+      limit: limite,
+    });
+    return pedidos.map((p) => p.id);
   }
 }
 

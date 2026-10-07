@@ -26,6 +26,18 @@ class PedidoRepository {
   async buscarPorNumero(_numero) {
     throw new Error("Metodo buscarPorNumero no implementado");
   }
+
+  /**
+   * @description Lista los ids de los pedidos cuya reserva venció: pago pendiente o
+   * rechazado, plazo pasado y sin comprobante informado. No bloquea nada: es solo la
+   * lista de candidatos, y cada uno se vuelve a verificar con candado al cancelarlo.
+   * @param {Date} _ahora - Momento de referencia.
+   * @param {number} _limite - Máximo de pedidos por vuelta.
+   * @returns {Promise<number[]>} Ids, los más viejos primero.
+   */
+  async listarVencidos(_ahora, _limite) {
+    throw new Error("Metodo listarVencidos no implementado");
+  }
 }
 
 /**
@@ -117,6 +129,45 @@ class PedidoTransaccion {
    */
   async encolarEmail(_email) {
     throw new Error("Metodo encolarEmail no implementado");
+  }
+
+  /**
+   * @description Lee un pedido y lo bloquea hasta el fin de la transacción.
+   * @param {number} _id - Id del pedido.
+   * @returns {Promise<Object|null>} Pedido crudo, o null si no existe.
+   */
+  async bloquearPedido(_id) {
+    throw new Error("Metodo bloquearPedido no implementado");
+  }
+
+  /**
+   * @description Lista los ítems de un pedido, con su variante y cantidad.
+   * @param {number} _pedidoId - Id del pedido.
+   * @returns {Promise<Array<{varianteId: number|null, cantidad: number}>>} Ítems.
+   */
+  async listarItems(_pedidoId) {
+    throw new Error("Metodo listarItems no implementado");
+  }
+
+  /**
+   * @description Devuelve unidades al stock de una variante.
+   * @param {number} _varianteId - Id de la variante.
+   * @param {number} _cantidad - Unidades a devolver.
+   * @returns {Promise<void>}
+   */
+  async reponerStock(_varianteId, _cantidad) {
+    throw new Error("Metodo reponerStock no implementado");
+  }
+
+  /**
+   * @description Guarda los estados nuevos del pedido. Solo lo llama
+   * PedidoEstadoService, después de validar la transición.
+   * @param {number} _pedidoId - Id del pedido.
+   * @param {{estadoPago?: string, estadoPedido?: string}} _estados - Estados nuevos.
+   * @returns {Promise<void>}
+   */
+  async actualizarEstados(_pedidoId, _estados) {
+    throw new Error("Metodo actualizarEstados no implementado");
   }
 }
 
