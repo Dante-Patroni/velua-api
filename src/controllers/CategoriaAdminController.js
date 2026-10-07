@@ -105,6 +105,34 @@ class CategoriaAdminController {
       manejarErrorHttp(error, res);
     }
   };
+
+  /**
+   * @description Sube o reemplaza la imagen de una categoría.
+   * @param {import("express").Request} req - Request con el id y el archivo en req.file.
+   * @param {import("express").Response} res - Response de Express.
+   * @returns {Promise<void>}
+   */
+  subirImagen = async (req, res) => {
+    try {
+      res.status(200).json(await this.servicio.subirImagen(req.params.id, req.file.buffer));
+    } catch (error) {
+      manejarErrorHttp(error, res);
+    }
+  };
+
+  /**
+   * @description Quita la imagen de una categoría.
+   * @param {import("express").Request} req - Request con el id.
+   * @param {import("express").Response} res - Response de Express.
+   * @returns {Promise<void>}
+   */
+  quitarImagen = async (req, res) => {
+    try {
+      res.status(200).json(await this.servicio.quitarImagen(req.params.id));
+    } catch (error) {
+      manejarErrorHttp(error, res);
+    }
+  };
 }
 
 module.exports = CategoriaAdminController;

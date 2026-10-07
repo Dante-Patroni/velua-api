@@ -40,10 +40,15 @@ module.exports = (sequelize) => {
         type: DataTypes.STRING(300),
         allowNull: true,
       },
-      imagenUrl: {
+            imagenUrl: {
         type: DataTypes.STRING(500),
         allowNull: true,
         field: "imagen_url",
+      },
+      imagenPublicId: {
+        type: DataTypes.STRING(255),
+        allowNull: true,
+        field: "imagen_public_id",
       },
       orden: {
         type: DataTypes.SMALLINT,

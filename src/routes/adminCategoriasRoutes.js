@@ -9,11 +9,13 @@ const { authMiddleware } = require("../middlewares/authMiddleware");
 const { soloPermisos } = require("../middlewares/roleMiddleware");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { PERMISOS } = require("../config/permisos");
+const CloudinaryStorage = require("../almacenamiento/CloudinaryStorage");
+const { recibirImagen } = require("../middlewares/subidaImagen");
 
 const router = express.Router();
 
 const controller = new CategoriaAdminController(
-  new CategoriaAdminService(new SequelizeCategoriaRepository(db))
+  new CategoriaAdminService(new SequelizeCategoriaRepository(db), new CloudinaryStorage())
 );
 
 /**
@@ -344,6 +346,99 @@ router.patch(
   proteger(PERMISOS.CATALOGO_EDITAR),
   validarEstado,
   controller.cambiarEstado
+);
+
+/**
+ * @openapi
+ * /admin/categorias/{id}/imagen:
+ *   post:
+ *     tags: [Admin - Categorias]
+ *     summary: Subir o reemplazar la imagen de una categoria
+ *     description: >
+ *       Se envia como multipart/form-data, con el archivo en el campo `imagen`.
+ *       Formatos jpg, png y webp, hasta 5 MB; el contenido se verifica por sus
+ *       primeros bytes. Si la categoria ya tenia imagen, la anterior se borra
+ *       del proveedor despues de guardar la nueva.
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/IdRuta'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required: [imagen]
+ *             properties:
+ *               imagen:
+ *                 type: string
+ *                 format: binary
+ *     responses:
+ *       200:
+ *         description: Categoria con la imagen nueva
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CategoriaAdmin'
+ *       400:
+ *         description: ARCHIVO_REQUERIDO, TIPO_ARCHIVO_INVALIDO o ARCHIVO_DEMASIADO_GRANDE.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: ARCHIVO_DEMASIADO_GRANDE
+ *       401:
+ *         $ref: '#/components/responses/NoAutorizado'
+ *       403:
+ *         $ref: '#/components/responses/SinPermiso'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ *       502:
+ *         description: El proveedor de imagenes rechazo la subida.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: ERROR_AL_SUBIR
+ *   delete:
+ *     tags: [Admin - Categorias]
+ *     summary: Quitar la imagen de una categoria
+ *     description: >
+ *       Primero limpia la categoria y despues borra el archivo del proveedor. Si
+ *       el borrado remoto falla, la categoria igual queda sin imagen.
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/IdRuta'
+ *     responses:
+ *       200:
+ *         description: Categoria sin imagen
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CategoriaAdmin'
+ *       401:
+ *         $ref: '#/components/responses/NoAutorizado'
+ *       403:
+ *         $ref: '#/components/responses/SinPermiso'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ */
+router.post(
+  "/admin/categorias/:id/imagen",
+  proteger(PERMISOS.CATALOGO_EDITAR),
+  [validarId(), manejarErroresValidacion],
+  recibirImagen,
+  controller.subirImagen
+);
+router.delete(
+  "/admin/categorias/:id/imagen",
+  proteger(PERMISOS.CATALOGO_EDITAR),
+  [validarId(), manejarErroresValidacion],
+  controller.quitarImagen
 );
 
 module.exports = router;
