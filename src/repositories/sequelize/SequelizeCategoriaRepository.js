@@ -10,6 +10,14 @@ const CANTIDAD_PRODUCTOS = literal(
   "(SELECT COUNT(*) FROM productos p WHERE p.categoria_id = `Categoria`.`id` AND p.activo = 1)"
 );
 
+/**
+ * @description Subconsulta que cuenta las categorías hijas. El panel la usa para
+ * saber si una categoría puede recibir productos o ir debajo de otra.
+ */
+const CANTIDAD_HIJAS = literal(
+  "(SELECT COUNT(*) FROM categorias h WHERE h.padre_id = `Categoria`.`id`)"
+);
+
 const ATRIBUTOS = [
   "id",
   "nombre",
@@ -17,9 +25,11 @@ const ATRIBUTOS = [
   "descripcion",
   "imagenUrl",
   "imagenPublicId",
+  "padreId",
   "orden",
   "activa",
   [CANTIDAD_PRODUCTOS, "cantidadProductos"],
+  [CANTIDAD_HIJAS, "cantidadHijas"],
 ];
 
 /**
@@ -73,6 +83,20 @@ class SequelizeCategoriaRepository extends CategoriaRepository {
     }
     const cantidad = await this.models.Categoria.count({ where });
     return cantidad > 0;
+  }
+
+  /**
+   * @description Indica si una categoría tiene productos, publicados o no. Cuenta
+   * también los despublicados: siguen perteneciendo a la categoría.
+   * @param {number} id - Id de la categoría.
+   * @returns {Promise<boolean>} true si tiene al menos uno.
+   */
+  async tieneProductos(id) {
+    const filas = await this.models.sequelize.query(
+      "SELECT 1 FROM productos WHERE categoria_id = :id LIMIT 1",
+      { replacements: { id }, type: this.models.sequelize.QueryTypes.SELECT }
+    );
+    return filas.length > 0;
   }
 
   /**

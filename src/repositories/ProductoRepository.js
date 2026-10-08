@@ -42,6 +42,15 @@ class ProductoRepository {
   }
 
   /**
+   * @description Indica si una categoría tiene categorías hijas.
+   * @param {number} _categoriaId - Id de la categoría.
+   * @returns {Promise<boolean>} true si tiene al menos una.
+   */
+  async categoriaTieneHijas(_categoriaId) {
+    throw new Error("Metodo categoriaTieneHijas no implementado");
+  }
+
+  /**
    * @description Crea un producto con sus variantes en una sola transacción:
    * el esquema exige al menos una variante, así que un producto sin ellas
    * quedaría inválido.

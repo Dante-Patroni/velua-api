@@ -150,6 +150,15 @@ class SequelizeProductoRepository extends ProductoRepository {
   }
 
   /**
+   * @description Indica si una categoría tiene categorías hijas.
+   * @param {number} categoriaId - Id de la categoría.
+   * @returns {Promise<boolean>} true si tiene al menos una.
+   */
+  async categoriaTieneHijas(categoriaId) {
+    return (await this.models.Categoria.count({ where: { padreId: categoriaId } })) > 0;
+  }
+
+  /**
    * @description Crea un producto con sus variantes en una transacción.
    * Si falla una variante, no queda el producto suelto sin nada que vender.
    * @param {Object} producto - Datos del producto.

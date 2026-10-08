@@ -32,6 +32,15 @@ class CategoriaRepository {
   }
 
   /**
+   * @description Indica si una categoría tiene productos, publicados o no.
+   * @param {number} _id - Id de la categoría.
+   * @returns {Promise<boolean>} true si tiene al menos uno.
+   */
+  async tieneProductos(_id) {
+    throw new Error("Metodo tieneProductos no implementado");
+  }
+
+  /**
    * @description Devuelve el próximo valor de orden disponible, para ubicar una categoría nueva al final.
    * @returns {Promise<number>} Mayor orden existente más uno.
    */

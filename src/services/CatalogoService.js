@@ -5,6 +5,7 @@
  */
 const mapearCategoria = (categoria) => ({
   id: categoria.id,
+  padreId: categoria.padreId ?? null,
   nombre: categoria.nombre,
   slug: categoria.slug,
   descripcion: categoria.descripcion,
@@ -12,8 +13,33 @@ const mapearCategoria = (categoria) => ({
 });
 
 /**
- * @description Servicio para la lectura del catálogo público.
+ * @description Arma el árbol de categorías a partir de la lista plana.
+ *
+ * Arriba quedan las de primer nivel, en su orden, y cada una trae sus hijas en
+ * `hijas`, también en su orden. Una hija cuyo padre no vino en la lista (porque
+ * está desactivado) no aparece: el repositorio ya la filtra, y esto no la
+ * rescata.
+ *
+ * @param {Array<Object>} filas - Categorías crudas, ya ordenadas.
+ * @returns {Array<Object>} Categorías de primer nivel con sus hijas.
  */
+const armarArbol = (filas) => {
+  const hijasPorPadre = new Map();
+  for (const categoria of filas) {
+    if (categoria.padreId) {
+      const hermanas = hijasPorPadre.get(categoria.padreId) ?? [];
+      hermanas.push(mapearCategoria(categoria));
+      hijasPorPadre.set(categoria.padreId, hermanas);
+    }
+  }
+
+  return filas
+    .filter((categoria) => !categoria.padreId)
+    .map((categoria) => ({
+      ...mapearCategoria(categoria),
+      hijas: hijasPorPadre.get(categoria.id) ?? [],
+    }));
+};
 
 /**
  * @description Servicio para la lectura del catálogo público.
@@ -28,11 +54,11 @@ class CatalogoService {
   }
 
   /**
-   * @description Lista las categorías activas del catálogo.
-   * @returns {Promise<Array<Object>>} Categorías listas para la respuesta.
+   * @description Lista las categorías visibles como árbol de dos niveles.
+   * @returns {Promise<Array<Object>>} Categorías de primer nivel, cada una con sus hijas.
    */
-  listarCategorias() {
-    return this.catalogoRepository.listarCategorias();
+  async listarCategorias() {
+    return armarArbol(await this.catalogoRepository.listarCategorias());
   }
 
   /**

@@ -19,9 +19,11 @@ const mapearCategoriaAdmin = (categoria) => ({
   slug: categoria.slug,
   descripcion: categoria.descripcion ?? null,
   imagenUrl: categoria.imagenUrl ?? null,
+  padreId: categoria.padreId ?? null,
   orden: categoria.orden,
   activa: Boolean(categoria.activa),
   cantidadProductos: Number(categoria.cantidadProductos ?? 0),
+  cantidadHijas: Number(categoria.cantidadHijas ?? 0),
 });
 
 /**
@@ -71,10 +73,16 @@ class CategoriaAdminService {
    * @param {string} [datos.slug] - Slug elegido a mano.
    * @param {string} [datos.descripcion] - Descripción corta.
    * @param {string} [datos.imagenUrl] - URL de la imagen de la categoría.
+   * @param {number|null} [datos.padreId] - Categoría padre, o null para el primer nivel.
    * @returns {Promise<Object>} Categoría creada.
-   * @throws {Error} DATOS_INVALIDOS, CONFLICTO_DE_DATOS
+   * @throws {Error} DATOS_INVALIDOS, CONFLICTO_DE_DATOS, CATEGORIA_PADRE_INVALIDA,
+   *   CATEGORIA_CON_PRODUCTOS
    */
-  async crear({ nombre, slug, descripcion, imagenUrl }) {
+  async crear({ nombre, slug, descripcion, imagenUrl, padreId }) {
+    if (padreId) {
+      await this.#validarPadre(null, padreId);
+    }
+
     const slugFinal = slug
       ? await this.#slugElegido(slug)
       : await generarSlugUnico(
@@ -88,6 +96,7 @@ class CategoriaAdminService {
       slug: slugFinal,
       descripcion: descripcion?.trim() || null,
       imagenUrl: imagenUrl || null,
+      padreId: padreId || null,
       orden: await this.categoriaRepository.siguienteOrden(),
       activa: true,
     });
@@ -104,10 +113,13 @@ class CategoriaAdminService {
    * @param {string} [cambios.slug] - Slug nuevo, solo si se edita a propósito.
    * @param {string} [cambios.descripcion] - Descripción corta.
    * @param {string} [cambios.imagenUrl] - URL de la imagen de la categoría.
+   * @param {number|null} [cambios.padreId] - Categoría padre nueva, o null para
+   *   pasarla al primer nivel.
    * @returns {Promise<Object>} Categoría actualizada.
-   * @throws {Error} NO_ENCONTRADO, DATOS_INVALIDOS, CONFLICTO_DE_DATOS
+   * @throws {Error} NO_ENCONTRADO, DATOS_INVALIDOS, CONFLICTO_DE_DATOS,
+   *   CATEGORIA_PADRE_INVALIDA, CATEGORIA_CON_HIJAS, CATEGORIA_CON_PRODUCTOS
    */
-  async actualizar(id, { nombre, slug, descripcion, imagenUrl }) {
+  async actualizar(id, { nombre, slug, descripcion, imagenUrl, padreId }) {
     const actual = await this.categoriaRepository.buscarPorId(id);
     if (!actual) {
       throw new Error("NO_ENCONTRADO");
@@ -119,6 +131,13 @@ class CategoriaAdminService {
     if (imagenUrl !== undefined) aplicar.imagenUrl = imagenUrl || null;
     if (slug !== undefined && slug !== actual.slug) {
       aplicar.slug = await this.#slugElegido(slug, id);
+    }
+    if (padreId !== undefined && (padreId || null) !== (actual.padreId ?? null)) {
+      // Pasar al primer nivel siempre se puede; ir debajo de otra, se valida
+      if (padreId) {
+        await this.#validarPadre(actual, padreId);
+      }
+      aplicar.padreId = padreId || null;
     }
 
     if (Object.keys(aplicar).length > 0) {
@@ -235,6 +254,42 @@ class CategoriaAdminService {
     }
 
     return this.obtener(id);
+  }
+
+  /**
+   * @description Verifica que una categoría pueda ir debajo de otra.
+   *
+   * Hace cumplir las dos reglas del árbol: solo hay dos niveles, y una categoría
+   * tiene productos o tiene hijas, nunca las dos cosas. MySQL no puede expresar
+   * ninguna de las dos, así que viven acá.
+   *
+   * @param {Object|null} categoria - La categoría que se mueve, o null si se está creando.
+   * @param {number} padreId - Id de la categoría padre propuesta.
+   * @returns {Promise<void>}
+   * @throws {Error} CATEGORIA_PADRE_INVALIDA si el padre no existe, es ella misma o
+   *   ya es hija de otra; CATEGORIA_CON_HIJAS si la que se mueve tiene hijas;
+   *   CATEGORIA_CON_PRODUCTOS si el padre tiene productos.
+   */
+  async #validarPadre(categoria, padreId) {
+    if (categoria && Number(padreId) === Number(categoria.id)) {
+      throw new Error("CATEGORIA_PADRE_INVALIDA");
+    }
+
+    const padre = await this.categoriaRepository.buscarPorId(padreId);
+    if (!padre) {
+      throw new Error("CATEGORIA_PADRE_INVALIDA");
+    }
+    // Si el padre ya cuelga de otra, quedarían tres niveles
+    if (padre.padreId) {
+      throw new Error("CATEGORIA_PADRE_INVALIDA");
+    }
+    // Y si la que se mueve tiene hijas, también
+    if (categoria && Number(categoria.cantidadHijas ?? 0) > 0) {
+      throw new Error("CATEGORIA_CON_HIJAS");
+    }
+    if (await this.categoriaRepository.tieneProductos(padreId)) {
+      throw new Error("CATEGORIA_CON_PRODUCTOS");
+    }
   }
 
   /**

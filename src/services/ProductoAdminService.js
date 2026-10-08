@@ -198,6 +198,11 @@ class ProductoAdminService {
     if (!(await this.productoRepository.existeCategoria(categoriaId))) {
       throw datosInvalidos({ categoriaId: "La categoría no existe" });
     }
+    if (await this.productoRepository.categoriaTieneHijas(categoriaId)) {
+      throw datosInvalidos({
+        categoriaId: "Esta categoría agrupa otras: elegí una de las colecciones de adentro",
+      });
+    }
 
     const preparadas = [];
     for (const [i, variante] of variantes.entries()) {
@@ -266,6 +271,11 @@ class ProductoAdminService {
     if (cambios.categoriaId !== undefined && cambios.categoriaId !== actual.categoriaId) {
       if (!(await this.productoRepository.existeCategoria(cambios.categoriaId))) {
         throw datosInvalidos({ categoriaId: "La categoría no existe" });
+      }
+      if (await this.productoRepository.categoriaTieneHijas(cambios.categoriaId)) {
+        throw datosInvalidos({
+          categoriaId: "Esta categoría agrupa otras: elegí una de las colecciones de adentro",
+        });
       }
       aplicar.categoriaId = cambios.categoriaId;
     }

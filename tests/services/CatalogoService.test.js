@@ -37,11 +37,29 @@ describe("CatalogoService", () => {
   });
 
   describe("listarCategorias", () => {
-    it("devuelve lo que entrega el repositorio", async () => {
-      const categorias = [{ id: 1, nombre: "Jabones", slug: "jabones" }];
-      repositorio.listarCategorias.mockResolvedValue(categorias);
+    it("devuelve las categorías del repositorio como árbol", async () => {
+      repositorio.listarCategorias.mockResolvedValue([
+        {
+          id: 1,
+          padreId: null,
+          nombre: "Jabones",
+          slug: "jabones",
+          descripcion: null,
+          imagenUrl: null,
+        },
+      ]);
 
-      await expect(servicio.listarCategorias()).resolves.toEqual(categorias);
+      await expect(servicio.listarCategorias()).resolves.toEqual([
+        {
+          id: 1,
+          padreId: null,
+          nombre: "Jabones",
+          slug: "jabones",
+          descripcion: null,
+          imagenUrl: null,
+          hijas: [],
+        },
+      ]);
       expect(repositorio.listarCategorias).toHaveBeenCalledTimes(1);
     });
   });

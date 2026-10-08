@@ -184,6 +184,17 @@ module.exports = {
             nullable: true,
             format: "uri",
           },
+          padreId: {
+            type: "integer",
+            nullable: true,
+            example: null,
+          },
+          hijas: {
+            type: "array",
+            description:
+              "Solo en GET /categorias y solo en las de primer nivel: sus categorías hijas.",
+            items: { $ref: "#/components/schemas/Categoria" },
+          },
         },
         required: ["id", "nombre", "slug"],
       },
@@ -386,6 +397,16 @@ module.exports = {
           slug: { type: "string", example: "art-du-savon" },
           descripcion: { type: "string", nullable: true },
           imagenUrl: { type: "string", format: "uri", nullable: true },
+          padreId: {
+            type: "integer",
+            nullable: true,
+            description: "Categoría padre. Null si es de primer nivel.",
+          },
+          cantidadHijas: {
+            type: "integer",
+            description: "Si es mayor que cero, la categoría no puede tener productos.",
+            example: 0,
+          },
           orden: { type: "integer", example: 2 },
           activa: { type: "boolean" },
           cantidadProductos: {
@@ -410,6 +431,12 @@ module.exports = {
           },
           descripcion: { type: "string", maxLength: 300, nullable: true },
           imagenUrl: { type: "string", format: "uri", maxLength: 500, nullable: true },
+          padreId: {
+            type: "integer",
+            nullable: true,
+            description:
+              "Categoría padre, que tiene que ser de primer nivel y sin productos. Null para el primer nivel.",
+          },
         },
       },
       CategoriaCambios: {
@@ -421,6 +448,12 @@ module.exports = {
           slug: { type: "string", maxLength: 80, nullable: true },
           descripcion: { type: "string", maxLength: 300, nullable: true },
           imagenUrl: { type: "string", format: "uri", maxLength: 500, nullable: true },
+          padreId: {
+            type: "integer",
+            nullable: true,
+            description:
+              "Categoría padre, que tiene que ser de primer nivel y sin productos. Null para el primer nivel.",
+          },
         },
       },
       VarianteAdmin: {
