@@ -211,6 +211,18 @@
             "type": "string",
             "nullable": true,
             "format": "uri"
+          },
+          "padreId": {
+            "type": "integer",
+            "nullable": true,
+            "example": null
+          },
+          "hijas": {
+            "type": "array",
+            "description": "Solo en GET /categorias y solo en las de primer nivel: sus categorías hijas.",
+            "items": {
+              "$ref": "#/components/schemas/Categoria"
+            }
           }
         },
         "required": [
@@ -494,6 +506,16 @@
             "format": "uri",
             "nullable": true
           },
+          "padreId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Categoría padre. Null si es de primer nivel."
+          },
+          "cantidadHijas": {
+            "type": "integer",
+            "description": "Si es mayor que cero, la categoría no puede tener productos.",
+            "example": 0
+          },
           "orden": {
             "type": "integer",
             "example": 2
@@ -536,6 +558,11 @@
             "format": "uri",
             "maxLength": 500,
             "nullable": true
+          },
+          "padreId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Categoría padre, que tiene que ser de primer nivel y sin productos. Null para el primer nivel."
           }
         }
       },
@@ -563,6 +590,11 @@
             "format": "uri",
             "maxLength": 500,
             "nullable": true
+          },
+          "padreId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Categoría padre, que tiene que ser de primer nivel y sin productos. Null para el primer nivel."
           }
         }
       },
@@ -3005,7 +3037,7 @@
           "Admin - Categorias"
         ],
         "summary": "Crear una categoria",
-        "description": "Si no se indica slug, se genera del nombre y se le agrega un sufijo si ya existe. Si se indica a mano y esta tomado, se rechaza con CONFLICTO_DE_DATOS. La categoria nueva queda activa y al final del menu.\n",
+        "description": "Si no se indica slug, se genera del nombre y se le agrega un sufijo si ya existe. Si se indica a mano y esta tomado, se rechaza con CONFLICTO_DE_DATOS. La categoria nueva queda activa y al final del menu. Si viene padreId, el padre tiene que ser de primer nivel y sin productos: si no, CATEGORIA_PADRE_INVALIDA (400) o CATEGORIA_CON_PRODUCTOS (409).\n",
         "security": [
           {
             "cookieAuth": []
@@ -3159,7 +3191,7 @@
           "Admin - Categorias"
         ],
         "summary": "Editar una categoria",
-        "description": "Solo se modifican los campos que vienen. Cambiar el nombre NO cambia el slug: para cambiar la URL hay que editar el slug a proposito. Si la categoria esta activa, el panel tiene que avisar que los links anteriores dejan de funcionar.\n",
+        "description": "Solo se modifican los campos que vienen. Cambiar el nombre NO cambia el slug: para cambiar la URL hay que editar el slug a proposito. Si la categoria esta activa, el panel tiene que avisar que los links anteriores dejan de funcionar. padreId en null la pasa al primer nivel. Un padre tiene que ser de primer nivel y sin productos, y una categoria con hijas no puede ir debajo de otra: CATEGORIA_PADRE_INVALIDA (400), CATEGORIA_CON_PRODUCTOS (409) o CATEGORIA_CON_HIJAS (409).\n",
         "security": [
           {
             "cookieAuth": []
@@ -3215,7 +3247,7 @@
           "Admin - Categorias"
         ],
         "summary": "Activar o desactivar una categoria",
-        "description": "Desactivar una categoria oculta de la tienda TODOS sus productos, aunque cada uno siga activo. La respuesta incluye cantidadProductos, y el panel tiene que informarlo antes de confirmar.\n",
+        "description": "Desactivar una categoria oculta de la tienda TODOS sus productos, aunque cada uno siga activo. Si tiene hijas, tambien quedan ocultas, con sus productos. La respuesta incluye cantidadProductos y cantidadHijas, y el panel tiene que informarlo antes de confirmar.\n",
         "security": [
           {
             "cookieAuth": []

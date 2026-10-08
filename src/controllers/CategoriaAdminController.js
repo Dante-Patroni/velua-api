@@ -48,8 +48,14 @@ class CategoriaAdminController {
    */
   crear = async (req, res) => {
     try {
-      const { nombre, slug, descripcion, imagenUrl } = req.body;
-      const categoria = await this.servicio.crear({ nombre, slug, descripcion, imagenUrl });
+      const { nombre, slug, descripcion, imagenUrl, padreId } = req.body;
+      const categoria = await this.servicio.crear({
+        nombre,
+        slug,
+        descripcion,
+        imagenUrl,
+        padreId,
+      });
       res.status(201).json(categoria);
     } catch (error) {
       manejarErrorHttp(error, res);
@@ -70,7 +76,9 @@ class CategoriaAdminController {
         slug,
         descripcion,
         imagenUrl,
+        padreId: req.body.padreId,
       });
+
       res.status(200).json(categoria);
     } catch (error) {
       manejarErrorHttp(error, res);

@@ -79,6 +79,17 @@ const reglasCampos = {
       .isURL({ protocols: ["https"], require_protocol: true })
       .withMessage("La imagen tiene que ser una URL https")
       .isLength({ max: 500 }),
+  /**
+   * @description Construye la regla de validación para el campo padreId. Acepta
+   * null, que pasa la categoría al primer nivel.
+   * @returns {Object} Cadena de validación de express-validator.
+   */
+  padreId: () =>
+    body("padreId")
+      .optional({ values: "null" })
+      .isInt({ min: 1 })
+      .withMessage("La categoría padre no es válida")
+      .toInt(),
 };
 
 const validarCrear = [
@@ -86,6 +97,7 @@ const validarCrear = [
   reglasCampos.slug(),
   reglasCampos.descripcion(),
   reglasCampos.imagenUrl(),
+  reglasCampos.padreId(),
   manejarErroresValidacion,
 ];
 
@@ -95,6 +107,7 @@ const validarActualizar = [
   reglasCampos.slug(),
   reglasCampos.descripcion(),
   reglasCampos.imagenUrl(),
+  reglasCampos.padreId(),
   manejarErroresValidacion,
 ];
 
@@ -146,6 +159,8 @@ const validarOrden = [
  *       Si no se indica slug, se genera del nombre y se le agrega un sufijo si ya
  *       existe. Si se indica a mano y esta tomado, se rechaza con
  *       CONFLICTO_DE_DATOS. La categoria nueva queda activa y al final del menu.
+ *       Si viene padreId, el padre tiene que ser de primer nivel y sin productos:
+ *       si no, CATEGORIA_PADRE_INVALIDA (400) o CATEGORIA_CON_PRODUCTOS (409).
  *     security:
  *       - cookieAuth: []
  *     requestBody:
@@ -260,6 +275,10 @@ router.put(
  *       slug: para cambiar la URL hay que editar el slug a proposito. Si la
  *       categoria esta activa, el panel tiene que avisar que los links anteriores
  *       dejan de funcionar.
+ *       padreId en null la pasa al primer nivel. Un padre tiene que ser de primer
+ *       nivel y sin productos, y una categoria con hijas no puede ir debajo de
+ *       otra: CATEGORIA_PADRE_INVALIDA (400), CATEGORIA_CON_PRODUCTOS (409) o
+ *       CATEGORIA_CON_HIJAS (409).
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -309,8 +328,9 @@ router.patch(
  *     summary: Activar o desactivar una categoria
  *     description: >
  *       Desactivar una categoria oculta de la tienda TODOS sus productos, aunque
- *       cada uno siga activo. La respuesta incluye cantidadProductos, y el panel
- *       tiene que informarlo antes de confirmar.
+ *       cada uno siga activo. Si tiene hijas, tambien quedan ocultas, con sus
+ *       productos. La respuesta incluye cantidadProductos y cantidadHijas, y el
+ *       panel tiene que informarlo antes de confirmar.
  *     security:
  *       - cookieAuth: []
  *     parameters:
