@@ -47,6 +47,7 @@ describe("ProductoAdminService", () => {
       buscarPorId: jest.fn().mockResolvedValue(productoCrudo()),
       existeSlug: jest.fn().mockResolvedValue(false),
       existeCategoria: jest.fn().mockResolvedValue(true),
+      categoriaTieneHijas: jest.fn().mockResolvedValue(false),
       existeSku: jest.fn().mockResolvedValue(false),
       crearConVariantes: jest.fn().mockResolvedValue({ id: 1 }),
       actualizar: jest.fn().mockResolvedValue(undefined),
@@ -163,6 +164,16 @@ describe("ProductoAdminService", () => {
       await servicio.crear(base).catch((e) => {
         expect(e.details).toHaveProperty("categoriaId");
       });
+    });
+
+    it("rechaza una categoría que tiene hijas", async () => {
+      repositorio.categoriaTieneHijas.mockResolvedValue(true);
+
+      await expect(servicio.crear(base)).rejects.toMatchObject({
+        message: "DATOS_INVALIDOS",
+        details: { categoriaId: expect.any(String) },
+      });
+      expect(repositorio.crearConVariantes).not.toHaveBeenCalled();
     });
 
     it("genera el slug del nombre", async () => {
@@ -323,6 +334,16 @@ describe("ProductoAdminService", () => {
       repositorio.existeCategoria.mockResolvedValue(false);
 
       await expect(servicio.actualizar(1, { categoriaId: 99 })).rejects.toThrow("DATOS_INVALIDOS");
+      expect(repositorio.actualizar).not.toHaveBeenCalled();
+    });
+
+    it("rechaza mover el producto a una categoría que tiene hijas", async () => {
+      repositorio.categoriaTieneHijas.mockResolvedValue(true);
+
+      await expect(servicio.actualizar(1, { categoriaId: 99 })).rejects.toMatchObject({
+        message: "DATOS_INVALIDOS",
+        details: { categoriaId: expect.any(String) },
+      });
       expect(repositorio.actualizar).not.toHaveBeenCalled();
     });
 
