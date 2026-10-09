@@ -13,6 +13,13 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-09** Merge con squash, siempre, en los dos repos.
 - **2026-09** Archivo de instrucciones para agentes: `AGENTS.md` en ambos repos,
   importado desde `CLAUDE.md`.
+- **2026-10** Para actualizar con `main` una rama ya subida: `git merge main`. El
+  rebase solo en ramas locales que nunca se subieron. Con squash, `main` queda igual.
+- **2026-10** Prettier se corre sobre los archivos tocados, nunca sobre carpetas
+  enteras: en Windows reformatea los fines de línea de archivos ajenos.
+- **2026-10** Las migraciones corren solas en el pre-deploy de Railway
+  (`npx sequelize-cli db:migrate`). Si fallan, el código nuevo no se despliega. Después
+  de cada deploy se revisa en los logs que corrieron.
 
 ---
 
@@ -42,7 +49,17 @@ antes de tocar código. Cada línea lleva fecha.
   variante única.
 - **2026-09** Cada aroma o fórmula es un producto propio, con su slug. El eje de
   variante es el tamaño.
-- **2026-09** Las categorías son colecciones, no tipos de producto.
+- **2026-10** Las categorías tienen dos niveles: una categoría padre (Jabones, Cuidado
+  capilar, Combos) agrupa colecciones, y los productos van en las colecciones. Una
+  categoría tiene productos o tiene hijas, nunca las dos. Desactivar un padre oculta
+  sus hijas y los productos de ellas. (Reemplaza "las categorías son colecciones, no
+  tipos de producto", 2026-09.)
+- **2026-10** Los combos pueden incluir productos de cualquier línea, con el precio
+  que define el combo.
+- **2026-10** Ninguna categoría puede usar un slug igual a una ruta fija de la tienda
+  (`catalogo`, `carrito`, `admin`…). La lista vive en `src/utils/slugsReservados.js`
+  de la API: cada ruta nueva de primer nivel en `rutasTienda` se agrega ahí en el
+  mismo PR o antes.
 - **2026-09** Édition Unique: lo irrepetible es el diseño de cada pieza, no la
   fórmula. Se repone y se produce como cualquier otra colección.
 - **2026-09** Los totales los calcula únicamente el backend, en `services/cotizador`.
