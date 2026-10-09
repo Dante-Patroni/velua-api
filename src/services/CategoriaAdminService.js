@@ -1,4 +1,5 @@
 const { generarSlug, generarSlugUnico } = require("../utils/slug");
+const { esSlugReservado } = require("../utils/slugsReservados");
 
 const LARGO_SLUG = 80;
 
@@ -87,7 +88,7 @@ class CategoriaAdminService {
       ? await this.#slugElegido(slug)
       : await generarSlugUnico(
           generarSlug(nombre, LARGO_SLUG),
-          (s) => this.categoriaRepository.existeSlug(s),
+          (s) => esSlugReservado(s) || this.categoriaRepository.existeSlug(s),
           LARGO_SLUG
         );
 
@@ -310,12 +311,15 @@ class CategoriaAdminService {
    * @param {string} slug - Slug ingresado.
    * @param {number} [excluirId] - Id de la categoría que se está editando.
    * @returns {Promise<string>} Slug normalizado.
-   * @throws {Error} DATOS_INVALIDOS si queda vacío, CONFLICTO_DE_DATOS si está tomado.
+   * @throws {Error} DATOS_INVALIDOS si queda vacío, CONFLICTO_DE_DATOS si está tomado o reservado por la tienda.
    */
   async #slugElegido(slug, excluirId) {
     const normalizado = generarSlug(slug, LARGO_SLUG);
     if (!normalizado) {
       throw new Error("DATOS_INVALIDOS");
+    }
+    if (esSlugReservado(normalizado)) {
+      throw new Error("CONFLICTO_DE_DATOS");
     }
     if (await this.categoriaRepository.existeSlug(normalizado, excluirId)) {
       throw new Error("CONFLICTO_DE_DATOS");

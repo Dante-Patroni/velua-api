@@ -95,7 +95,10 @@
                   "",
                   "// Guarda un slug real para los requests siguientes",
                   "if (cuerpo.datos.length > 0) {",
-                  "    pm.collectionVariables.set('slug_categoria', cuerpo.datos[0].slug);",
+                  "    const c = cuerpo.datos[0];",
+                  "    pm.collectionVariables.set('slug_categoria', c.slug);",
+                  "    // El filtro incluye los productos de las hijas: se aceptan todos esos ids",
+                  "    pm.collectionVariables.set('ids_categoria', JSON.stringify([c.id, ...(c.hijas ?? []).map((h) => h.id)]));",
                   "}"
                 ]
               }
@@ -301,8 +304,9 @@
                   "",
                   "pm.test('Hay resultados para esa categoria', () => pm.expect(cuerpo.datos.length).to.be.above(0));",
                   "",
-                  "pm.test('Todos pertenecen a la categoria pedida', () => {",
-                  "    cuerpo.datos.forEach((p) => pm.expect(p.categoria.slug).to.eql(slug));",
+                  "pm.test('Todos pertenecen a la categoria pedida o a una de sus hijas', () => {",
+                  "    const validos = JSON.parse(pm.collectionVariables.get('ids_categoria'));",
+                  "    cuerpo.datos.forEach((p) => pm.expect(validos, `${p.slug} está en ${p.categoria.slug}`).to.include(p.categoria.id));",
                   "});"
                 ]
               }
