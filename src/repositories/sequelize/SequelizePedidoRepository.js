@@ -281,6 +281,16 @@ class SequelizePedidoRepository extends PedidoRepository {
     });
     return pedidos.map((p) => p.id);
   }
+
+  /**
+   * @description Guarda el id de la preferencia de Mercado Pago.
+   * @param {number} pedidoId - Id del pedido.
+   * @param {string} preferenciaId - Id de la preferencia.
+   * @returns {Promise<void>}
+   */
+  async guardarPreferencia(pedidoId, preferenciaId) {
+    await this.models.Pedido.update({ mpPreferenceId: preferenciaId }, { where: { id: pedidoId } });
+  }
 }
 
 module.exports = SequelizePedidoRepository;

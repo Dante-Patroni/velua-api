@@ -822,6 +822,20 @@ module.exports = {
             format: "date-time",
             description: "Hasta cuando queda apartado el stock si no se paga.",
           },
+          urlPago: {
+            type: "string",
+            nullable: true,
+            description:
+              "Solo con Mercado Pago. Link al que se redirige a la clienta. Null si Mercado Pago no respondió: se reintenta con POST /pedidos/{numero}/pago.",
+          },
+        },
+      },
+      PagoIniciado: {
+        type: "object",
+        required: ["numero", "urlPago"],
+        properties: {
+          numero: { type: "string", example: "VEL-4K7Q2X" },
+          urlPago: { type: "string", description: "Link de pago de Mercado Pago." },
         },
       },
       PedidoPublico: {

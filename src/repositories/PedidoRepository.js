@@ -38,6 +38,17 @@ class PedidoRepository {
   async listarVencidos(_ahora, _limite) {
     throw new Error("Metodo listarVencidos no implementado");
   }
+
+  /**
+   * @description Guarda el id de la preferencia de pago del pedido. Va fuera de la
+   * transacción del checkout: se llama después de hablar con el procesador.
+   * @param {number} _pedidoId - Id del pedido.
+   * @param {string} _preferenciaId - Id de la preferencia en el procesador.
+   * @returns {Promise<void>}
+   */
+  async guardarPreferencia(_pedidoId, _preferenciaId) {
+    throw new Error("Metodo guardarPreferencia no implementado");
+  }
 }
 
 /**

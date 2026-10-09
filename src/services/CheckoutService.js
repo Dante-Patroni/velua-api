@@ -24,6 +24,25 @@ const VENCIMIENTO_HORAS = Object.freeze({ mercadopago: 1, transferencia: 24 });
 
 const MEDIOS = Object.keys(VENCIMIENTO_HORAS);
 
+/** Estados de pago desde los que todavía se puede pagar con Mercado Pago. */
+const ESTADOS_PAGABLES = Object.freeze(["pendiente", "rechazado"]);
+
+/**
+ * @description Normaliza un número de pedido y verifica su forma.
+ * @param {string} numero - Número tal como llegó.
+ * @returns {string} Número en mayúsculas y sin espacios.
+ * @throws {Error} NO_ENCONTRADO si no tiene forma de número de pedido.
+ */
+const normalizarNumero = (numero) => {
+  const texto = String(numero ?? "")
+    .trim()
+    .toUpperCase();
+  if (!/^VEL-[A-Z0-9]{4,12}$/.test(texto)) {
+    throw new Error("NO_ENCONTRADO");
+  }
+  return texto;
+};
+
 /**
  * @description Genera un número de pedido con aleatoriedad criptográfica.
  *
@@ -144,11 +163,21 @@ class CheckoutService {
    * @param {Object} pedidoRepository - Implementación de PedidoRepository.
    * @param {Object} [config] - Parámetros comerciales, los mismos del cotizador.
    * @param {() => Date} [ahora] - Reloj. Se inyecta para poder probar los vencimientos.
+   * @param {Object|null} [procesadorPagos] - Implementación de ProcesadorPagos.
+   * @param {{error: Function}} [logger] - Dónde anotar las fallas del procesador.
    */
-  constructor(pedidoRepository, config = {}, ahora = () => new Date()) {
+  constructor(
+    pedidoRepository,
+    config = {},
+    ahora = () => new Date(),
+    procesadorPagos = null,
+    logger = console
+  ) {
     this.repositorio = pedidoRepository;
     this.config = config;
     this.ahora = ahora;
+    this.procesadorPagos = procesadorPagos;
+    this.logger = logger;
   }
 
   /**
@@ -163,7 +192,8 @@ class CheckoutService {
    * mostró, rechaza y el frontend vuelve a cotizar.
    *
    * @param {Object} entrada - Carrito, clienta, entrega, medio de pago y total visto.
-   * @returns {Promise<Object>} Número, total, medio de pago y vencimiento.
+   * @returns {Promise<Object>} Número, total, medio de pago, vencimiento y, con
+   *   Mercado Pago, `urlPago` (null si el procesador no respondió).
    * @throws {Error} DATOS_INVALIDOS, CARRITO_DESACTUALIZADO, TOTAL_CAMBIO,
    *   CARRITO_SIN_ITEMS_VALIDOS, ZONA_INVALIDA, STOCK_INSUFICIENTE
    */
@@ -274,6 +304,7 @@ class CheckoutService {
       });
 
       return {
+        pedidoId: pedido.id,
         numero,
         estadoPago: "pendiente",
         medioPago,
@@ -282,7 +313,86 @@ class CheckoutService {
       };
     });
 
-    return resultado;
+    // El id es interno: la respuesta pública identifica el pedido por su número
+    const { pedidoId, ...publico } = resultado;
+    if (medioPago !== "mercadopago") {
+      return publico;
+    }
+
+    // Fuera de la transacción: el pedido ya está confirmado y el stock apartado. Si
+    // Mercado Pago falla, el pedido sigue en pie y la clienta reintenta el pago.
+    try {
+      const urlPago = await this.#crearPreferencia({
+        id: pedidoId,
+        numero: publico.numero,
+        total: publico.total,
+        email: cliente.email.trim().toLowerCase(),
+        expiraEn: publico.expiraEn,
+      });
+      return { ...publico, urlPago };
+    } catch (error) {
+      this.logger.error(
+        `[checkout] ${publico.numero}: no se pudo crear el pago (${error.message})`,
+        error.cause ?? ""
+      );
+      return { ...publico, urlPago: null };
+    }
+  }
+
+  /**
+   * @description Genera un link de pago nuevo para un pedido de Mercado Pago. Sirve
+   * si al crear el pedido Mercado Pago no respondió, o para reintentar después de un
+   * rechazo.
+   * @param {string} numero - Número del pedido.
+   * @returns {Promise<{numero: string, urlPago: string}>} Link de pago.
+   * @throws {Error} NO_ENCONTRADO, PEDIDO_NO_PAGABLE, PEDIDO_VENCIDO,
+   *   PROCESADOR_NO_CONFIGURADO, PROCESADOR_NO_DISPONIBLE
+   */
+  async iniciarPago(numero) {
+    const p = await this.repositorio.buscarPorNumero(normalizarNumero(numero));
+    if (!p) {
+      throw new Error("NO_ENCONTRADO");
+    }
+    if (p.medioPago !== "mercadopago" || !ESTADOS_PAGABLES.includes(p.estadoPago)) {
+      throw new Error("PEDIDO_NO_PAGABLE");
+    }
+    if (!p.expiraEn || new Date(p.expiraEn) <= this.ahora()) {
+      throw new Error("PEDIDO_VENCIDO");
+    }
+
+    const urlPago = await this.#crearPreferencia({
+      id: p.id,
+      numero: p.numero,
+      total: p.total,
+      email: p.clienteEmail,
+      expiraEn: new Date(p.expiraEn),
+    });
+    return { numero: p.numero, urlPago };
+  }
+
+  /**
+   * @description Crea la preferencia en el procesador y guarda su id.
+   * @param {Object} pedido - Datos del pedido.
+   * @param {number} pedido.id - Id interno.
+   * @param {string} pedido.numero - Número público.
+   * @param {string} pedido.total - Total como cadena decimal.
+   * @param {string} pedido.email - Mail de la clienta.
+   * @param {Date} pedido.expiraEn - Vencimiento de la reserva.
+   * @returns {Promise<string>} URL de pago.
+   * @throws {Error} PROCESADOR_NO_CONFIGURADO, PROCESADOR_NO_DISPONIBLE
+   */
+  async #crearPreferencia({ id, numero, total, email, expiraEn }) {
+    if (!this.procesadorPagos) {
+      throw new Error("PROCESADOR_NO_CONFIGURADO");
+    }
+    const { preferenciaId, urlPago } = await this.procesadorPagos.crearPreferencia({
+      numero,
+      total,
+      email,
+      expiraEn,
+    });
+    await this.repositorio.guardarPreferencia(id, preferenciaId);
+    return urlPago;
   }
 
   /**
@@ -298,14 +408,8 @@ class CheckoutService {
    * @throws {Error} NO_ENCONTRADO
    */
   async consultarPorNumero(numero) {
-    const texto = String(numero ?? "")
-      .trim()
-      .toUpperCase();
-    if (!/^VEL-[A-Z0-9]{4,12}$/.test(texto)) {
-      throw new Error("NO_ENCONTRADO");
-    }
+    const p = await this.repositorio.buscarPorNumero(normalizarNumero(numero));
 
-    const p = await this.repositorio.buscarPorNumero(texto);
     if (!p) {
       throw new Error("NO_ENCONTRADO");
     }

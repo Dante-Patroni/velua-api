@@ -8,14 +8,20 @@ const { TOPE_ITEMS } = require("../services/cotizador");
 const PedidoController = require("../controllers/PedidoController");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { limitadorPedidos } = require("../middlewares/rateLimitMiddleware");
+const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
 
 const router = express.Router();
 
 const controller = new PedidoController(
-  new CheckoutService(new SequelizePedidoRepository(db), {
-    umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
-    descuentoTransferencia: Number(process.env.DESCUENTO_TRANSFERENCIA || 0),
-  })
+  new CheckoutService(
+    new SequelizePedidoRepository(db),
+    {
+      umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
+      descuentoTransferencia: Number(process.env.DESCUENTO_TRANSFERENCIA || 0),
+    },
+    undefined,
+    new MercadoPagoProcesador()
+  )
 );
 
 /**
@@ -173,5 +179,50 @@ router.post("/pedidos", limitadorPedidos, validarPedido, controller.crear);
  *         $ref: '#/components/responses/NoEncontrado'
  */
 router.get("/pedidos/:numero", controller.consultar);
+
+/**
+ * @openapi
+ * /pedidos/{numero}/pago:
+ *   post:
+ *     tags: [Pedidos]
+ *     summary: Generar un link de pago de Mercado Pago
+ *     description: >
+ *       Para un pedido de Mercado Pago con el pago pendiente o rechazado y la
+ *       reserva vigente. Se usa si al crear el pedido Mercado Pago no respondio
+ *       (urlPago null), o para reintentar despues de un rechazo. Publico: el numero
+ *       funciona como llave. Comparte el limite de 10 por hora por IP con la
+ *       creacion de pedidos.
+ *     parameters:
+ *       - name: numero
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: VEL-4K7Q2X
+ *     responses:
+ *       200:
+ *         description: Link de pago
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PagoIniciado'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ *       409:
+ *         description: >
+ *           PEDIDO_NO_PAGABLE (otro medio de pago, o ya aprobado o cancelado) o
+ *           PEDIDO_VENCIDO (la reserva vencio).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       502:
+ *         description: PROCESADOR_NO_DISPONIBLE. Mercado Pago no respondio.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post("/pedidos/:numero/pago", limitadorPedidos, controller.iniciarPago);
 
 module.exports = router;

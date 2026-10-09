@@ -1402,6 +1402,28 @@
             "type": "string",
             "format": "date-time",
             "description": "Hasta cuando queda apartado el stock si no se paga."
+          },
+          "urlPago": {
+            "type": "string",
+            "nullable": true,
+            "description": "Solo con Mercado Pago. Link al que se redirige a la clienta. Null si Mercado Pago no respondió: se reintenta con POST /pedidos/{numero}/pago."
+          }
+        }
+      },
+      "PagoIniciado": {
+        "type": "object",
+        "required": [
+          "numero",
+          "urlPago"
+        ],
+        "properties": {
+          "numero": {
+            "type": "string",
+            "example": "VEL-4K7Q2X"
+          },
+          "urlPago": {
+            "type": "string",
+            "description": "Link de pago de Mercado Pago."
           }
         }
       },
@@ -1662,6 +1684,61 @@
           },
           "404": {
             "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      }
+    },
+    "/pedidos/{numero}/pago": {
+      "post": {
+        "tags": [
+          "Pedidos"
+        ],
+        "summary": "Generar un link de pago de Mercado Pago",
+        "description": "Para un pedido de Mercado Pago con el pago pendiente o rechazado y la reserva vigente. Se usa si al crear el pedido Mercado Pago no respondio (urlPago null), o para reintentar despues de un rechazo. Publico: el numero funciona como llave. Comparte el limite de 10 por hora por IP con la creacion de pedidos.\n",
+        "parameters": [
+          {
+            "name": "numero",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "VEL-4K7Q2X"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Link de pago",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PagoIniciado"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          },
+          "409": {
+            "description": "PEDIDO_NO_PAGABLE (otro medio de pago, o ya aprobado o cancelado) o PEDIDO_VENCIDO (la reserva vencio).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "PROCESADOR_NO_DISPONIBLE. Mercado Pago no respondio.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
