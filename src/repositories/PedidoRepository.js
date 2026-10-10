@@ -180,6 +180,17 @@ class PedidoTransaccion {
   async actualizarEstados(_pedidoId, _estados) {
     throw new Error("Metodo actualizarEstados no implementado");
   }
+
+  /**
+   * @description Guarda los datos del pago en el pedido: el id y el método del
+   * procesador y, cuando se aprueba, el fin del vencimiento.
+   * @param {number} _pedidoId - Id del pedido.
+   * @param {{mpPaymentId?: string, mpMetodo?: string|null, expiraEn?: Date|null}} _datos - Datos del pago.
+   * @returns {Promise<void>}
+   */
+  async guardarDatosPago(_pedidoId, _datos) {
+    throw new Error("Metodo guardarDatosPago no implementado");
+  }
 }
 
 module.exports = { PedidoRepository, PedidoTransaccion };

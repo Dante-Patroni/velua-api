@@ -221,6 +221,19 @@ class SequelizePedidoTransaccion extends PedidoTransaccion {
       transaction: this.t,
     });
   }
+
+  /**
+   * @description Guarda los datos del pago en el pedido.
+   * @param {number} pedidoId - Id del pedido.
+   * @param {{mpPaymentId?: string, mpMetodo?: string|null, expiraEn?: Date|null}} datos - Datos del pago.
+   * @returns {Promise<void>}
+   */
+  async guardarDatosPago(pedidoId, datos) {
+    await this.models.Pedido.update(datos, {
+      where: { id: pedidoId },
+      transaction: this.t,
+    });
+  }
 }
 
 /**

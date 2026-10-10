@@ -1,4 +1,11 @@
-const { ESTADOS_PAGO_VENCIBLES, validarTransicion } = require("./transicionesPedido");
+const {
+  ESTADOS_PAGO_VENCIBLES,
+  esTransicionValida,
+  validarTransicion,
+} = require("./transicionesPedido");
+
+/** Resultados del procesador que mueven el estado de pago. */
+const RESULTADOS_PAGO = Object.freeze(["aprobado", "rechazado"]);
 
 /**
  * @description Indica si la reserva de un pedido está vencida y se puede cancelar.
@@ -23,9 +30,9 @@ const estaVencido = (pedido, ahora) =>
  * @description Cambia el estado de los pedidos pasando por la máquina de estados.
  *
  * Ninguna transición se hace con un update suelto: cada una valida que sea legal y
- * ejecuta sus efectos (stock, bitácora, mail) dentro de una sola transacción. Por
- * ahora implementa la cancelación por vencimiento; las demás transiciones llegan
- * con el webhook y el panel de pedidos.
+ * ejecuta sus efectos (stock, bitácora, mail) dentro de una sola transacción.
+ * Implementa la cancelación por vencimiento y el resultado de un pago online;
+ * las transiciones manuales llegan con el panel de pedidos.
  */
 class PedidoEstadoService {
   /**
@@ -111,6 +118,100 @@ class PedidoEstadoService {
       });
 
       return { cancelado: true, numero: pedido.numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description Registra el resultado de un pago online: aprobado o rechazado.
+   *
+   * Es idempotente: el procesador puede avisar varias veces lo mismo, y repetir un
+   * resultado ya registrado no vuelve a encolar el mail ni a escribir nada.
+   *
+   * Nunca lanza por un aviso que no corresponde, porque el webhook lo reintentaría
+   * para siempre. Devuelve el motivo:
+   * - YA_REGISTRADO: el pedido ya estaba en ese estado.
+   * - FUERA_DE_ORDEN: un rechazo que llega después de la aprobación. Se ignora.
+   * - REQUIERE_REVISION: un pago aprobado sobre un pedido cancelado. Se cobró sin
+   *   pedido: queda en la bitácora para que la dueña lo devuelva a mano.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} pago - Resultado del procesador.
+   * @param {"aprobado"|"rechazado"} pago.estado - Resultado.
+   * @param {string} pago.pagoId - Id del pago en el procesador.
+   * @param {string|null} [pago.metodo] - Medio usado, por ejemplo "visa".
+   * @returns {Promise<{cambiado: boolean, numero?: string, motivo?: string}>}
+   *   cambiado en true si movió el estado; si no, el motivo.
+   * @throws {Error} Si el estado no es aprobado ni rechazado: error de programación.
+   */
+  async registrarResultadoPago(pedidoId, { estado, pagoId, metodo = null }) {
+    if (!RESULTADOS_PAGO.includes(estado)) {
+      throw new Error(`Resultado de pago desconocido: ${estado}`);
+    }
+
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        return { cambiado: false, motivo: "NO_EXISTE" };
+      }
+      const { numero } = pedido;
+
+      if (pedido.estadoPago === estado) {
+        return { cambiado: false, numero, motivo: "YA_REGISTRADO" };
+      }
+
+      if (!esTransicionValida("pago", pedido.estadoPago, estado)) {
+        if (estado !== "aprobado") {
+          return { cambiado: false, numero, motivo: "FUERA_DE_ORDEN" };
+        }
+        // Plata cobrada sobre un pedido que ya no existe para la tienda: el stock
+        // se devolvió y el pedido no se prepara. No se reabre solo; lo decide la dueña.
+        await tx.registrarEvento({
+          pedidoId: pedido.id,
+          campo: "pago",
+          estadoAnterior: pedido.estadoPago,
+          estadoNuevo: pedido.estadoPago,
+          origen: "webhook",
+          detalle: `Pago ${pagoId} aprobado sobre un pedido ${pedido.estadoPago}: revisar y devolver el dinero`,
+        });
+        return { cambiado: false, numero, motivo: "REQUIERE_REVISION" };
+      }
+
+      await tx.actualizarEstados(pedido.id, { estadoPago: estado });
+      await tx.guardarDatosPago(pedido.id, {
+        mpPaymentId: String(pagoId),
+        mpMetodo: metodo,
+        // Aprobado: el pedido deja de vencer. Rechazado: sigue el plazo original,
+        // así la clienta puede reintentar mientras el stock esté apartado.
+        ...(estado === "aprobado" ? { expiraEn: null } : {}),
+      });
+
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "pago",
+        estadoAnterior: pedido.estadoPago,
+        estadoNuevo: estado,
+        origen: "webhook",
+        detalle: `Pago ${pagoId}${metodo ? ` (${metodo})` : ""}`,
+      });
+
+      // Si el encolado falla, falla todo y el procesador vuelve a avisar.
+      await tx.encolarEmail({
+        pedidoId: pedido.id,
+        tipo: estado === "aprobado" ? "pago_confirmado" : "pago_rechazado",
+        destinatario: pedido.clienteEmail,
+        datos: {
+          numero,
+          nombre: pedido.clienteNombre,
+          total: pedido.total,
+          ...(estado === "rechazado" && pedido.expiraEn
+            ? { expiraEn: new Date(pedido.expiraEn).toISOString() }
+            : {}),
+        },
+      });
+
+            return { cambiado: true, numero };
     });
 
     return resultado;
