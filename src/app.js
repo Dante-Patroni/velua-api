@@ -39,6 +39,7 @@ app.use("/api/v1", require("./routes/adminProductosRoutes"));
 app.use("/api/v1", require("./routes/adminImagenesRoutes"));
 app.use("/api/v1", require("./routes/cotizacionRoutes"));
 app.use("/api/v1", require("./routes/pedidoRoutes"));
+app.use("/api/v1", require("./routes/webhookRoutes"));
 /**
  * @openapi
  * /salud:
