@@ -44,12 +44,28 @@ class PagoWebhookService {
    * @param {string} pagoId - Id del pago que trae el aviso.
    * @returns {Promise<{procesado: boolean, numero?: string, motivo?: string}>}
    *   procesado en true si el pedido cambió de estado; si no, el motivo.
-   * @throws {Error} PROCESADOR_NO_DISPONIBLE o PROCESADOR_NO_CONFIGURADO: el aviso
-   *   tiene que reintentarse.
+   * @throws {Error} PROCESADOR_NO_DISPONIBLE, PAGO_NO_ENCONTRADO o
+   *   PROCESADOR_NO_CONFIGURADO: el aviso tiene que reintentarse.
    */
   async procesarNotificacion(pagoId) {
     const pago = await this.procesador.obtenerPago(String(pagoId));
+    return this.aplicarPago(pago);
+  }
 
+  /**
+   * @description Aplica a su pedido un pago ya consultado al procesador.
+   *
+   * Es el único camino para registrar un resultado de pago: lo usan el webhook
+   * (después de consultar por id) y la reconciliación (después de buscar por
+   * referencia). Así las validaciones, la idempotencia y la transacción son las
+   * mismas venga de donde venga el pago.
+   *
+   * @param {{id: string, estado: string, referencia: string|null, monto: string,
+   *   moneda: string, metodo: string|null}} pago - Pago normalizado.
+   * @returns {Promise<{procesado: boolean, numero?: string, motivo?: string}>}
+   *   procesado en true si el pedido cambió de estado; si no, el motivo.
+   */
+  async aplicarPago(pago) {
     const resultado = RESULTADO_POR_ESTADO[pago.estado];
     if (!resultado) {
       return { procesado: false, motivo: "SIN_RESULTADO" };

@@ -150,3 +150,43 @@ describe("procesarNotificacion", () => {
     await expect(servicio.procesarNotificacion("123")).rejects.toThrow("PROCESADOR_NO_DISPONIBLE");
   });
 });
+
+describe("aplicarPago", () => {
+  it("aplica un pago ya consultado, sin volver a pedirlo al procesador", async () => {
+    const procesadorPagos = { obtenerPago: jest.fn() };
+    const pedidoRepository = {
+      buscarPorNumero: jest.fn().mockResolvedValue({
+        id: 22,
+        numero: "VEL-UZQ4ZU",
+        medioPago: "mercadopago",
+        total: "8500.00",
+      }),
+    };
+    const pedidoEstadoService = {
+      registrarResultadoPago: jest.fn().mockResolvedValue({ cambiado: true }),
+    };
+    const servicio = new PagoWebhookService({
+      procesadorPagos,
+      pedidoRepository,
+      pedidoEstadoService,
+      logger: { error: jest.fn() },
+    });
+
+    const r = await servicio.aplicarPago({
+      id: "182598690217",
+      estado: "approved",
+      referencia: "VEL-UZQ4ZU",
+      monto: "8500.00",
+      moneda: "ARS",
+      metodo: "account_money",
+    });
+
+    expect(r).toEqual({ procesado: true, numero: "VEL-UZQ4ZU" });
+    expect(procesadorPagos.obtenerPago).not.toHaveBeenCalled();
+    expect(pedidoEstadoService.registrarResultadoPago).toHaveBeenCalledWith(22, {
+      estado: "aprobado",
+      pagoId: "182598690217",
+      metodo: "account_money",
+    });
+  });
+});
