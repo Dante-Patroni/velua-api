@@ -45,6 +45,10 @@ class WebhookController {
       secreto: this.secreto,
     });
     if (!valida) {
+      // Sin datos sensibles: solo lo necesario para saber que llegó un aviso y se rechazó
+      this.logger.info(
+        `[webhook] firma inválida (data.id=${dataId ?? "-"}, request-id=${req.get("x-request-id") ?? "-"})`
+      );
       res.sendStatus(401);
       return;
     }

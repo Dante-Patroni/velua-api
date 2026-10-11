@@ -42,12 +42,13 @@ describe("WebhookController.mercadoPago", () => {
   });
 
   it("con firma inválida responde 401 y no procesa nada", async () => {
-    const { controller, servicio, res } = armar();
+    const { controller, servicio, logger, res } = armar();
 
     await controller.mercadoPago(armarReq({ firma: "ts=1,v1=abcd" }), res);
 
     expect(res.sendStatus).toHaveBeenCalledWith(401);
     expect(servicio.procesarNotificacion).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("firma inválida"));
   });
 
   it("un aviso que no es de pagos responde 200 sin procesar", async () => {
