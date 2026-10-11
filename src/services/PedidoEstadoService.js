@@ -211,7 +211,86 @@ class PedidoEstadoService {
         },
       });
 
-            return { cambiado: true, numero };
+      return { cambiado: true, numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description Posterga el vencimiento de un pedido que tiene un pago en curso.
+   *
+   * Lo usa la reconciliación cuando Mercado Pago tiene un pago que todavía puede
+   * aprobarse: el stock sigue apartado y el pedido se vuelve a mirar más tarde.
+   * Igual que cancelarVencido, relee el pedido con candado: si mientras tanto se
+   * aprobó, no le vuelve a poner un vencimiento.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} opciones - Datos de la postergación.
+   * @param {Date} opciones.hasta - Nuevo vencimiento.
+   * @param {string} opciones.motivo - Por qué se posterga, para la bitácora.
+   * @returns {Promise<{postergado: boolean, numero?: string, motivo?: string}>}
+   *   postergado en true si movió el vencimiento; si no, el motivo.
+   */
+  async postergarVencimiento(pedidoId, { hasta, motivo }) {
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        return { postergado: false, motivo: "NO_EXISTE" };
+      }
+      if (!estaVencido(pedido, this.ahora())) {
+        return { postergado: false, numero: pedido.numero, motivo: "YA_NO_CORRESPONDE" };
+      }
+
+      await tx.guardarDatosPago(pedido.id, { expiraEn: hasta });
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "pago",
+        estadoAnterior: pedido.estadoPago,
+        estadoNuevo: pedido.estadoPago,
+        origen: "job",
+        detalle: `Vencimiento postergado hasta ${hasta.toISOString()}: ${motivo}`,
+      });
+
+      return { postergado: true, numero: pedido.numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description Deja un pedido para que la dueña lo revise a mano.
+   *
+   * Si el pedido todavía vence, deja de vencer: el stock queda apartado hasta que
+   * alguien decida, en lugar de liberarse solo. Si ya no vence (por ejemplo, se
+   * aprobó y hubo un cobro duplicado), solo anota el motivo en la bitácora.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} opciones - Datos de la revisión.
+   * @param {string} opciones.motivo - Qué hay que revisar, para la bitácora.
+   * @returns {Promise<{marcado: boolean, numero?: string, motivo?: string}>}
+   *   marcado en true si lo anotó; si no, el motivo.
+   */
+  async marcarRevision(pedidoId, { motivo }) {
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        return { marcado: false, motivo: "NO_EXISTE" };
+      }
+
+      if (pedido.expiraEn && ESTADOS_PAGO_VENCIBLES.includes(pedido.estadoPago)) {
+        await tx.guardarDatosPago(pedido.id, { expiraEn: null });
+      }
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "pago",
+        estadoAnterior: pedido.estadoPago,
+        estadoNuevo: pedido.estadoPago,
+        origen: "job",
+        detalle: `Requiere revisión: ${motivo}`,
+      });
+
+      return { marcado: true, numero: pedido.numero };
     });
 
     return resultado;
