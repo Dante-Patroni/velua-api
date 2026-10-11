@@ -119,12 +119,27 @@ class MercadoPagoProcesador extends ProcesadorPagos {
 
   /**
    * @description Consulta un pago por su id.
+   *
+   * Un 404 no es lo mismo que Mercado Pago caído: dice que ese pago no existe en
+   * la cuenta de estas credenciales. Se distingue para el log y para quien decida
+   * si reintentar; no implica que el pago esté rechazado.
+   *
    * @param {string} pagoId - Id del pago en Mercado Pago.
    * @returns {Promise<Object>} Pago normalizado.
-   * @throws {Error} PROCESADOR_NO_CONFIGURADO, PROCESADOR_NO_DISPONIBLE
+   * @throws {Error} PROCESADOR_NO_CONFIGURADO, PAGO_NO_ENCONTRADO, PROCESADOR_NO_DISPONIBLE
    */
   async obtenerPago(pagoId) {
-    const p = await this.#llamar(() => this.pagos.get({ id: pagoId }));
+    let p;
+    try {
+      p = await this.#llamar(() => this.pagos.get({ id: pagoId }));
+    } catch (error) {
+      if (error.cause?.status === 404) {
+        const noEncontrado = new Error("PAGO_NO_ENCONTRADO");
+        noEncontrado.cause = error.cause;
+        throw noEncontrado;
+      }
+      throw error;
+    }
     return normalizarPago(p);
   }
 

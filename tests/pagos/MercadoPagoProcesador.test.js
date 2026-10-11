@@ -10,7 +10,10 @@ const PEDIDO = {
   email: "clienta@example.com",
   expiraEn: new Date("2026-10-09T21:00:00.000Z"),
 };
-const PRODUCCION = { urlWeb: "https://veluanature.com.ar", urlApi: "https://api.veluanature.com.ar" };
+const PRODUCCION = {
+  urlWeb: "https://veluanature.com.ar",
+  urlApi: "https://api.veluanature.com.ar",
+};
 const LOCAL = { urlWeb: "http://localhost:5173", urlApi: "http://localhost:3000" };
 
 describe("armarPreferencia", () => {
@@ -79,15 +82,28 @@ describe("MercadoPagoProcesador", () => {
   const crear = (clientes) => new MercadoPagoProcesador({ ...PRODUCCION, clientes });
 
   it("crearPreferencia devuelve el id y la URL de pago", async () => {
-    const preferencias = { create: jest.fn().mockResolvedValue({ id: "pref-1", init_point: "https://mp/pagar" }) };
+    const preferencias = {
+      create: jest.fn().mockResolvedValue({ id: "pref-1", init_point: "https://mp/pagar" }),
+    };
     const r = await crear({ preferencias, pagos: {} }).crearPreferencia(PEDIDO);
 
     expect(r).toEqual({ preferenciaId: "pref-1", urlPago: "https://mp/pagar" });
-    expect(preferencias.create).toHaveBeenCalledWith({ body: expect.objectContaining({ external_reference: "VEL-4K7Q2X" }) });
+    expect(preferencias.create).toHaveBeenCalledWith({
+      body: expect.objectContaining({ external_reference: "VEL-4K7Q2X" }),
+    });
   });
 
   it("obtenerPago consulta por id y normaliza", async () => {
-    const pagos = { get: jest.fn().mockResolvedValue({ id: 9, status: "rejected", transaction_amount: 100, currency_id: "ARS" }) };
+    const pagos = {
+      get: jest
+        .fn()
+        .mockResolvedValue({
+          id: 9,
+          status: "rejected",
+          transaction_amount: 100,
+          currency_id: "ARS",
+        }),
+    };
     const r = await crear({ preferencias: {}, pagos }).obtenerPago("9");
 
     expect(pagos.get).toHaveBeenCalledWith({ id: "9" });
@@ -98,9 +114,46 @@ describe("MercadoPagoProcesador", () => {
     const causa = new Error("timeout");
     const preferencias = { create: jest.fn().mockRejectedValue(causa) };
 
-    await expect(crear({ preferencias, pagos: {} }).crearPreferencia(PEDIDO)).rejects.toMatchObject({
+    await expect(crear({ preferencias, pagos: {} }).crearPreferencia(PEDIDO)).rejects.toMatchObject(
+      {
+        message: "PROCESADOR_NO_DISPONIBLE",
+        cause: causa,
+      }
+    );
+  });
+
+  it("obtenerPago: un 404 lanza PAGO_NO_ENCONTRADO, con la causa", async () => {
+    const causa = { status: 404, error: "not_found", message: "Payment not found" };
+    const procesador = new MercadoPagoProcesador({
+      clientes: { preferencias: {}, pagos: { get: jest.fn().mockRejectedValue(causa) } },
+    });
+
+    await expect(procesador.obtenerPago("1")).rejects.toMatchObject({
+      message: "PAGO_NO_ENCONTRADO",
+      cause: causa,
+    });
+  });
+
+  it("obtenerPago: otro status sigue siendo PROCESADOR_NO_DISPONIBLE", async () => {
+    const causa = { status: 500, error: "internal_error" };
+    const procesador = new MercadoPagoProcesador({
+      clientes: { preferencias: {}, pagos: { get: jest.fn().mockRejectedValue(causa) } },
+    });
+
+    await expect(procesador.obtenerPago("1")).rejects.toMatchObject({
       message: "PROCESADOR_NO_DISPONIBLE",
       cause: causa,
+    });
+  });
+
+  it("obtenerPago: un error sin status (red, timeout) es PROCESADOR_NO_DISPONIBLE", async () => {
+    const causa = new Error("timeout");
+    const procesador = new MercadoPagoProcesador({
+      clientes: { preferencias: {}, pagos: { get: jest.fn().mockRejectedValue(causa) } },
+    });
+
+    await expect(procesador.obtenerPago("1")).rejects.toMatchObject({
+      message: "PROCESADOR_NO_DISPONIBLE",
     });
   });
 
