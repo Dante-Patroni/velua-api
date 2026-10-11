@@ -141,11 +141,13 @@ class PedidoEstadoService {
    * @param {"aprobado"|"rechazado"} pago.estado - Resultado.
    * @param {string} pago.pagoId - Id del pago en el procesador.
    * @param {string|null} [pago.metodo] - Medio usado, por ejemplo "visa".
+   * @param {string} [pago.origen] - Quién lo registra, para la bitácora: "webhook"
+   * (por defecto) o "job" (reconciliación).
    * @returns {Promise<{cambiado: boolean, numero?: string, motivo?: string}>}
    *   cambiado en true si movió el estado; si no, el motivo.
    * @throws {Error} Si el estado no es aprobado ni rechazado: error de programación.
    */
-  async registrarResultadoPago(pedidoId, { estado, pagoId, metodo = null }) {
+  async registrarResultadoPago(pedidoId, { estado, pagoId, metodo = null, origen = "webhook" }) {
     if (!RESULTADOS_PAGO.includes(estado)) {
       throw new Error(`Resultado de pago desconocido: ${estado}`);
     }
@@ -172,7 +174,7 @@ class PedidoEstadoService {
           campo: "pago",
           estadoAnterior: pedido.estadoPago,
           estadoNuevo: pedido.estadoPago,
-          origen: "webhook",
+          origen,
           detalle: `Pago ${pagoId} aprobado sobre un pedido ${pedido.estadoPago}: revisar y devolver el dinero`,
         });
         return { cambiado: false, numero, motivo: "REQUIERE_REVISION" };
@@ -192,7 +194,7 @@ class PedidoEstadoService {
         campo: "pago",
         estadoAnterior: pedido.estadoPago,
         estadoNuevo: estado,
-        origen: "webhook",
+        origen,
         detalle: `Pago ${pagoId}${metodo ? ` (${metodo})` : ""}`,
       });
 

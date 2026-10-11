@@ -189,4 +189,40 @@ describe("aplicarPago", () => {
       metodo: "account_money",
     });
   });
+
+  it("con origen job, se lo pasa al registro del resultado", async () => {
+    const pedidoEstadoService = {
+      registrarResultadoPago: jest.fn().mockResolvedValue({ cambiado: true }),
+    };
+    const servicio = new PagoWebhookService({
+      procesadorPagos: {},
+      pedidoRepository: {
+        buscarPorNumero: jest.fn().mockResolvedValue({
+          id: 22,
+          numero: "VEL-UZQ4ZU",
+          medioPago: "mercadopago",
+          total: "8500.00",
+        }),
+      },
+      pedidoEstadoService,
+      logger: { error: jest.fn() },
+    });
+
+    await servicio.aplicarPago(
+      {
+        id: "1",
+        estado: "approved",
+        referencia: "VEL-UZQ4ZU",
+        monto: "8500.00",
+        moneda: "ARS",
+        metodo: "master",
+      },
+      { origen: "job" }
+    );
+
+    expect(pedidoEstadoService.registrarResultadoPago).toHaveBeenCalledWith(
+      22,
+      expect.objectContaining({ origen: "job" })
+    );
+  });
 });

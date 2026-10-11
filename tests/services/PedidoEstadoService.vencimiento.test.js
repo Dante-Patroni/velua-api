@@ -170,3 +170,18 @@ describe("marcarRevision", () => {
     });
   });
 });
+
+describe("registrarResultadoPago con origen", () => {
+  it("anota en la bitácora quién registró el pago", async () => {
+    const repo = crearRepositorio();
+
+    await servicio(repo).registrarResultadoPago(1, {
+      estado: "aprobado",
+      pagoId: "9",
+      metodo: "master",
+      origen: "job",
+    });
+
+    expect(repo.estado.eventos).toEqual([expect.objectContaining({ origen: "job" })]);
+  });
+});

@@ -62,46 +62,54 @@ class PagoWebhookService {
    *
    * @param {{id: string, estado: string, referencia: string|null, monto: string,
    *   moneda: string, metodo: string|null}} pago - Pago normalizado.
+   * @param {{origen?: string}} [opciones] - origen: "job" cuando aplica la
+   *   reconciliación. Por defecto, "webhook".
    * @returns {Promise<{procesado: boolean, numero?: string, motivo?: string}>}
    *   procesado en true si el pedido cambió de estado; si no, el motivo.
    */
-  async aplicarPago(pago) {
-    const resultado = RESULTADO_POR_ESTADO[pago.estado];
-    if (!resultado) {
-      return { procesado: false, motivo: "SIN_RESULTADO" };
-    }
+  async aplicarPago(pago, opciones = {}) {
+    const prefijo = `[${opciones.origen ?? "webhook"}]`;
+    {
+      const resultado = RESULTADO_POR_ESTADO[pago.estado];
+      if (!resultado) {
+        return { procesado: false, motivo: "SIN_RESULTADO" };
+      }
 
-    const pedido = pago.referencia ? await this.repositorio.buscarPorNumero(pago.referencia) : null;
-    if (!pedido) {
-      this.logger.error(`[webhook] pago ${pago.id}: no hay pedido "${pago.referencia}"`);
-      return { procesado: false, motivo: "PEDIDO_DESCONOCIDO" };
-    }
+      const pedido = pago.referencia
+        ? await this.repositorio.buscarPorNumero(pago.referencia)
+        : null;
+      if (!pedido) {
+        this.logger.error(`${prefijo} pago ${pago.id}: no hay pedido "${pago.referencia}"`);
+        return { procesado: false, motivo: "PEDIDO_DESCONOCIDO" };
+      }
 
-    const { numero } = pedido;
-    if (pedido.medioPago !== "mercadopago") {
-      this.logger.error(`[webhook] pago ${pago.id}: ${numero} no es de Mercado Pago`);
-      return { procesado: false, numero, motivo: "MEDIO_INCORRECTO" };
-    }
-    if (resultado === "aprobado" && !coincideImporte(pago, pedido)) {
-      this.logger.error(
-        `[webhook] pago ${pago.id}: ${numero} cobró ${pago.monto} ${pago.moneda} y el total es ${pedido.total} ARS`
-      );
-      return { procesado: false, numero, motivo: "MONTO_NO_COINCIDE" };
-    }
+      const { numero } = pedido;
+      if (pedido.medioPago !== "mercadopago") {
+        this.logger.error(`${prefijo} pago ${pago.id}: ${numero} no es de Mercado Pago`);
+        return { procesado: false, numero, motivo: "MEDIO_INCORRECTO" };
+      }
+      if (resultado === "aprobado" && !coincideImporte(pago, pedido)) {
+        this.logger.error(
+          `${prefijo} pago ${pago.id}: ${numero} cobró ${pago.monto} ${pago.moneda} y el total es ${pedido.total} ARS`
+        );
+        return { procesado: false, numero, motivo: "MONTO_NO_COINCIDE" };
+      }
 
-    const r = await this.estados.registrarResultadoPago(pedido.id, {
-      estado: resultado,
-      pagoId: pago.id,
-      metodo: pago.metodo,
-    });
+      const r = await this.estados.registrarResultadoPago(pedido.id, {
+        estado: resultado,
+        pagoId: pago.id,
+        metodo: pago.metodo,
+        ...opciones,
+      });
 
-    if (r.motivo === "REQUIERE_REVISION") {
-      this.logger.error(`[webhook] pago ${pago.id}: ${numero} aprobado sobre un pedido cerrado`);
+      if (r.motivo === "REQUIERE_REVISION") {
+        this.logger.error(`${prefijo} pago ${pago.id}: ${numero} aprobado sobre un pedido cerrado`);
+      }
+
+      return r.cambiado
+        ? { procesado: true, numero }
+        : { procesado: false, numero, motivo: r.motivo };
     }
-
-    return r.cambiado
-      ? { procesado: true, numero }
-      : { procesado: false, numero, motivo: r.motivo };
   }
 }
 
