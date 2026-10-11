@@ -33,7 +33,8 @@ class PedidoRepository {
    * lista de candidatos, y cada uno se vuelve a verificar con candado al cancelarlo.
    * @param {Date} _ahora - Momento de referencia.
    * @param {number} _limite - Máximo de pedidos por vuelta.
-   * @returns {Promise<number[]>} Ids, los más viejos primero.
+   * @returns {Promise<Array<{id: number, numero: string, medioPago: string,
+   *   total: string, creadoEn: Date, expiraEn: Date}>>} Pedidos, los más viejos primero.
    */
   async listarVencidos(_ahora, _limite) {
     throw new Error("Metodo listarVencidos no implementado");

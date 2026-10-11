@@ -276,14 +276,16 @@ class SequelizePedidoRepository extends PedidoRepository {
   }
 
   /**
-   * @description Lista los ids de los pedidos con la reserva vencida.
+   * @description Lista los pedidos con la reserva vencida, con los datos que el job
+   * necesita para decidir qué hacer con cada uno.
    * @param {Date} ahora - Momento de referencia.
    * @param {number} limite - Máximo de pedidos por vuelta.
-   * @returns {Promise<number[]>} Ids, los más viejos primero.
+   * @returns {Promise<Array<{id: number, numero: string, medioPago: string,
+   *   total: string, creadoEn: Date, expiraEn: Date}>>} Pedidos, los más viejos primero.
    */
   async listarVencidos(ahora, limite) {
     const pedidos = await this.models.Pedido.findAll({
-      attributes: ["id"],
+      attributes: ["id", "numero", "medioPago", "total", "creadoEn", "expiraEn"],
       where: {
         estadoPago: { [Op.in]: ESTADOS_PAGO_VENCIBLES },
         expiraEn: { [Op.lte]: ahora },
@@ -292,7 +294,7 @@ class SequelizePedidoRepository extends PedidoRepository {
       order: [["expiraEn", "ASC"]],
       limit: limite,
     });
-    return pedidos.map((p) => p.id);
+    return pedidos.map((p) => p.toJSON());
   }
 
   /**

@@ -11,7 +11,12 @@ const loggerMudo = () => ({ info: jest.fn(), error: jest.fn() });
  * Arma el job con un repositorio y un servicio simulados.
  */
 const crearJob = ({ ids = [1, 2, 3], cancelar } = {}) => {
-  const pedidoRepository = { listarVencidos: jest.fn(async () => ids) };
+  // Transferencias: el camino de siempre, cancelar
+  const pedidoRepository = {
+    listarVencidos: jest.fn(async () =>
+      ids.map((id) => ({ id, numero: `VEL-00000${id}`, medioPago: "transferencia" }))
+    ),
+  };
   const pedidoEstadoService = {
     cancelarVencido: jest.fn(
       cancelar ?? (async (id) => ({ cancelado: true, numero: `VEL-00000${id}` }))

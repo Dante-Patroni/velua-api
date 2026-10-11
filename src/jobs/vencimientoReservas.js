@@ -62,12 +62,12 @@ class VencimientoReservas {
     this.corriendo = true;
 
     try {
-      const ids = await this.repositorio.listarVencidos(this.ahora(), this.limite);
+      const pedidos = await this.repositorio.listarVencidos(this.ahora(), this.limite);
 
-      for (const id of ids) {
+      for (const pedido of pedidos) {
         resumen.revisados++;
         try {
-          const r = await this.servicio.cancelarVencido(id);
+          const r = await this.servicio.cancelarVencido(pedido.id);
           if (r.cancelado) {
             resumen.cancelados++;
             this.logger.info(`[vencimientos] ${r.numero} cancelado, stock devuelto`);
@@ -77,7 +77,7 @@ class VencimientoReservas {
           }
         } catch (error) {
           resumen.errores++;
-          this.logger.error(`[vencimientos] pedido ${id}: ${error.message}`);
+          this.logger.error(`[vencimientos] pedido ${pedido.id}: ${error.message}`);
         }
       }
     } catch (error) {
