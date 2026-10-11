@@ -55,6 +55,9 @@ class WebhookController {
 
     // Mercado Pago también avisa de órdenes y otros recursos: solo interesan los pagos
     if (req.query.type !== "payment" || !dataId) {
+      this.logger.info(
+        `[webhook] aviso ignorado (type=${req.query.type ?? "-"}, data.id=${dataId ?? "-"})`
+      );
       res.sendStatus(200);
       return;
     }

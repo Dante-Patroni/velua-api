@@ -52,12 +52,13 @@ describe("WebhookController.mercadoPago", () => {
   });
 
   it("un aviso que no es de pagos responde 200 sin procesar", async () => {
-    const { controller, servicio, res } = armar();
+    const { controller, servicio, logger, res } = armar();
 
     await controller.mercadoPago(armarReq({ tipo: "merchant_order" }), res);
 
     expect(res.sendStatus).toHaveBeenCalledWith(200);
     expect(servicio.procesarNotificacion).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("aviso ignorado"));
   });
 
   it("si el servicio falla, responde 500 para que Mercado Pago reintente", async () => {
