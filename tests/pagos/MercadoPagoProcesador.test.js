@@ -95,14 +95,12 @@ describe("MercadoPagoProcesador", () => {
 
   it("obtenerPago consulta por id y normaliza", async () => {
     const pagos = {
-      get: jest
-        .fn()
-        .mockResolvedValue({
-          id: 9,
-          status: "rejected",
-          transaction_amount: 100,
-          currency_id: "ARS",
-        }),
+      get: jest.fn().mockResolvedValue({
+        id: 9,
+        status: "rejected",
+        transaction_amount: 100,
+        currency_id: "ARS",
+      }),
     };
     const r = await crear({ preferencias: {}, pagos }).obtenerPago("9");
 
@@ -161,5 +159,93 @@ describe("MercadoPagoProcesador", () => {
     const p = new MercadoPagoProcesador({ accessToken: "", ...PRODUCCION });
 
     await expect(p.obtenerPago("1")).rejects.toThrow("PROCESADOR_NO_CONFIGURADO");
+  });
+
+  describe("buscarPagosPorReferencia", () => {
+    const pagoMP = (id, status) => ({
+      id,
+      status,
+      external_reference: "VEL-4K7Q2X",
+      transaction_amount: 8500,
+      currency_id: "ARS",
+      payment_method_id: "master",
+    });
+
+    it("busca por referencia, del más nuevo al más viejo", async () => {
+      const pagos = {
+        search: jest.fn().mockResolvedValue({ paging: { total: 0 }, results: [] }),
+      };
+      await crear({ preferencias: {}, pagos }).buscarPagosPorReferencia("VEL-4K7Q2X");
+
+      expect(pagos.search).toHaveBeenCalledWith({
+        options: expect.objectContaining({
+          external_reference: "VEL-4K7Q2X",
+          sort: "date_created",
+          criteria: "desc",
+          offset: 0,
+        }),
+      });
+    });
+
+    it("sin pagos devuelve una lista vacía, con una sola consulta", async () => {
+      const pagos = {
+        search: jest.fn().mockResolvedValue({ paging: { total: 0 }, results: [] }),
+      };
+      const r = await crear({ preferencias: {}, pagos }).buscarPagosPorReferencia("VEL-4K7Q2X");
+
+      expect(r).toEqual([]);
+      expect(pagos.search).toHaveBeenCalledTimes(1);
+    });
+
+    it("normaliza cada pago", async () => {
+      const pagos = {
+        search: jest.fn().mockResolvedValue({
+          paging: { total: 2 },
+          results: [pagoMP(2, "approved"), pagoMP(1, "rejected")],
+        }),
+      };
+      const r = await crear({ preferencias: {}, pagos }).buscarPagosPorReferencia("VEL-4K7Q2X");
+
+      expect(r).toEqual([
+        expect.objectContaining({ id: "2", estado: "approved", monto: "8500.00" }),
+        expect.objectContaining({ id: "1", estado: "rejected" }),
+      ]);
+    });
+
+    it("recorre todas las páginas y junta los resultados", async () => {
+      const primera = Array.from({ length: 30 }, (_, i) => pagoMP(100 + i, "rejected"));
+      const pagos = {
+        search: jest
+          .fn()
+          .mockResolvedValueOnce({ paging: { total: 31 }, results: primera })
+          .mockResolvedValueOnce({ paging: { total: 31 }, results: [pagoMP(1, "approved")] }),
+      };
+      const r = await crear({ preferencias: {}, pagos }).buscarPagosPorReferencia("VEL-4K7Q2X");
+
+      expect(r).toHaveLength(31);
+      expect(pagos.search).toHaveBeenCalledTimes(2);
+      expect(pagos.search.mock.calls[1][0].options.offset).toBe(30);
+    });
+
+    it("si pasa el tope de páginas, falla en vez de devolver una lista incompleta", async () => {
+      const pagina = Array.from({ length: 30 }, (_, i) => pagoMP(i, "rejected"));
+      const pagos = {
+        search: jest.fn().mockResolvedValue({ paging: { total: 5000 }, results: pagina }),
+      };
+
+      await expect(
+        crear({ preferencias: {}, pagos }).buscarPagosPorReferencia("VEL-4K7Q2X")
+      ).rejects.toThrow("BUSQUEDA_INCOMPLETA");
+      expect(pagos.search).toHaveBeenCalledTimes(10);
+    });
+
+    it("si Mercado Pago falla, lanza PROCESADOR_NO_DISPONIBLE con la causa", async () => {
+      const causa = { status: 500, error: "internal_error" };
+      const pagos = { search: jest.fn().mockRejectedValue(causa) };
+
+      await expect(
+        crear({ preferencias: {}, pagos }).buscarPagosPorReferencia("VEL-4K7Q2X")
+      ).rejects.toMatchObject({ message: "PROCESADOR_NO_DISPONIBLE", cause: causa });
+    });
   });
 });

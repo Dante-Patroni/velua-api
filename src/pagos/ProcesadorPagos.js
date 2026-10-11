@@ -30,6 +30,19 @@ class ProcesadorPagos {
   async obtenerPago(_pagoId) {
     throw new Error("Metodo obtenerPago no implementado");
   }
+
+  /**
+   * @description Busca todos los pagos de un pedido por su referencia, del más
+   * nuevo al más viejo. Sirve para reconciliar sin depender de que el aviso del
+   * webhook haya llegado. Sin pagos devuelve [] (no es un error).
+   * @param {string} _referencia - Número de pedido (external_reference).
+   * @returns {Promise<Array<{id: string, estado: string, detalle: string|null,
+   *   referencia: string|null, monto: string, moneda: string, metodo: string|null}>>}
+   *   Pagos normalizados, con el mismo formato que obtenerPago.
+   */
+  async buscarPagosPorReferencia(_referencia) {
+    throw new Error("Metodo buscarPagosPorReferencia no implementado");
+  }
 }
 
 module.exports = ProcesadorPagos;

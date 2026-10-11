@@ -5,6 +5,15 @@ const ProcesadorPagos = require("./ProcesadorPagos");
 /** Si Mercado Pago no responde en este tiempo, se corta: la clienta no espera eterno. */
 const TIMEOUT_MS = 8000;
 
+/** Pagos por página al buscar por referencia (el máximo habitual de Mercado Pago). */
+const LIMITE_BUSQUEDA = 30;
+
+/**
+ * Tope de páginas. Un pedido real tiene uno o dos pagos: si se llega acá, algo
+ * anda mal y es mejor fallar que devolver una lista incompleta en silencio.
+ */
+const MAX_PAGINAS_BUSQUEDA = 10;
+
 /**
  * @description Arma el cuerpo de la preferencia. Es una función pura para poder
  * probarla sin llamar a Mercado Pago.
@@ -141,6 +150,45 @@ class MercadoPagoProcesador extends ProcesadorPagos {
       throw error;
     }
     return normalizarPago(p);
+  }
+
+  /**
+   * @description Busca todos los pagos de un pedido por su referencia, recorriendo
+   * todas las páginas, del más nuevo al más viejo.
+   *
+   * Sin pagos devuelve [] (no es un error). Solo ve los pagos de la cuenta de
+   * estas credenciales.
+   *
+   * @param {string} referencia - Número de pedido (external_reference).
+   * @returns {Promise<Object[]>} Pagos normalizados.
+   * @throws {Error} PROCESADOR_NO_CONFIGURADO, PROCESADOR_NO_DISPONIBLE, BUSQUEDA_INCOMPLETA
+   */
+  async buscarPagosPorReferencia(referencia) {
+    const pagos = [];
+    let offset = 0;
+    let pagina = 0;
+    let total;
+    do {
+      if (pagina === MAX_PAGINAS_BUSQUEDA) {
+        throw new Error("BUSQUEDA_INCOMPLETA");
+      }
+      const r = await this.#llamar(() =>
+        this.pagos.search({
+          options: {
+            external_reference: referencia,
+            sort: "date_created",
+            criteria: "desc",
+            limit: LIMITE_BUSQUEDA,
+            offset,
+          },
+        })
+      );
+      pagos.push(...(r.results ?? []));
+      total = r.paging?.total ?? 0;
+      offset += LIMITE_BUSQUEDA;
+      pagina += 1;
+    } while (offset < total);
+    return pagos.map(normalizarPago);
   }
 
   /**
