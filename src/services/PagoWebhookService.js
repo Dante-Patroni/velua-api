@@ -105,4 +105,4 @@ class PagoWebhookService {
   }
 }
 
-module.exports = { PagoWebhookService, RESULTADO_POR_ESTADO };
+module.exports = { PagoWebhookService, RESULTADO_POR_ESTADO, coincideImporte };
