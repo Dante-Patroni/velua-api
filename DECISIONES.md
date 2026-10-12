@@ -197,6 +197,49 @@ antes de tocar código. Cada línea lleva fecha.
 
 ---
 
+## Mercado Pago
+
+- **2026-10** Checkout Pro con la API de preferencias, detrás de la interfaz
+  `ProcesadorPagos`. Se descartó la API de Orders por ahora: pasarse sería escribir
+  otro adaptador, sin tocar los servicios ni el webhook.
+- **2026-10** El aviso del webhook solo trae un id: el pago se consulta siempre a
+  Mercado Pago. Se verifica la firma (HMAC con `MP_WEBHOOK_SECRET`) y, antes de
+  aprobar, la referencia, el medio, el monto en centavos y la moneda ARS. Solo se
+  procesa `type=payment`; el resto responde 200. Las firmas inválidas (401) y los
+  avisos ignorados quedan en el log.
+- **2026-10** Un pago inexistente (404) responde 500 y Mercado Pago reintenta: podría
+  ser pasajero, y perder una aprobación cuesta más que un reintento de más. El log
+  lo distingue como `PAGO_NO_ENCONTRADO`.
+- **2026-10** Reconciliación antes de cancelar: el job de vencimientos no cancela un
+  pedido de Mercado Pago sin buscar sus pagos por referencia
+  (`/v1/payments/search`). El aviso del webhook puede no llegar: pasó en la prueba
+  del 11/10. Con un pago aprobado, lo aprueba (`origen: job`). Con uno en curso,
+  posterga de a una hora, hasta 48 h desde la creación. Si Mercado Pago no responde,
+  no cancela en esa vuelta. Margen de gracia de 15 minutos después del vencimiento.
+  La política vive en una función pura, `decidirVencimientoMP`.
+- **2026-10** Para cancelar se usa una lista blanca: solo si no hay pagos o si todos
+  están en `rejected`, `cancelled`, `refunded` o `charged_back`. Cualquier otro
+  estado, conocido o nuevo, va a revisión. Liberar stock no se puede deshacer.
+- **2026-10** Revisión: el pedido deja de vencer (`expira_en` en null), el stock
+  sigue apartado y queda un evento en la bitácora con el motivo y los ids de los
+  pagos. La resuelve la dueña a mano.
+- **2026-10** Cobro duplicado (dos pagos aprobados para un pedido): se aprueba con el
+  más viejo que coincide en monto y se marca revisión para devolver el otro. Se
+  descartó dejarlo en revisión sin aprobar: la clienta pagó bien, y hoy no hay forma
+  de aprobar un pedido a mano. Decisión revisada con dos opiniones externas.
+- **2026-10** Aviso repetido o segundo cobro: con el mismo `mp_payment_id` es un aviso
+  repetido y no se hace nada. Con otro id sobre un pedido ya aprobado es un posible
+  cobro duplicado, y se anota con los dos ids.
+- **2026-10** Transferencias: control manual. Van a la cuenta de Mercado Pago de la
+  dueña, y Mercado Pago no expone por API las transferencias que entran al CVU. La
+  web ayuda con el número de pedido en el concepto, el monto exacto y la lista del
+  panel.
+- **2026-10** Desarrollo con una app propia ("Velua - desarrollo", en la cuenta de
+  Dante) y sus cuentas de prueba. Producción con la app de la dueña: las
+  credenciales van solo en Railway.
+
+---
+
 ## Fuera de alcance
 
 - **2026-09** Notificación de reposición. El link "Avisarme" de las tarjetas agotadas
@@ -206,9 +249,16 @@ antes de tocar código. Cada línea lleva fecha.
 
 ## Pendientes de decidir
 
-- Servicio de conciliación automática de transferencias por CVU. Definir antes del
-  hito 4.
 - Umbral de envío gratis y porcentaje de descuento por transferencia. Los define la
   dueña de la marca.
 - Archivar productos: un estado más allá de despublicado, para que un combo de
   temporada con ventas desaparezca del listado sin borrarse.
+  - Pagos en efectivo (Rapipago, Pago Fácil): se acreditan días después y no encajan
+  con una reserva de una hora. Los decide la dueña.
+- Plazo de acreditación en Mercado Pago y estrategia de cuotas sin interés. Los
+  decide la dueña, con las tarifas online.
+- Bandeja propia de avisos de pago (`notificaciones_pago`), con reintentos con
+  backoff, para no depender de los reintentos de Mercado Pago.
+- Prevenir el cobro doble: antes de generar un link de pago nuevo, buscar por
+  referencia y aplicar el pago aprobado si ya existe.
+- Vista en el panel de los pedidos en revisión y aviso por mail a la dueña (H5).
