@@ -135,6 +135,8 @@ class PedidoEstadoService {
    * - FUERA_DE_ORDEN: un rechazo que llega después de la aprobación. Se ignora.
    * - REQUIERE_REVISION: un pago aprobado sobre un pedido cancelado. Se cobró sin
    *   pedido: queda en la bitácora para que la dueña lo devuelva a mano.
+   * - PAGO_DUPLICADO: un pago aprobado distinto del que ya aprobó el pedido. Se
+   *   anota con los dos ids; no se vuelve a aprobar.
    *
    * @param {number} pedidoId - Id del pedido.
    * @param {Object} pago - Resultado del procesador.
@@ -160,6 +162,24 @@ class PedidoEstadoService {
       const { numero } = pedido;
 
       if (pedido.estadoPago === estado) {
+        // Aprobado con OTRO pago: la clienta pudo haber pagado dos veces (por ejemplo,
+        // reintentó antes de ver la confirmación). No se aplica de nuevo: se anota
+        // con los dos ids para que la dueña revise y devuelva uno.
+        const otroPago =
+          estado === "aprobado" &&
+          pedido.mpPaymentId &&
+          String(pedido.mpPaymentId) !== String(pagoId);
+        if (otroPago) {
+          await tx.registrarEvento({
+            pedidoId: pedido.id,
+            campo: "pago",
+            estadoAnterior: pedido.estadoPago,
+            estadoNuevo: pedido.estadoPago,
+            origen,
+            detalle: `Posible cobro duplicado: pago ${pagoId} aprobado y el pedido ya estaba aprobado con el pago ${pedido.mpPaymentId}. Revisar y devolver uno`,
+          });
+          return { cambiado: false, numero, motivo: "PAGO_DUPLICADO" };
+        }
         return { cambiado: false, numero, motivo: "YA_REGISTRADO" };
       }
 

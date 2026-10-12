@@ -185,3 +185,49 @@ describe("registrarResultadoPago con origen", () => {
     expect(repo.estado.eventos).toEqual([expect.objectContaining({ origen: "job" })]);
   });
 });
+
+describe("registrarResultadoPago: aviso repetido vs. cobro duplicado", () => {
+  const aprobado = pedido({ estadoPago: "aprobado", expiraEn: null, mpPaymentId: "111" });
+
+  it("otro pago aprobado sobre un pedido aprobado: anota los dos ids y no repite nada", async () => {
+    const repo = crearRepositorio([aprobado]);
+
+    const r = await servicio(repo).registrarResultadoPago(1, {
+      estado: "aprobado",
+      pagoId: "222",
+      metodo: "master",
+    });
+
+    expect(r).toEqual({ cambiado: false, numero: "VEL-AAAAAA", motivo: "PAGO_DUPLICADO" });
+    expect(repo.estado.eventos).toEqual([
+      expect.objectContaining({ detalle: expect.stringMatching(/222.*111/) }),
+    ]);
+    expect(repo.tx.actualizarEstados).not.toHaveBeenCalled();
+    expect(repo.tx.guardarDatosPago).not.toHaveBeenCalled();
+    expect(repo.tx.encolarEmail).not.toHaveBeenCalled();
+  });
+
+  it("el mismo pago otra vez sigue siendo un aviso repetido, sin escribir nada", async () => {
+    const repo = crearRepositorio([aprobado]);
+
+    const r = await servicio(repo).registrarResultadoPago(1, {
+      estado: "aprobado",
+      pagoId: "111",
+    });
+
+    expect(r.motivo).toBe("YA_REGISTRADO");
+    expect(repo.estado.eventos).toHaveLength(0);
+  });
+
+  it("un rechazo de otro pago sobre un pedido aprobado se sigue ignorando", async () => {
+    const repo = crearRepositorio([aprobado]);
+
+    const r = await servicio(repo).registrarResultadoPago(1, {
+      estado: "rechazado",
+      pagoId: "333",
+    });
+
+    expect(r.motivo).toBe("FUERA_DE_ORDEN");
+    expect(repo.estado.eventos).toHaveLength(0);
+  });
+});

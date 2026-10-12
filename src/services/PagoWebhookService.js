@@ -106,6 +106,12 @@ class PagoWebhookService {
         this.logger.error(`${prefijo} pago ${pago.id}: ${numero} aprobado sobre un pedido cerrado`);
       }
 
+      if (r.motivo === "PAGO_DUPLICADO") {
+        this.logger.error(
+          `${prefijo} pago ${pago.id}: ${numero} ya estaba aprobado con otro pago, posible cobro duplicado`
+        );
+      }
+
       return r.cambiado
         ? { procesado: true, numero }
         : { procesado: false, numero, motivo: r.motivo };

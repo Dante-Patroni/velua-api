@@ -225,4 +225,37 @@ describe("aplicarPago", () => {
       expect.objectContaining({ origen: "job" })
     );
   });
+
+  it("un cobro duplicado queda en el log como error", async () => {
+    const logger = { error: jest.fn() };
+    const servicio = new PagoWebhookService({
+      procesadorPagos: {},
+      pedidoRepository: {
+        buscarPorNumero: jest.fn().mockResolvedValue({
+          id: 22,
+          numero: "VEL-UZQ4ZU",
+          medioPago: "mercadopago",
+          total: "8500.00",
+        }),
+      },
+      pedidoEstadoService: {
+        registrarResultadoPago: jest
+          .fn()
+          .mockResolvedValue({ cambiado: false, numero: "VEL-UZQ4ZU", motivo: "PAGO_DUPLICADO" }),
+      },
+      logger,
+    });
+
+    const r = await servicio.aplicarPago({
+      id: "222",
+      estado: "approved",
+      referencia: "VEL-UZQ4ZU",
+      monto: "8500.00",
+      moneda: "ARS",
+      metodo: "master",
+    });
+
+    expect(r).toEqual({ procesado: false, numero: "VEL-UZQ4ZU", motivo: "PAGO_DUPLICADO" });
+    expect(logger.error).toHaveBeenCalledWith(expect.stringContaining("cobro duplicado"));
+  });
 });
