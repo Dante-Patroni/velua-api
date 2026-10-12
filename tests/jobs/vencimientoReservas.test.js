@@ -292,7 +292,7 @@ describe("reconciliación con Mercado Pago", () => {
   });
 
   it("dentro del margen de gracia no consulta ni cancela", async () => {
-    const { job, pedidoEstadoService, procesadorPagos } = crearJobMP({
+    const { job, pedidoEstadoService, procesadorPagos, logger } = crearJobMP({
       pedidos: [pedidoMP({ expiraEn: new Date(AHORA.getTime() - 5 * 60 * 1000) })],
     });
 
@@ -301,6 +301,7 @@ describe("reconciliación con Mercado Pago", () => {
     expect(procesadorPagos.buscarPagosPorReferencia).not.toHaveBeenCalled();
     expect(pedidoEstadoService.cancelarVencido).not.toHaveBeenCalled();
     expect(r.descartados).toBe(1);
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining("margen de gracia"));
   });
 
   it("una transferencia no consulta a Mercado Pago", async () => {

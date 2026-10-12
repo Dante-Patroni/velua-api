@@ -150,6 +150,9 @@ class VencimientoReservas {
     const ahora = this.ahora();
     if (ahora.getTime() < new Date(pedido.expiraEn).getTime() + this.graciaMs) {
       resumen.descartados++;
+      this.logger.info(
+        `[vencimientos] ${pedido.numero}: en el margen de gracia, se revisa en la próxima vuelta`
+      );
       return;
     }
 
