@@ -20,6 +20,15 @@ class ArrepentimientoRepository {
   async registrar(_arrepentimiento, _emails) {
     throw new Error("Metodo registrar no implementado");
   }
+
+  /**
+   * @description Lista solicitudes, de la más nueva a la más vieja.
+   * @param {{estado: string|null, pagina: number, limite: number}} _filtros - Filtro y página.
+   * @returns {Promise<{filas: Object[], total: number}>} Página de solicitudes y total.
+   */
+  async listar(_filtros) {
+    throw new Error("Metodo listar no implementado");
+  }
 }
 
 module.exports = { ArrepentimientoRepository };

@@ -120,3 +120,52 @@ describe("generarCodigo", () => {
     }
   });
 });
+
+describe("ArrepentimientoService.listar", () => {
+  const FILA = {
+    id: 7,
+    codigo: "ARR-K7Q2XM",
+    pedidoNumero: "VEL-TV89DE",
+    nombre: "Valentina Ruiz",
+    email: "valentina@ejemplo.test",
+    telefono: null,
+    motivo: null,
+    estado: "recibido",
+    creadoEn: CREADO,
+    campoInterno: "no se expone",
+  };
+
+  const conRepo = () => {
+    const repositorio = { listar: jest.fn(async () => ({ filas: [FILA], total: 1 })) };
+    return {
+      servicio: new ArrepentimientoService(repositorio, { emailAvisos: null }),
+      repositorio,
+    };
+  };
+
+  it("sin filtros pide la primera página de 20", async () => {
+    const { servicio, repositorio } = conRepo();
+
+    await servicio.listar();
+
+    expect(repositorio.listar).toHaveBeenCalledWith({ estado: null, pagina: 1, limite: 20 });
+  });
+
+  it("pasa el estado y la paginación pedidos", async () => {
+    const { servicio, repositorio } = conRepo();
+
+    await servicio.listar({ estado: "recibido", pagina: 2, limite: 10 });
+
+    expect(repositorio.listar).toHaveBeenCalledWith({ estado: "recibido", pagina: 2, limite: 10 });
+  });
+
+  it("devuelve las solicitudes sin campos internos, con el meta", async () => {
+    const { servicio } = conRepo();
+
+    const r = await servicio.listar();
+
+    const { campoInterno, ...visible } = FILA;
+    expect(campoInterno).toBeDefined();
+    expect(r).toEqual({ datos: [visible], meta: { pagina: 1, limite: 20, total: 1 } });
+  });
+});

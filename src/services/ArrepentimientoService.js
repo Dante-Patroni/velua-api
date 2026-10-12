@@ -5,6 +5,24 @@ const { ALFABETO } = require("./CheckoutService");
 const PREFIJO = "ARR-";
 const LARGO_CODIGO = 6;
 const INTENTOS_CODIGO = 5;
+const LIMITE_POR_DEFECTO = 20;
+
+/**
+ * @description Lo que el panel ve de cada solicitud: sin campos internos.
+ * @param {Object} a - Fila del repositorio.
+ * @returns {Object} Solicitud para el panel.
+ */
+const aPanel = (a) => ({
+  id: a.id,
+  codigo: a.codigo,
+  pedidoNumero: a.pedidoNumero,
+  nombre: a.nombre,
+  email: a.email,
+  telefono: a.telefono,
+  motivo: a.motivo,
+  estado: a.estado,
+  creadoEn: a.creadoEn,
+});
 
 /**
  * @description Genera un código de trámite: ARR- y seis caracteres del mismo
@@ -95,6 +113,20 @@ class ArrepentimientoService {
 
     const creado = await this.repositorio.registrar({ ...datos, codigo }, emails);
     return { codigo: creado.codigo, creadoEn: creado.creadoEn };
+  }
+
+  /**
+   * @description Lista solicitudes para el panel, de la más nueva a la más vieja.
+   * @param {Object} [filtros] - Filtros.
+   * @param {string|null} [filtros.estado] - recibido, en_gestion o resuelto.
+   * @param {number} [filtros.pagina] - Página, desde 1.
+   * @param {number} [filtros.limite] - Solicitudes por página.
+   * @returns {Promise<{datos: Object[], meta: {pagina: number, limite: number, total: number}}>}
+   *   Página de solicitudes.
+   */
+  async listar({ estado = null, pagina = 1, limite = LIMITE_POR_DEFECTO } = {}) {
+    const { filas, total } = await this.repositorio.listar({ estado, pagina, limite });
+    return { datos: filas.map(aPanel), meta: { pagina, limite, total } };
   }
 
   /**

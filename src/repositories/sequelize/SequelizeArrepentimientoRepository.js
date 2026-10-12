@@ -42,6 +42,24 @@ class SequelizeArrepentimientoRepository extends ArrepentimientoRepository {
     });
     return resultado;
   }
+
+  /**
+   * @description Lista solicitudes, de la más nueva a la más vieja.
+   * @param {{estado: string|null, pagina: number, limite: number}} filtros - Filtro y página.
+   * @returns {Promise<{filas: Object[], total: number}>} Página de solicitudes y total.
+   */
+  async listar({ estado, pagina, limite }) {
+    const { rows, count } = await this.models.Arrepentimiento.findAndCountAll({
+      where: estado ? { estado } : {},
+      order: [
+        ["creadoEn", "DESC"],
+        ["id", "DESC"],
+      ],
+      limit: limite,
+      offset: (pagina - 1) * limite,
+    });
+    return { filas: rows.map((r) => r.toJSON()), total: count };
+  }
 }
 
 module.exports = SequelizeArrepentimientoRepository;
