@@ -47,4 +47,17 @@ const limitadorPedidos = rateLimit({
   handler: handlerLimiteSuperado,
 });
 
-module.exports = { limitadorLogin, limitadorGlobal, limitadorPedidos };
+/**
+ * @description Límite para el formulario de arrepentimiento. Es público y encola
+ * mails: sin límite, alguien podría llenar la bandeja de salida y la casilla de la
+ * dueña con solicitudes falsas. Una clienta real manda una, a lo sumo dos.
+ */
+const limitadorArrepentimiento = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: process.env.NODE_ENV === "production" ? 5 : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: handlerLimiteSuperado,
+});
+
+module.exports = { limitadorLogin, limitadorGlobal, limitadorPedidos, limitadorArrepentimiento };
