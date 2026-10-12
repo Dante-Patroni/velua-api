@@ -2190,6 +2190,101 @@
         }
       }
     },
+    "/arrepentimientos": {
+      "post": {
+        "tags": [
+          "Arrepentimiento"
+        ],
+        "summary": "Solicitar el arrepentimiento de una compra",
+        "description": "Botón de arrepentimiento (Resolución 424/2020). No requiere registrarse. Siempre registra la solicitud y devuelve un código de trámite, que también se le manda por mail a la clienta.\n\nNo confirma si el pedido existe ni controla el plazo legal: de eso se ocupa la dueña. El motivo es opcional: no hace falta justificar.\n",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nombre",
+                  "email"
+                ],
+                "properties": {
+                  "pedidoNumero": {
+                    "type": "string",
+                    "example": "VEL-TV89DE"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 140
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "maxLength": 180
+                  },
+                  "telefono": {
+                    "type": "string",
+                    "maxLength": 40
+                  },
+                  "motivo": {
+                    "type": "string",
+                    "maxLength": 600
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Solicitud registrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "codigo",
+                    "creadoEn"
+                  ],
+                  "properties": {
+                    "codigo": {
+                      "type": "string",
+                      "example": "ARR-K7Q2XM"
+                    },
+                    "creadoEn": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "DATOS_INVALIDOS, con el campo que falla en details.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiadas solicitudes desde la misma dirección",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "LIMITE_SUPERADO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/admin/productos": {
       "get": {
         "tags": [
@@ -3540,6 +3635,144 @@
           },
           "404": {
             "$ref": "#/components/responses/NoEncontrado"
+          }
+        }
+      }
+    },
+    "/admin/arrepentimientos": {
+      "get": {
+        "tags": [
+          "Admin - Arrepentimientos"
+        ],
+        "summary": "Listar las solicitudes de arrepentimiento",
+        "description": "De la más nueva a la más vieja. Incluye los datos de contacto de la clienta: por eso pide el permiso de ver pedidos. El plazo legal y si el pedido existe los evalúa quien gestiona la solicitud.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "estado",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "recibido",
+                "en_gestion",
+                "resuelto"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "pagina",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "in": "query",
+            "name": "limite",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de solicitudes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "datos",
+                    "meta"
+                  ],
+                  "properties": {
+                    "datos": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer"
+                          },
+                          "codigo": {
+                            "type": "string"
+                          },
+                          "pedidoNumero": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "telefono": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "motivo": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "estado": {
+                            "type": "string",
+                            "enum": [
+                              "recibido",
+                              "en_gestion",
+                              "resuelto"
+                            ]
+                          },
+                          "creadoEn": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "properties": {
+                        "pagina": {
+                          "type": "integer"
+                        },
+                        "limite": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
           }
         }
       }
