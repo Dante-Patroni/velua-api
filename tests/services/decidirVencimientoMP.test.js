@@ -52,7 +52,12 @@ describe("decidirVencimientoMP", () => {
     it("dos aprobados: aprueba con el más viejo y avisa el cobro duplicado", () => {
       const viejo = pago("1", "approved");
       const r = decidir([pago("2", "approved"), viejo]);
-      expect(r).toEqual({ accion: "aprobar", motivo: "PAGO_DUPLICADO", pago: viejo });
+      expect(r).toEqual({
+        accion: "aprobar",
+        motivo: "PAGO_DUPLICADO",
+        pago: viejo,
+        pagosAprobados: ["2", "1"],
+      });
     });
   });
 
@@ -61,6 +66,7 @@ describe("decidirVencimientoMP", () => {
       expect(decidir([pago("1", "approved", "100.00")])).toEqual({
         accion: "revisar",
         motivo: "MONTO_NO_COINCIDE",
+        pagosAprobados: ["1"],
       });
     });
 
@@ -92,6 +98,27 @@ describe("decidirVencimientoMP", () => {
     it("cerca del tope, posterga solo hasta el tope", () => {
       const r = decidir([pago("1", "pending")], horas(TOPE - 0.5));
       expect(r.hasta).toEqual(horas(TOPE));
+    });
+  });
+
+  describe("estados que no se conocen no cancelan", () => {
+    it("un contracargo cuenta como sin cobro: cancela", () => {
+      expect(decidir([pago("1", "charged_back")]).accion).toBe("cancelar");
+    });
+
+    it("un pago en mediación va a revisión: se cobró y está en disputa", () => {
+      expect(decidir([pago("1", "in_mediation")])).toEqual({
+        accion: "revisar",
+        motivo: "ESTADO_DESCONOCIDO",
+      });
+    });
+
+    it("un estado que Mercado Pago agregue mañana va a revisión", () => {
+      expect(decidir([pago("1", "estado_nuevo")]).accion).toBe("revisar");
+    });
+
+    it("un rechazo junto a un estado desconocido también va a revisión", () => {
+      expect(decidir([pago("2", "in_mediation"), pago("1", "rejected")]).accion).toBe("revisar");
     });
   });
 });
