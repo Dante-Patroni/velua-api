@@ -33,10 +33,22 @@ class PedidoRepository {
    * lista de candidatos, y cada uno se vuelve a verificar con candado al cancelarlo.
    * @param {Date} _ahora - Momento de referencia.
    * @param {number} _limite - Máximo de pedidos por vuelta.
-   * @returns {Promise<number[]>} Ids, los más viejos primero.
+   * @returns {Promise<Array<{id: number, numero: string, medioPago: string,
+   *   total: string, creadoEn: Date, expiraEn: Date}>>} Pedidos, los más viejos primero.
    */
   async listarVencidos(_ahora, _limite) {
     throw new Error("Metodo listarVencidos no implementado");
+  }
+
+  /**
+   * @description Guarda el id de la preferencia de pago del pedido. Va fuera de la
+   * transacción del checkout: se llama después de hablar con el procesador.
+   * @param {number} _pedidoId - Id del pedido.
+   * @param {string} _preferenciaId - Id de la preferencia en el procesador.
+   * @returns {Promise<void>}
+   */
+  async guardarPreferencia(_pedidoId, _preferenciaId) {
+    throw new Error("Metodo guardarPreferencia no implementado");
   }
 }
 
@@ -168,6 +180,17 @@ class PedidoTransaccion {
    */
   async actualizarEstados(_pedidoId, _estados) {
     throw new Error("Metodo actualizarEstados no implementado");
+  }
+
+  /**
+   * @description Guarda los datos del pago en el pedido: el id y el método del
+   * procesador y, cuando se aprueba, el fin del vencimiento.
+   * @param {number} _pedidoId - Id del pedido.
+   * @param {{mpPaymentId?: string, mpMetodo?: string|null, expiraEn?: Date|null}} _datos - Datos del pago.
+   * @returns {Promise<void>}
+   */
+  async guardarDatosPago(_pedidoId, _datos) {
+    throw new Error("Metodo guardarDatosPago no implementado");
   }
 }
 

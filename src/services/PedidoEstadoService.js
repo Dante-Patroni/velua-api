@@ -1,4 +1,11 @@
-const { ESTADOS_PAGO_VENCIBLES, validarTransicion } = require("./transicionesPedido");
+const {
+  ESTADOS_PAGO_VENCIBLES,
+  esTransicionValida,
+  validarTransicion,
+} = require("./transicionesPedido");
+
+/** Resultados del procesador que mueven el estado de pago. */
+const RESULTADOS_PAGO = Object.freeze(["aprobado", "rechazado"]);
 
 /**
  * @description Indica si la reserva de un pedido está vencida y se puede cancelar.
@@ -23,9 +30,9 @@ const estaVencido = (pedido, ahora) =>
  * @description Cambia el estado de los pedidos pasando por la máquina de estados.
  *
  * Ninguna transición se hace con un update suelto: cada una valida que sea legal y
- * ejecuta sus efectos (stock, bitácora, mail) dentro de una sola transacción. Por
- * ahora implementa la cancelación por vencimiento; las demás transiciones llegan
- * con el webhook y el panel de pedidos.
+ * ejecuta sus efectos (stock, bitácora, mail) dentro de una sola transacción.
+ * Implementa la cancelación por vencimiento y el resultado de un pago online;
+ * las transiciones manuales llegan con el panel de pedidos.
  */
 class PedidoEstadoService {
   /**
@@ -111,6 +118,201 @@ class PedidoEstadoService {
       });
 
       return { cancelado: true, numero: pedido.numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description Registra el resultado de un pago online: aprobado o rechazado.
+   *
+   * Es idempotente: el procesador puede avisar varias veces lo mismo, y repetir un
+   * resultado ya registrado no vuelve a encolar el mail ni a escribir nada.
+   *
+   * Nunca lanza por un aviso que no corresponde, porque el webhook lo reintentaría
+   * para siempre. Devuelve el motivo:
+   * - YA_REGISTRADO: el pedido ya estaba en ese estado.
+   * - FUERA_DE_ORDEN: un rechazo que llega después de la aprobación. Se ignora.
+   * - REQUIERE_REVISION: un pago aprobado sobre un pedido cancelado. Se cobró sin
+   *   pedido: queda en la bitácora para que la dueña lo devuelva a mano.
+   * - PAGO_DUPLICADO: un pago aprobado distinto del que ya aprobó el pedido. Se
+   *   anota con los dos ids; no se vuelve a aprobar.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} pago - Resultado del procesador.
+   * @param {"aprobado"|"rechazado"} pago.estado - Resultado.
+   * @param {string} pago.pagoId - Id del pago en el procesador.
+   * @param {string|null} [pago.metodo] - Medio usado, por ejemplo "visa".
+   * @param {string} [pago.origen] - Quién lo registra, para la bitácora: "webhook"
+   * (por defecto) o "job" (reconciliación).
+   * @returns {Promise<{cambiado: boolean, numero?: string, motivo?: string}>}
+   *   cambiado en true si movió el estado; si no, el motivo.
+   * @throws {Error} Si el estado no es aprobado ni rechazado: error de programación.
+   */
+  async registrarResultadoPago(pedidoId, { estado, pagoId, metodo = null, origen = "webhook" }) {
+    if (!RESULTADOS_PAGO.includes(estado)) {
+      throw new Error(`Resultado de pago desconocido: ${estado}`);
+    }
+
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        return { cambiado: false, motivo: "NO_EXISTE" };
+      }
+      const { numero } = pedido;
+
+      if (pedido.estadoPago === estado) {
+        // Aprobado con OTRO pago: la clienta pudo haber pagado dos veces (por ejemplo,
+        // reintentó antes de ver la confirmación). No se aplica de nuevo: se anota
+        // con los dos ids para que la dueña revise y devuelva uno.
+        const otroPago =
+          estado === "aprobado" &&
+          pedido.mpPaymentId &&
+          String(pedido.mpPaymentId) !== String(pagoId);
+        if (otroPago) {
+          await tx.registrarEvento({
+            pedidoId: pedido.id,
+            campo: "pago",
+            estadoAnterior: pedido.estadoPago,
+            estadoNuevo: pedido.estadoPago,
+            origen,
+            detalle: `Posible cobro duplicado: pago ${pagoId} aprobado y el pedido ya estaba aprobado con el pago ${pedido.mpPaymentId}. Revisar y devolver uno`,
+          });
+          return { cambiado: false, numero, motivo: "PAGO_DUPLICADO" };
+        }
+        return { cambiado: false, numero, motivo: "YA_REGISTRADO" };
+      }
+
+      if (!esTransicionValida("pago", pedido.estadoPago, estado)) {
+        if (estado !== "aprobado") {
+          return { cambiado: false, numero, motivo: "FUERA_DE_ORDEN" };
+        }
+        // Plata cobrada sobre un pedido que ya no existe para la tienda: el stock
+        // se devolvió y el pedido no se prepara. No se reabre solo; lo decide la dueña.
+        await tx.registrarEvento({
+          pedidoId: pedido.id,
+          campo: "pago",
+          estadoAnterior: pedido.estadoPago,
+          estadoNuevo: pedido.estadoPago,
+          origen,
+          detalle: `Pago ${pagoId} aprobado sobre un pedido ${pedido.estadoPago}: revisar y devolver el dinero`,
+        });
+        return { cambiado: false, numero, motivo: "REQUIERE_REVISION" };
+      }
+
+      await tx.actualizarEstados(pedido.id, { estadoPago: estado });
+      await tx.guardarDatosPago(pedido.id, {
+        mpPaymentId: String(pagoId),
+        mpMetodo: metodo,
+        // Aprobado: el pedido deja de vencer. Rechazado: sigue el plazo original,
+        // así la clienta puede reintentar mientras el stock esté apartado.
+        ...(estado === "aprobado" ? { expiraEn: null } : {}),
+      });
+
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "pago",
+        estadoAnterior: pedido.estadoPago,
+        estadoNuevo: estado,
+        origen,
+        detalle: `Pago ${pagoId}${metodo ? ` (${metodo})` : ""}`,
+      });
+
+      // Si el encolado falla, falla todo y el procesador vuelve a avisar.
+      await tx.encolarEmail({
+        pedidoId: pedido.id,
+        tipo: estado === "aprobado" ? "pago_confirmado" : "pago_rechazado",
+        destinatario: pedido.clienteEmail,
+        datos: {
+          numero,
+          nombre: pedido.clienteNombre,
+          total: pedido.total,
+          ...(estado === "rechazado" && pedido.expiraEn
+            ? { expiraEn: new Date(pedido.expiraEn).toISOString() }
+            : {}),
+        },
+      });
+
+      return { cambiado: true, numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description Posterga el vencimiento de un pedido que tiene un pago en curso.
+   *
+   * Lo usa la reconciliación cuando Mercado Pago tiene un pago que todavía puede
+   * aprobarse: el stock sigue apartado y el pedido se vuelve a mirar más tarde.
+   * Igual que cancelarVencido, relee el pedido con candado: si mientras tanto se
+   * aprobó, no le vuelve a poner un vencimiento.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} opciones - Datos de la postergación.
+   * @param {Date} opciones.hasta - Nuevo vencimiento.
+   * @param {string} opciones.motivo - Por qué se posterga, para la bitácora.
+   * @returns {Promise<{postergado: boolean, numero?: string, motivo?: string}>}
+   *   postergado en true si movió el vencimiento; si no, el motivo.
+   */
+  async postergarVencimiento(pedidoId, { hasta, motivo }) {
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        return { postergado: false, motivo: "NO_EXISTE" };
+      }
+      if (!estaVencido(pedido, this.ahora())) {
+        return { postergado: false, numero: pedido.numero, motivo: "YA_NO_CORRESPONDE" };
+      }
+
+      await tx.guardarDatosPago(pedido.id, { expiraEn: hasta });
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "pago",
+        estadoAnterior: pedido.estadoPago,
+        estadoNuevo: pedido.estadoPago,
+        origen: "job",
+        detalle: `Vencimiento postergado hasta ${hasta.toISOString()}: ${motivo}`,
+      });
+
+      return { postergado: true, numero: pedido.numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description Deja un pedido para que la dueña lo revise a mano.
+   *
+   * Si el pedido todavía vence, deja de vencer: el stock queda apartado hasta que
+   * alguien decida, en lugar de liberarse solo. Si ya no vence (por ejemplo, se
+   * aprobó y hubo un cobro duplicado), solo anota el motivo en la bitácora.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} opciones - Datos de la revisión.
+   * @param {string} opciones.motivo - Qué hay que revisar, para la bitácora.
+   * @returns {Promise<{marcado: boolean, numero?: string, motivo?: string}>}
+   *   marcado en true si lo anotó; si no, el motivo.
+   */
+  async marcarRevision(pedidoId, { motivo }) {
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        return { marcado: false, motivo: "NO_EXISTE" };
+      }
+
+      if (pedido.expiraEn && ESTADOS_PAGO_VENCIBLES.includes(pedido.estadoPago)) {
+        await tx.guardarDatosPago(pedido.id, { expiraEn: null });
+      }
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "pago",
+        estadoAnterior: pedido.estadoPago,
+        estadoNuevo: pedido.estadoPago,
+        origen: "job",
+        detalle: `Requiere revisión: ${motivo}`,
+      });
+
+      return { marcado: true, numero: pedido.numero };
     });
 
     return resultado;

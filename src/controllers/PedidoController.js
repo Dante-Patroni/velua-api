@@ -48,6 +48,20 @@ class PedidoController {
       manejarErrorHttp(error, res);
     }
   };
+
+  /**
+   * @description Genera un link de pago nuevo para un pedido de Mercado Pago.
+   * @param {import("express").Request} req - Request con el número en la ruta.
+   * @param {import("express").Response} res - Response de Express.
+   * @returns {Promise<void>}
+   */
+  iniciarPago = async (req, res) => {
+    try {
+      res.status(200).json(await this.servicio.iniciarPago(req.params.numero));
+    } catch (error) {
+      manejarErrorHttp(error, res);
+    }
+  };
 }
 
 module.exports = PedidoController;
