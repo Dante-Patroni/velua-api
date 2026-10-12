@@ -1913,6 +1913,168 @@
       ]
     },
     {
+      "name": "Arrepentimiento",
+      "item": [
+        {
+          "name": "POST /arrepentimientos completo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/arrepentimientos",
+              "host": ["{{base_url}}"],
+              "path": ["arrepentimientos"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pedidoNumero\":\"vel-k7q2xm\",\"nombre\":\"Prueba Newman\",\"email\":\"Prueba@Newman.TEST\",\"motivo\":\"\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json();",
+                  "pm.test('Devuelve un código de trámite ARR-', () => pm.expect(r.codigo).to.match(/^ARR-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{6}$/));",
+                  "pm.test('No devuelve nada más que el código y la fecha', () => pm.expect(Object.keys(r).sort()).to.eql(['codigo', 'creadoEn']));",
+                  "pm.collectionVariables.set('arr_codigo', r.codigo);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /arrepentimientos sin numero de pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/arrepentimientos",
+              "host": ["{{base_url}}"],
+              "path": ["arrepentimientos"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"nombre\":\"Prueba Newman\",\"email\":\"prueba@newman.test\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Es otro código', () => pm.expect(pm.response.json().codigo).to.not.eql(pm.collectionVariables.get('arr_codigo')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /arrepentimientos con pedido y email mal escritos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/arrepentimientos",
+              "host": ["{{base_url}}"],
+              "path": ["arrepentimientos"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"pedidoNumero\":\"123\",\"nombre\":\"Prueba Newman\",\"email\":\"no-es-un-mail\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "const r = pm.response.json();",
+                  "pm.test('Es DATOS_INVALIDOS', () => pm.expect(r.error).to.eql('DATOS_INVALIDOS'));",
+                  "pm.test('Informa los dos campos juntos', () => pm.expect(r.details).to.have.all.keys('pedidoNumero', 'email'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /arrepentimientos vacio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/arrepentimientos",
+              "host": ["{{base_url}}"],
+              "path": ["arrepentimientos"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Pide nombre y email', () => pm.expect(pm.response.json().details).to.include.all.keys('nombre', 'email'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Autenticacion",
       "item": [
         {
@@ -3864,6 +4026,193 @@
       ]
     },
     {
+      "name": "Admin - Arrepentimientos",
+      "item": [
+        {
+          "name": "GET /admin/arrepentimientos sin sesion",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/arrepentimientos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "arrepentimientos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login (entrar al panel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "login"]
+            },
+            "description": "El grupo hace su propio login para no depender del orden de los demas grupos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{admin_email}}\",\"password\":\"{{admin_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Tiene permiso de ver pedidos', () => pm.expect(pm.response.json().permisos).to.include('PEDIDOS_VER'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/arrepentimientos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/arrepentimientos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "arrepentimientos"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Trae la primera página de 20', () => pm.expect(r.meta).to.include({ pagina: 1, limite: 20 }));",
+                  "const s = r.datos.find((d) => d.codigo === pm.collectionVariables.get('arr_codigo'));",
+                  "pm.test('Incluye la solicitud recién creada', () => pm.expect(s).to.be.an('object'));",
+                  "pm.test('La guardó normalizada', () => {",
+                  "    pm.expect(s.pedidoNumero).to.eql('VEL-K7Q2XM');",
+                  "    pm.expect(s.email).to.eql('prueba@newman.test');",
+                  "    pm.expect(s.motivo).to.eql(null);",
+                  "    pm.expect(s.estado).to.eql('recibido');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/arrepentimientos filtrado y paginado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/arrepentimientos?estado=recibido&limite=1",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "arrepentimientos"],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "recibido"
+                },
+                {
+                  "key": "limite",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Respeta el límite', () => { pm.expect(r.meta.limite).to.eql(1); pm.expect(r.datos.length).to.be.at.most(1); });",
+                  "pm.test('Solo trae el estado pedido', () => r.datos.forEach((d) => pm.expect(d.estado).to.eql('recibido')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/arrepentimientos con estado inventado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/arrepentimientos?estado=inventado",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "arrepentimientos"],
+              "query": [
+                {
+                  "key": "estado",
+                  "value": "inventado"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el estado', () => pm.expect(pm.response.json().details).to.have.property('estado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": ["{{base_url}}"],
+              "path": ["auth", "logout"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cierra la sesión', () => pm.expect(pm.response.code).to.be.oneOf([200, 204]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
       "name": "Errores",
       "item": [
         {
@@ -3990,6 +4339,10 @@
     },
     {
       "key": "ped_numero",
+      "value": ""
+    },
+    {
+      "key": "arr_codigo",
       "value": ""
     }
   ]
