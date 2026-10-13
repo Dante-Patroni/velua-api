@@ -5,6 +5,7 @@ const cors = require("cors");
 const { crearValidadorOrigen, leerConfigCors } = require("./config/cors");
 const cookieParser = require("cookie-parser");
 const { limitadorGlobal } = require("./middlewares/rateLimitMiddleware");
+const { normalizarUnicode } = require("./middlewares/normalizarUnicode");
 
 const app = express();
 
@@ -13,6 +14,7 @@ app.set("trust proxy", 1);
 app.use(cors({ origin: crearValidadorOrigen(leerConfigCors()), credentials: true }));
 
 app.use(express.json({ limit: "1mb" }));
+app.use(normalizarUnicode);
 app.use(cookieParser());
 const swaggerSpec = require("./docs/swagger");
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
@@ -28,6 +30,7 @@ app.use("/api/v1", require("./routes/pedidoRoutes"));
 app.use("/api/v1", require("./routes/webhookRoutes"));
 app.use("/api/v1", require("./routes/arrepentimientoRoutes"));
 app.use("/api/v1", require("./routes/adminArrepentimientosRoutes"));
+
 /**
  * @openapi
  * /salud:
