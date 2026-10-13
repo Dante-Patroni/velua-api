@@ -122,6 +122,14 @@ antes de tocar código. Cada línea lleva fecha.
 
 ---
 
+## CORS y sesión
+
+- CORS acepta orígenes exactos (`CORS_ORIGENES`) y, opcionalmente, un patrón para las previews de Vercel (`CORS_PATRON_PREVIEWS`). La lógica está en `src/config/cors.js` y tiene tests.
+- El patrón está anclado (`^…$`), exige https y el nombre del proyecto y la cuenta. Igual no puede impedir que otra cuenta de Vercel con un nombre que termine en `-dante-patroni` coincida. **Riesgo asumido**: esa página solo podría leer endpoints públicos, porque la cookie de sesión es `SameSite=Lax` y `vercel.app` está en la Public Suffix List, así que el navegador no la manda desde ahí. Hay un test que documenta este caso.
+- **Esto depende de que la cookie siga en `Lax` o `Strict`.** Si algún día pasa a `SameSite=None`, hay que sacar el patrón o dejar de dar credenciales a esos orígenes.
+- Regla: **ningún GET modifica estado.** Con `Lax`, la cookie viaja en navegaciones GET de primer nivel, así que un GET que modificara datos abriría la puerta a CSRF.
+- Desde una preview no se puede usar el panel, porque la cookie no viaja. Las previews son para probar la tienda.
+
 ## Infraestructura
 
 - **2026-09** Solo MySQL. Sin MongoDB. Se evaluó pasar a PostgreSQL y se sostuvo
