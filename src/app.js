@@ -2,6 +2,7 @@ require("dotenv").config();
 const swaggerUi = require("swagger-ui-express");
 const express = require("express");
 const cors = require("cors");
+const { crearValidadorOrigen, leerConfigCors } = require("./config/cors");
 const cookieParser = require("cookie-parser");
 const { limitadorGlobal } = require("./middlewares/rateLimitMiddleware");
 
@@ -9,22 +10,7 @@ const app = express();
 
 app.set("trust proxy", 1);
 
-const ORIGENES = (process.env.CORS_ORIGENES || "http://localhost:5173")
-  .split(",")
-  .map((o) => o.trim());
-
-/**
- * @description Decide si un origen tiene permitido consumir la API.
- * @param {string|undefined} origin - Origen de la peticion. Indefinido en llamadas sin navegador.
- * @param {Function} callback - Callback de cors, recibe (error, permitido).
- * @returns {void}
- */
-const validarOrigen = (origin, callback) => {
-  if (!origin || ORIGENES.includes(origin)) return callback(null, true);
-  return callback(new Error("ORIGEN_NO_PERMITIDO"));
-};
-
-app.use(cors({ origin: validarOrigen, credentials: true }));
+app.use(cors({ origin: crearValidadorOrigen(leerConfigCors()), credentials: true }));
 
 app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
