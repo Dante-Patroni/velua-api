@@ -137,6 +137,37 @@ class MercadoPagoProcesador extends ProcesadorPagos {
   }
 
   /**
+   * @description Lee una preferencia ya creada, para reusar su link en vez de
+   * crear otra. Una sola preferencia por pedido es lo que evita que haya dos
+   * checkouts pagables a la vez.
+   *
+   * Un 404 se distingue de Mercado Pago caído: dice que la preferencia no existe,
+   * y quien llama puede crear una nueva. Una caída, en cambio, no da link.
+   *
+   * @param {string} preferenciaId - Id de la preferencia.
+   * @returns {Promise<{urlPago: string, venceEn: Date|null}>} Link y vencimiento.
+   * @throws {Error} PROCESADOR_NO_CONFIGURADO, PREFERENCIA_NO_ENCONTRADA,
+   *   PROCESADOR_NO_DISPONIBLE
+   */
+  async obtenerPreferencia(preferenciaId) {
+    let r;
+    try {
+      r = await this.#llamar(() => this.preferencias.get({ preferenceId: preferenciaId }));
+    } catch (error) {
+      if (error.cause?.status === 404) {
+        const e = new Error("PREFERENCIA_NO_ENCONTRADA");
+        e.cause = error.cause;
+        throw e;
+      }
+      throw error;
+    }
+    return {
+      urlPago: r.init_point,
+      venceEn: r.expiration_date_to ? new Date(r.expiration_date_to) : null,
+    };
+  }
+
+  /**
    * @description Consulta un pago por su id.
    *
    * Un 404 no es lo mismo que Mercado Pago caído: dice que ese pago no existe en
