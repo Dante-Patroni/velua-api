@@ -208,6 +208,12 @@ router.get("/pedidos/:numero", controller.consultar);
  *       (urlPago null), o para reintentar despues de un rechazo. Publico: el numero
  *       funciona como llave. Comparte el limite de 10 por hora por IP con la
  *       creacion de pedidos.
+ *
+ *       Antes de dar el link consulta a Mercado Pago si el pedido ya tiene pagos:
+ *       si hay uno aprobado lo registra y responde PEDIDO_YA_PAGADO, y si hay uno en
+ *       curso responde PAGO_EN_PROCESO. Si no puede consultar, no da link. Reusa la
+ *       preferencia del pedido mientras siga vigente, asi que dos llamadas seguidas
+ *       devuelven el mismo link.
  *     parameters:
  *       - name: numero
  *         in: path
@@ -226,14 +232,20 @@ router.get("/pedidos/:numero", controller.consultar);
  *         $ref: '#/components/responses/NoEncontrado'
  *       409:
  *         description: >
- *           PEDIDO_NO_PAGABLE (otro medio de pago, o ya aprobado o cancelado) o
- *           PEDIDO_VENCIDO (la reserva vencio).
+ *           PEDIDO_NO_PAGABLE (otro medio de pago, o ya aprobado o cancelado),
+ *           PEDIDO_VENCIDO (la reserva vencio), PEDIDO_YA_PAGADO (Mercado Pago ya
+ *           tiene un pago aprobado; el pedido queda aprobado, recargar el pedido),
+ *           PAGO_EN_PROCESO (hay un pago pendiente; no ofrecer otro pago, esperar o
+ *           escribir a la tienda) o PEDIDO_EN_REVISION (la tienda lo esta revisando;
+ *           no ofrecer otro pago).
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *       502:
- *         description: PROCESADOR_NO_DISPONIBLE. Mercado Pago no respondio.
+ *         description: >
+ *           PROCESADOR_NO_DISPONIBLE. Mercado Pago no respondio, o no se pudo
+ *           verificar si el pedido ya tenia un pago. Reintentar en unos minutos.
  *         content:
  *           application/json:
  *             schema:
