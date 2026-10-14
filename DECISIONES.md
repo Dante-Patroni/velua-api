@@ -245,6 +245,7 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-10** Desarrollo con una app propia ("Velua - desarrollo", en la cuenta de
   Dante) y sus cuentas de prueba. Producción con la app de la dueña: las
   credenciales van solo en Railway.
+- **Medios de pago lentos excluidos** (`ticket`: Rapipago y Pago Fácil; `atm`: cajeros). Un cupón se puede pagar días después de que venció la reserva, con el pedido cancelado y el stock liberado: cobro sin producto y devolución manual (CWE-367). Además, `date_of_expiration` vence con la reserva, para que, si algún día se habilita el efectivo, los cupones venzan igual. **Habilitar efectivo es una decisión de la marca** (pendiente "E") y requiere una reserva más larga para esos pedidos. Hay un test que lo controla: `tests/pagos/armarPreferencia.test.js`.
 
 ---
 

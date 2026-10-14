@@ -34,6 +34,8 @@ const MAX_PAGINAS_BUSQUEDA = 10;
  */
 const armarPreferencia = ({ numero, total, email, expiraEn }, { urlWeb, urlApi }) => {
   const vuelta = `${urlWeb}/pedido/${numero}`;
+  // Mercado Pago pide la zona horaria explícita
+  const vence = expiraEn.toISOString().replace("Z", "+00:00");
   const cuerpo = {
     items: [
       {
@@ -49,8 +51,16 @@ const armarPreferencia = ({ numero, total, email, expiraEn }, { urlWeb, urlApi }
     back_urls: { success: vuelta, failure: vuelta, pending: vuelta },
     statement_descriptor: "VELUA",
     expires: true,
-    // Mercado Pago pide la zona horaria explícita
-    expiration_date_to: expiraEn.toISOString().replace("Z", "+00:00"),
+    // El checkout deja de aceptar pagos cuando vence la reserva
+    expiration_date_to: vence,
+    // Los cupones en efectivo también vencen con la reserva: si no, se podrían
+    // pagar días después, con el pedido cancelado y el stock liberado
+    date_of_expiration: vence,
+    // Medios lentos (Rapipago, Pago Fácil, cajeros) excluidos hasta que la marca
+    // decida si acepta efectivo. Ver DECISIONES.md
+    payment_methods: {
+      excluded_payment_types: [{ id: "ticket" }, { id: "atm" }],
+    },
   };
 
   // Mercado Pago rechaza auto_return y el webhook si las URLs no son públicas y
