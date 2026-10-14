@@ -33,20 +33,39 @@ const guardado = (cambios = {}) => ({
   ...cambios,
 });
 
-const armar = ({ resultado = creado(), pedido = guardado(), procesador } = {}) => {
+/** Pago de Mercado Pago normalizado, como lo devuelve buscarPagosPorReferencia. */
+const pago = (id, estado, monto = "17000.00", moneda = "ARS") => ({
+  id,
+  estado,
+  referencia: "VEL-ABC234",
+  monto,
+  moneda,
+  metodo: "master",
+});
+
+const armar = ({ resultado = creado(), pedido = guardado(), procesador, pagos = [] } = {}) => {
   const repositorio = {
     transaccion: jest.fn().mockResolvedValue(resultado),
     buscarPorNumero: jest.fn().mockResolvedValue(pedido),
-    guardarPreferencia: jest.fn().mockResolvedValue(),
+    guardarPreferencia: jest.fn().mockResolvedValue(true),
   };
   const procesadorPagos = procesador ?? {
     crearPreferencia: jest
       .fn()
       .mockResolvedValue({ preferenciaId: "pref-1", urlPago: "https://mp/pagar" }),
+    buscarPagosPorReferencia: jest.fn().mockResolvedValue(pagos),
+    obtenerPreferencia: jest
+      .fn()
+      .mockResolvedValue({ urlPago: "https://mp/pagar-existente", venceEn: VENCE }),
   };
-  const logger = { error: jest.fn() };
-  const servicio = new CheckoutService(repositorio, {}, () => AHORA, procesadorPagos, logger);
-  return { servicio, repositorio, procesadorPagos, logger };
+  const logger = { error: jest.fn(), info: jest.fn() };
+  const pagoService = { aplicarPago: jest.fn().mockResolvedValue({}) };
+  const pedidoEstadoService = { marcarRevision: jest.fn().mockResolvedValue({}) };
+  const servicio = new CheckoutService(repositorio, {}, () => AHORA, procesadorPagos, logger, {
+    pagoService,
+    pedidoEstadoService,
+  });
+  return { servicio, repositorio, procesadorPagos, logger, pagoService, pedidoEstadoService };
 };
 
 describe("crearPedido con Mercado Pago", () => {
@@ -100,18 +119,22 @@ describe("crearPedido con Mercado Pago", () => {
 });
 
 describe("iniciarPago", () => {
-  it("genera un link nuevo para un pedido pendiente y vigente", async () => {
-    const { servicio, repositorio } = armar();
+  it("sin preferencia previa ni pagos, crea una y la guarda con compare-and-set", async () => {
+    const { servicio, repositorio, procesadorPagos } = armar();
 
     const r = await servicio.iniciarPago("vel-abc234");
 
     expect(repositorio.buscarPorNumero).toHaveBeenCalledWith("VEL-ABC234");
-    expect(repositorio.guardarPreferencia).toHaveBeenCalledWith(7, "pref-1");
+    expect(procesadorPagos.buscarPagosPorReferencia).toHaveBeenCalledWith("VEL-ABC234");
+    expect(repositorio.guardarPreferencia).toHaveBeenCalledWith(7, "pref-1", { anterior: null });
     expect(r).toEqual({ numero: "VEL-ABC234", urlPago: "https://mp/pagar" });
   });
 
   it("también después de un rechazo", async () => {
-    const { servicio } = armar({ pedido: guardado({ estadoPago: "rechazado" }) });
+    const { servicio } = armar({
+      pedido: guardado({ estadoPago: "rechazado" }),
+      pagos: [pago("1", "rejected")],
+    });
 
     await expect(servicio.iniciarPago("VEL-ABC234")).resolves.toHaveProperty("urlPago");
   });
@@ -135,6 +158,13 @@ describe("iniciarPago", () => {
     await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PEDIDO_VENCIDO");
   });
 
+  it("PEDIDO_EN_REVISION si el pedido no tiene vencimiento, sin consultar a Mercado Pago", async () => {
+    const { servicio, procesadorPagos } = armar({ pedido: guardado({ expiraEn: null }) });
+
+    await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PEDIDO_EN_REVISION");
+    expect(procesadorPagos.buscarPagosPorReferencia).not.toHaveBeenCalled();
+  });
+
   it("NO_ENCONTRADO si el número no tiene forma o no existe", async () => {
     const { servicio } = armar({ pedido: null });
 
@@ -142,13 +172,151 @@ describe("iniciarPago", () => {
     await expect(servicio.iniciarPago("VEL-ZZZZ99")).rejects.toThrow("NO_ENCONTRADO");
   });
 
-  it("si Mercado Pago falla, propaga el error: la clienta lo pidió y tiene que saberlo", async () => {
+  it("si Mercado Pago falla al crear la preferencia, propaga el error", async () => {
     const procesador = {
+      buscarPagosPorReferencia: jest.fn().mockResolvedValue([]),
       crearPreferencia: jest.fn().mockRejectedValue(new Error("PROCESADOR_NO_DISPONIBLE")),
     };
-    const { servicio } = armar({ procesador });
+    const { servicio, repositorio } = armar({ procesador });
 
     await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PROCESADOR_NO_DISPONIBLE");
+    expect(procesador.crearPreferencia).toHaveBeenCalled();
+    expect(repositorio.guardarPreferencia).not.toHaveBeenCalled();
+  });
+});
+
+describe("iniciarPago: evita el cobro doble", () => {
+  it("si no puede consultar a Mercado Pago, no da link (fail secure)", async () => {
+    const procesador = {
+      buscarPagosPorReferencia: jest.fn().mockRejectedValue(new Error("BUSQUEDA_INCOMPLETA")),
+      crearPreferencia: jest.fn(),
+    };
+    const { servicio, logger } = armar({ procesador });
+
+    await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PROCESADOR_NO_DISPONIBLE");
+    expect(procesador.crearPreferencia).not.toHaveBeenCalled();
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("VEL-ABC234"),
+      expect.anything()
+    );
+  });
+
+  it("con un pago aprobado: lo aplica y responde PEDIDO_YA_PAGADO, sin link", async () => {
+    const aprobado = pago("1", "approved");
+    const { servicio, procesadorPagos, pagoService, pedidoEstadoService } = armar({
+      pagos: [aprobado],
+    });
+
+    await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PEDIDO_YA_PAGADO");
+    expect(pagoService.aplicarPago).toHaveBeenCalledWith(aprobado, { origen: "reintento" });
+    expect(pedidoEstadoService.marcarRevision).not.toHaveBeenCalled();
+    expect(procesadorPagos.crearPreferencia).not.toHaveBeenCalled();
+  });
+
+  it("con dos aprobados: aplica el más viejo, marca revisión con los dos ids, sin link", async () => {
+    const nuevo = pago("2", "approved");
+    const viejo = pago("1", "approved");
+    const { servicio, procesadorPagos, pagoService, pedidoEstadoService } = armar({
+      pagos: [nuevo, viejo],
+    });
+
+    await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PEDIDO_YA_PAGADO");
+    expect(pagoService.aplicarPago).toHaveBeenCalledWith(viejo, { origen: "reintento" });
+    expect(pedidoEstadoService.marcarRevision).toHaveBeenCalledWith(7, {
+      motivo: expect.stringMatching(/PAGO_DUPLICADO.*2, 1/),
+    });
+    expect(procesadorPagos.crearPreferencia).not.toHaveBeenCalled();
+  });
+
+  it("con un aprobado de otro monto: revisión, sin aplicar y sin link", async () => {
+    const { servicio, procesadorPagos, pagoService, pedidoEstadoService } = armar({
+      pagos: [pago("1", "approved", "100.00")],
+    });
+
+    await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PEDIDO_EN_REVISION");
+    expect(pagoService.aplicarPago).not.toHaveBeenCalled();
+    expect(pedidoEstadoService.marcarRevision).toHaveBeenCalledWith(7, {
+      motivo: expect.stringContaining("MONTO_NO_COINCIDE"),
+    });
+    expect(procesadorPagos.crearPreferencia).not.toHaveBeenCalled();
+  });
+
+  it("con un pago en curso: PAGO_EN_PROCESO, sin tocar nada", async () => {
+    const { servicio, procesadorPagos, pagoService, pedidoEstadoService } = armar({
+      pagos: [pago("1", "pending")],
+    });
+
+    await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PAGO_EN_PROCESO");
+    expect(pagoService.aplicarPago).not.toHaveBeenCalled();
+    expect(pedidoEstadoService.marcarRevision).not.toHaveBeenCalled();
+    expect(procesadorPagos.crearPreferencia).not.toHaveBeenCalled();
+  });
+});
+
+describe("iniciarPago: una sola preferencia por pedido", () => {
+  it("reusa la preferencia vigente en vez de crear otra", async () => {
+    const { servicio, repositorio, procesadorPagos } = armar({
+      pedido: guardado({ mpPreferenceId: "pref-0" }),
+    });
+
+    const r = await servicio.iniciarPago("VEL-ABC234");
+
+    expect(procesadorPagos.obtenerPreferencia).toHaveBeenCalledWith("pref-0");
+    expect(procesadorPagos.crearPreferencia).not.toHaveBeenCalled();
+    expect(repositorio.guardarPreferencia).not.toHaveBeenCalled();
+    expect(r.urlPago).toBe("https://mp/pagar-existente");
+  });
+
+  it("si la preferencia está por vencer, crea otra y reemplaza solo esa", async () => {
+    const { servicio, repositorio, procesadorPagos } = armar({
+      pedido: guardado({ mpPreferenceId: "pref-0" }),
+    });
+    procesadorPagos.obtenerPreferencia.mockResolvedValue({
+      urlPago: "https://mp/vieja",
+      venceEn: new Date(AHORA.getTime() + 2 * 60 * 1000),
+    });
+
+    const r = await servicio.iniciarPago("VEL-ABC234");
+
+    expect(repositorio.guardarPreferencia).toHaveBeenCalledWith(7, "pref-1", {
+      anterior: "pref-0",
+    });
+    expect(r.urlPago).toBe("https://mp/pagar");
+  });
+
+  it("si la preferencia no existe en Mercado Pago, crea otra", async () => {
+    const { servicio, procesadorPagos } = armar({ pedido: guardado({ mpPreferenceId: "pref-0" }) });
+    procesadorPagos.obtenerPreferencia.mockRejectedValue(new Error("PREFERENCIA_NO_ENCONTRADA"));
+
+    await expect(servicio.iniciarPago("VEL-ABC234")).resolves.toHaveProperty(
+      "urlPago",
+      "https://mp/pagar"
+    );
+  });
+
+  it("si Mercado Pago falla al leer la preferencia, no da link ni crea otra", async () => {
+    const { servicio, procesadorPagos } = armar({ pedido: guardado({ mpPreferenceId: "pref-0" }) });
+    procesadorPagos.obtenerPreferencia.mockRejectedValue(new Error("PROCESADOR_NO_DISPONIBLE"));
+
+    await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PROCESADOR_NO_DISPONIBLE");
+    expect(procesadorPagos.crearPreferencia).not.toHaveBeenCalled();
+  });
+
+  it("si otro reintento guardó primero, devuelve el link del ganador", async () => {
+    const { servicio, repositorio, procesadorPagos } = armar();
+    repositorio.guardarPreferencia.mockResolvedValue(false);
+    repositorio.buscarPorNumero
+      .mockResolvedValueOnce(guardado())
+      .mockResolvedValueOnce(guardado({ mpPreferenceId: "pref-ganadora" }));
+    procesadorPagos.obtenerPreferencia.mockResolvedValue({
+      urlPago: "https://mp/ganadora",
+      venceEn: VENCE,
+    });
+
+    const r = await servicio.iniciarPago("VEL-ABC234");
+
+    expect(procesadorPagos.obtenerPreferencia).toHaveBeenCalledWith("pref-ganadora");
+    expect(r.urlPago).toBe("https://mp/ganadora");
   });
 });
 

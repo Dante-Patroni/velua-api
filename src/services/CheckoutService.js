@@ -2,6 +2,10 @@ const crypto = require("crypto");
 
 const { Cotizador } = require("./cotizador");
 const { aCentavos } = require("../utils/dinero");
+const { decidirReintentoMP } = require("./decidirReintentoMP");
+
+/** Una preferencia se reusa si le quedan al menos estos minutos de vida. */
+const MARGEN_PREFERENCIA_MS = 5 * 60 * 1000;
 
 /**
  * @description Caracteres del número de pedido. Sin 0, O, 1, I ni L: se confunden
@@ -165,19 +169,27 @@ class CheckoutService {
    * @param {() => Date} [ahora] - Reloj. Se inyecta para poder probar los vencimientos.
    * @param {Object|null} [procesadorPagos] - Implementación de ProcesadorPagos.
    * @param {{error: Function}} [logger] - Dónde anotar las fallas del procesador.
+   * @param {Object} [dependencias] - Servicios para el reintento de pago.
+   * @param {Object} [dependencias.pagoService] - Aplica un pago aprobado
+   *   (PagoWebhookService).
+   * @param {Object} [dependencias.pedidoEstadoService] - Marca revisiones
+   *   (PedidoEstadoService).
    */
   constructor(
     pedidoRepository,
     config = {},
     ahora = () => new Date(),
     procesadorPagos = null,
-    logger = console
+    logger = console,
+    { pagoService = null, pedidoEstadoService = null } = {}
   ) {
     this.repositorio = pedidoRepository;
     this.config = config;
     this.ahora = ahora;
     this.procesadorPagos = procesadorPagos;
     this.logger = logger;
+    this.pagoService = pagoService;
+    this.pedidoEstadoService = pedidoEstadoService;
   }
 
   /**
@@ -340,12 +352,19 @@ class CheckoutService {
   }
 
   /**
-   * @description Genera un link de pago nuevo para un pedido de Mercado Pago. Sirve
-   * si al crear el pedido Mercado Pago no respondió, o para reintentar después de un
-   * rechazo.
+   * @description Da el link de pago de un pedido de Mercado Pago que ya existe:
+   * si al crearlo Mercado Pago no respondió, o para reintentar tras un rechazo.
+   *
+   * Antes de dar un link le pregunta a Mercado Pago si ya hay un pago, porque el
+   * aviso puede no haber llegado todavía y la base decir "pendiente" con el pedido
+   * pago. Si no puede preguntar, no da link (fail secure): esperar es mejor que
+   * cobrar dos veces. Y reusa la preferencia del pedido en vez de crear otra, para
+   * que nunca haya dos checkouts pagables a la vez.
+   *
    * @param {string} numero - Número del pedido.
    * @returns {Promise<{numero: string, urlPago: string}>} Link de pago.
-   * @throws {Error} NO_ENCONTRADO, PEDIDO_NO_PAGABLE, PEDIDO_VENCIDO,
+   * @throws {Error} NO_ENCONTRADO, PEDIDO_NO_PAGABLE, PEDIDO_EN_REVISION,
+   *   PEDIDO_VENCIDO, PEDIDO_YA_PAGADO, PAGO_EN_PROCESO,
    *   PROCESADOR_NO_CONFIGURADO, PROCESADOR_NO_DISPONIBLE
    */
   async iniciarPago(numero) {
@@ -356,18 +375,110 @@ class CheckoutService {
     if (p.medioPago !== "mercadopago" || !ESTADOS_PAGABLES.includes(p.estadoPago)) {
       throw new Error("PEDIDO_NO_PAGABLE");
     }
-    if (!p.expiraEn || new Date(p.expiraEn) <= this.ahora()) {
+    // Un pedido de Mercado Pago pagable sin vencimiento está en revisión:
+    // marcarRevision lo saca del vencimiento. (Al aprobar también se anula,
+    // pero un pedido aprobado ya no es pagable y no llega hasta acá.)
+    if (!p.expiraEn) {
+      throw new Error("PEDIDO_EN_REVISION");
+    }
+    if (new Date(p.expiraEn) <= this.ahora()) {
       throw new Error("PEDIDO_VENCIDO");
     }
+    if (!this.procesadorPagos) {
+      throw new Error("PROCESADOR_NO_CONFIGURADO");
+    }
 
-    const urlPago = await this.#crearPreferencia({
-      id: p.id,
+    await this.#verificarPagosPrevios(p);
+    const urlPago = await this.#linkDePago(p);
+    return { numero: p.numero, urlPago };
+  }
+
+  /**
+   * @description Consulta los pagos del pedido en Mercado Pago y, si no corresponde
+   * dar otro link, registra lo que haya (pago aprobado, revisión) y lanza el error
+   * para la clienta.
+   * @param {Object} p - Pedido.
+   * @returns {Promise<void>} Resuelve solo si se puede dar el link.
+   * @throws {Error} PEDIDO_YA_PAGADO, PEDIDO_EN_REVISION, PAGO_EN_PROCESO,
+   *   PROCESADOR_NO_DISPONIBLE
+   */
+  async #verificarPagosPrevios(p) {
+    let pagos;
+    try {
+      pagos = await this.procesadorPagos.buscarPagosPorReferencia(p.numero);
+    } catch (error) {
+      this.logger.error(
+        `[reintento] ${p.numero}: no se pudo consultar Mercado Pago, no se da link`,
+        error
+      );
+      throw new Error("PROCESADOR_NO_DISPONIBLE", { cause: error });
+    }
+
+    const decision = decidirReintentoMP({ pagos, pedido: p });
+    if (decision.permitir) {
+      return;
+    }
+
+    if (decision.pagoAAplicar) {
+      await this.pagoService.aplicarPago(decision.pagoAAplicar, { origen: "reintento" });
+    }
+    if (decision.revisar) {
+      const ids = decision.pagosAprobados?.join(", ");
+      await this.pedidoEstadoService.marcarRevision(p.id, {
+        motivo: ids ? `${decision.motivo} (pagos aprobados: ${ids})` : decision.motivo,
+      });
+    }
+    this.logger.info(`[reintento] ${p.numero}: no se da link (${decision.motivo})`);
+    throw new Error(decision.codigo);
+  }
+
+  /**
+   * @description Devuelve el link de la preferencia del pedido. Si la que tiene
+   * sigue vigente la reusa; si no, crea una y la guarda solo si nadie se adelantó
+   * (compare-and-set). Si otro reintento ganó, usa la del ganador: la creada acá
+   * nunca llega a la clienta, así que no se puede pagar.
+   * @param {Object} p - Pedido.
+   * @returns {Promise<string>} URL de pago.
+   * @throws {Error} PROCESADOR_NO_DISPONIBLE
+   */
+  async #linkDePago(p) {
+    if (p.mpPreferenceId) {
+      try {
+        const { urlPago, venceEn } = await this.procesadorPagos.obtenerPreferencia(
+          p.mpPreferenceId
+        );
+        if (!venceEn || venceEn.getTime() - this.ahora().getTime() > MARGEN_PREFERENCIA_MS) {
+          return urlPago;
+        }
+      } catch (error) {
+        // Si no existe se crea otra; si Mercado Pago falla, no se da link
+        if (error.message !== "PREFERENCIA_NO_ENCONTRADA") {
+          throw error;
+        }
+      }
+    }
+
+    const { preferenciaId, urlPago } = await this.procesadorPagos.crearPreferencia({
       numero: p.numero,
       total: p.total,
       email: p.clienteEmail,
       expiraEn: new Date(p.expiraEn),
     });
-    return { numero: p.numero, urlPago };
+    const gano = await this.repositorio.guardarPreferencia(p.id, preferenciaId, {
+      anterior: p.mpPreferenceId ?? null,
+    });
+    if (gano) {
+      return urlPago;
+    }
+
+    this.logger.info(
+      `[reintento] ${p.numero}: otro reintento guardó su preferencia antes, se usa esa`
+    );
+    const actual = await this.repositorio.buscarPorNumero(p.numero);
+    const { urlPago: delGanador } = await this.procesadorPagos.obtenerPreferencia(
+      actual.mpPreferenceId
+    );
+    return delGanador;
   }
 
   /**
