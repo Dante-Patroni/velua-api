@@ -9,20 +9,36 @@ const PedidoController = require("../controllers/PedidoController");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { limitadorPedidos } = require("../middlewares/rateLimitMiddleware");
 const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
-
-const router = express.Router();
+const { PedidoEstadoService } = require("../services/PedidoEstadoService");
+const { PagoWebhookService } = require("../services/PagoWebhookService");
+const pedidoRepository = new SequelizePedidoRepository(db);
+const procesadorPagos = new MercadoPagoProcesador();
+const pedidoEstadoService = new PedidoEstadoService(pedidoRepository);
 
 const controller = new PedidoController(
   new CheckoutService(
-    new SequelizePedidoRepository(db),
+    pedidoRepository,
     {
       umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
       descuentoTransferencia: Number(process.env.DESCUENTO_TRANSFERENCIA || 0),
     },
     undefined,
-    new MercadoPagoProcesador()
+    procesadorPagos,
+    undefined,
+    {
+      // Para el reintento de pago: aplicar un pago aprobado y marcar revisiones,
+      // con el mismo armado que el webhook y el job de vencimientos
+      pagoService: new PagoWebhookService({
+        procesadorPagos,
+        pedidoRepository,
+        pedidoEstadoService,
+      }),
+      pedidoEstadoService,
+    }
   )
 );
+
+const router = express.Router();
 
 /**
  * @description Regla de texto opcional con largo máximo.
