@@ -420,7 +420,8 @@ class CheckoutService {
     }
 
     if (decision.pagoAAplicar) {
-      await this.pagoService.aplicarPago(decision.pagoAAplicar, { origen: "reintento" });
+      // origen es un ENUM de la base: la acción la dispara la clienta al pedir el link
+      await this.pagoService.aplicarPago(decision.pagoAAplicar, { origen: "cliente" });
     }
     if (decision.revisar) {
       const ids = decision.pagosAprobados?.join(", ");

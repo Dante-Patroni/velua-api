@@ -208,7 +208,7 @@ describe("iniciarPago: evita el cobro doble", () => {
     });
 
     await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PEDIDO_YA_PAGADO");
-    expect(pagoService.aplicarPago).toHaveBeenCalledWith(aprobado, { origen: "reintento" });
+    expect(pagoService.aplicarPago).toHaveBeenCalledWith(aprobado, { origen: "cliente" });
     expect(pedidoEstadoService.marcarRevision).not.toHaveBeenCalled();
     expect(procesadorPagos.crearPreferencia).not.toHaveBeenCalled();
   });
@@ -221,7 +221,7 @@ describe("iniciarPago: evita el cobro doble", () => {
     });
 
     await expect(servicio.iniciarPago("VEL-ABC234")).rejects.toThrow("PEDIDO_YA_PAGADO");
-    expect(pagoService.aplicarPago).toHaveBeenCalledWith(viejo, { origen: "reintento" });
+    expect(pagoService.aplicarPago).toHaveBeenCalledWith(viejo, { origen: "cliente" });
     expect(pedidoEstadoService.marcarRevision).toHaveBeenCalledWith(7, {
       motivo: expect.stringMatching(/PAGO_DUPLICADO.*2, 1/),
     });
