@@ -41,17 +41,17 @@ class PedidoRepository {
   }
 
   /**
-   * @description Guarda el id de la preferencia de pago del pedido. Va fuera de la
-   * transacción del checkout: se llama después de hablar con el procesador.
+   * @description Guarda el id de la preferencia. Con `anterior`, solo si la
+   * guardada sigue siendo esa (compare-and-set).
    * @param {number} _pedidoId - Id del pedido.
-   * @param {string} _preferenciaId - Id de la preferencia en el procesador.
-   * @returns {Promise<void>}
+   * @param {string} _preferenciaId - Id de la preferencia nueva.
+   * @param {{anterior?: string|null}} [_opciones] - Valor que se espera encontrar.
+   * @returns {Promise<boolean>} true si guardó.
    */
-  async guardarPreferencia(_pedidoId, _preferenciaId) {
+  async guardarPreferencia(_pedidoId, _preferenciaId, _opciones) {
     throw new Error("Metodo guardarPreferencia no implementado");
   }
 }
-
 /**
  * @description Interfaz del repositorio que se usa dentro de una transacción.
  *

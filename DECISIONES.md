@@ -245,6 +245,14 @@ antes de tocar código. Cada línea lleva fecha.
 - **2026-10** Desarrollo con una app propia ("Velua - desarrollo", en la cuenta de
   Dante) y sus cuentas de prueba. Producción con la app de la dueña: las
   credenciales van solo en Railway.
+- **Medios de pago lentos excluidos** (`ticket`: Rapipago y Pago Fácil; `atm`: cajeros). Un cupón se puede pagar días después de que venció la reserva, con el pedido cancelado y el stock liberado: cobro sin producto y devolución manual (CWE-367). Además, `date_of_expiration` vence con la reserva, para que, si algún día se habilita el efectivo, los cupones venzan igual. **Habilitar efectivo es una decisión de la marca** (pendiente "E") y requiere una reserva más larga para esos pedidos. Hay un test que lo controla: `tests/pagos/armarPreferencia.test.js`.
+- - **Reintento de pago sin cobro doble.** `POST /pedidos/:numero/pago` le pregunta a Mercado Pago por los pagos del pedido antes de dar un link, porque el aviso de un pago puede no haber llegado y la base decir "pendiente" con el pedido pago. La política está en `decidirReintentoMP`, sobre la misma clasificación que usa el vencimiento (`clasificarPagosMP`): aprobado → se aplica y `PEDIDO_YA_PAGADO`; duplicado → además revisión; monto o moneda distintos, o estado desconocido → `PEDIDO_EN_REVISION`; en curso → `PAGO_EN_PROCESO`. Si no se puede consultar, no se da link (*fail secure*, CWE-636).
+- **Una sola preferencia por pedido.** El reintento reusa la preferencia vigente; solo crea otra si no hay, si no existe o si vence en menos de 5 minutos, y la guarda con *compare-and-set* (`guardarPreferencia` con `anterior`). Si dos reintentos corren a la vez, gana uno y el otro devuelve el link del ganador. Verificado contra MySQL: de tres escrituras simultáneas gana exactamente una.
+- **Riesgos asumidos** (válidos **mientras el job de vencimientos concilie** y detecte `PAGO_DUPLICADO`):
+- Carrera de segundos: si la clienta paga entre la consulta a Mercado Pago y la entrega del link, puede pagar dos veces. La conciliación lo detecta y el pedido va a revisión para devolver un cobro.
+- Pestaña vieja: Mercado Pago acepta dos pagos sobre la misma preferencia. Lo limita el vencimiento de la preferencia (`expiration_date_to`) y lo detecta la conciliación.
+- **Pedidos en revisión retienen stock** hasta que alguien los resuelve (`marcarRevision` los saca del vencimiento). **Bloqueante para salir con pagos reales:** el panel tiene que listar los pedidos en revisión, y cada revisión tiene que avisar a `EMAIL_AVISOS`.
+- El reintento consulta a Mercado Pago en cada llamada. El límite de 10 por hora por IP de la ruta evita que se use para saturar la API de Mercado Pago con nuestras credenciales.
 
 ---
 

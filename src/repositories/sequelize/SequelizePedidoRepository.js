@@ -298,13 +298,26 @@ class SequelizePedidoRepository extends PedidoRepository {
   }
 
   /**
-   * @description Guarda el id de la preferencia de Mercado Pago.
+   * @description Guarda el id de la preferencia del pedido.
+   *
+   * Con `anterior`, la escritura es condicional (compare-and-set): solo guarda si
+   * la preferencia guardada sigue siendo esa. Si dos reintentos crean una
+   * preferencia a la vez, gana uno solo; el otro lee la del ganador y la usa, y
+   * la suya nunca llega a la clienta. `anterior: null` significa "sin preferencia".
+   *
    * @param {number} pedidoId - Id del pedido.
-   * @param {string} preferenciaId - Id de la preferencia.
-   * @returns {Promise<void>}
+   * @param {string} preferenciaId - Id de la preferencia nueva.
+   * @param {{anterior?: string|null}} [opciones] - Valor que se espera encontrar.
+   * @returns {Promise<boolean>} true si guardó; false si otro escribió antes.
    */
-  async guardarPreferencia(pedidoId, preferenciaId) {
-    await this.models.Pedido.update({ mpPreferenceId: preferenciaId }, { where: { id: pedidoId } });
+  async guardarPreferencia(pedidoId, preferenciaId, opciones = {}) {
+    const where = { id: pedidoId };
+    if ("anterior" in opciones) {
+      // Con null, Sequelize genera IS NULL
+      where.mpPreferenceId = opciones.anterior;
+    }
+    const [filas] = await this.models.Pedido.update({ mpPreferenceId: preferenciaId }, { where });
+    return filas === 1;
   }
 }
 

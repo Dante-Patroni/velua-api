@@ -20,6 +20,15 @@ class ProcesadorPagos {
   }
 
   /**
+   * @description Lee una preferencia ya creada.
+   * @param {string} _preferenciaId - Id de la preferencia.
+   * @returns {Promise<{urlPago: string, venceEn: Date|null}>} Link y vencimiento.
+   */
+  async obtenerPreferencia(_preferenciaId) {
+    throw new Error("Metodo obtenerPreferencia no implementado");
+  }
+
+  /**
    * @description Consulta un pago en el procesador. Es la única fuente de verdad:
    * el aviso del webhook solo dice que algo cambió, nunca qué.
    * @param {string} _pagoId - Id del pago en el procesador.

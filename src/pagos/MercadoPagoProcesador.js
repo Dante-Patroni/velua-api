@@ -34,6 +34,8 @@ const MAX_PAGINAS_BUSQUEDA = 10;
  */
 const armarPreferencia = ({ numero, total, email, expiraEn }, { urlWeb, urlApi }) => {
   const vuelta = `${urlWeb}/pedido/${numero}`;
+  // Mercado Pago pide la zona horaria explícita
+  const vence = expiraEn.toISOString().replace("Z", "+00:00");
   const cuerpo = {
     items: [
       {
@@ -49,8 +51,16 @@ const armarPreferencia = ({ numero, total, email, expiraEn }, { urlWeb, urlApi }
     back_urls: { success: vuelta, failure: vuelta, pending: vuelta },
     statement_descriptor: "VELUA",
     expires: true,
-    // Mercado Pago pide la zona horaria explícita
-    expiration_date_to: expiraEn.toISOString().replace("Z", "+00:00"),
+    // El checkout deja de aceptar pagos cuando vence la reserva
+    expiration_date_to: vence,
+    // Los cupones en efectivo también vencen con la reserva: si no, se podrían
+    // pagar días después, con el pedido cancelado y el stock liberado
+    date_of_expiration: vence,
+    // Medios lentos (Rapipago, Pago Fácil, cajeros) excluidos hasta que la marca
+    // decida si acepta efectivo. Ver DECISIONES.md
+    payment_methods: {
+      excluded_payment_types: [{ id: "ticket" }, { id: "atm" }],
+    },
   };
 
   // Mercado Pago rechaza auto_return y el webhook si las URLs no son públicas y
@@ -124,6 +134,37 @@ class MercadoPagoProcesador extends ProcesadorPagos {
       this.preferencias.create({ body: armarPreferencia(pedido, this.urls) })
     );
     return { preferenciaId: r.id, urlPago: r.init_point };
+  }
+
+  /**
+   * @description Lee una preferencia ya creada, para reusar su link en vez de
+   * crear otra. Una sola preferencia por pedido es lo que evita que haya dos
+   * checkouts pagables a la vez.
+   *
+   * Un 404 se distingue de Mercado Pago caído: dice que la preferencia no existe,
+   * y quien llama puede crear una nueva. Una caída, en cambio, no da link.
+   *
+   * @param {string} preferenciaId - Id de la preferencia.
+   * @returns {Promise<{urlPago: string, venceEn: Date|null}>} Link y vencimiento.
+   * @throws {Error} PROCESADOR_NO_CONFIGURADO, PREFERENCIA_NO_ENCONTRADA,
+   *   PROCESADOR_NO_DISPONIBLE
+   */
+  async obtenerPreferencia(preferenciaId) {
+    let r;
+    try {
+      r = await this.#llamar(() => this.preferencias.get({ preferenceId: preferenciaId }));
+    } catch (error) {
+      if (error.cause?.status === 404) {
+        const e = new Error("PREFERENCIA_NO_ENCONTRADA");
+        e.cause = error.cause;
+        throw e;
+      }
+      throw error;
+    }
+    return {
+      urlPago: r.init_point,
+      venceEn: r.expiration_date_to ? new Date(r.expiration_date_to) : null,
+    };
   }
 
   /**
