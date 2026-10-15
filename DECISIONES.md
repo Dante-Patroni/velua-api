@@ -246,8 +246,8 @@ antes de tocar código. Cada línea lleva fecha.
   Dante) y sus cuentas de prueba. Producción con la app de la dueña: las
   credenciales van solo en Railway.
 - **Medios de pago lentos excluidos** (`ticket`: Rapipago y Pago Fácil; `atm`: cajeros). Un cupón se puede pagar días después de que venció la reserva, con el pedido cancelado y el stock liberado: cobro sin producto y devolución manual (CWE-367). Además, `date_of_expiration` vence con la reserva, para que, si algún día se habilita el efectivo, los cupones venzan igual. **Habilitar efectivo es una decisión de la marca** (pendiente "E") y requiere una reserva más larga para esos pedidos. Hay un test que lo controla: `tests/pagos/armarPreferencia.test.js`.
-- - **Reintento de pago sin cobro doble.** `POST /pedidos/:numero/pago` le pregunta a Mercado Pago por los pagos del pedido antes de dar un link, porque el aviso de un pago puede no haber llegado y la base decir "pendiente" con el pedido pago. La política está en `decidirReintentoMP`, sobre la misma clasificación que usa el vencimiento (`clasificarPagosMP`): aprobado → se aplica y `PEDIDO_YA_PAGADO`; duplicado → además revisión; monto o moneda distintos, o estado desconocido → `PEDIDO_EN_REVISION`; en curso → `PAGO_EN_PROCESO`. Si no se puede consultar, no se da link (*fail secure*, CWE-636).
-- **Una sola preferencia por pedido.** El reintento reusa la preferencia vigente; solo crea otra si no hay, si no existe o si vence en menos de 5 minutos, y la guarda con *compare-and-set* (`guardarPreferencia` con `anterior`). Si dos reintentos corren a la vez, gana uno y el otro devuelve el link del ganador. Verificado contra MySQL: de tres escrituras simultáneas gana exactamente una.
+- - **Reintento de pago sin cobro doble.** `POST /pedidos/:numero/pago` le pregunta a Mercado Pago por los pagos del pedido antes de dar un link, porque el aviso de un pago puede no haber llegado y la base decir "pendiente" con el pedido pago. La política está en `decidirReintentoMP`, sobre la misma clasificación que usa el vencimiento (`clasificarPagosMP`): aprobado → se aplica y `PEDIDO_YA_PAGADO`; duplicado → además revisión; monto o moneda distintos, o estado desconocido → `PEDIDO_EN_REVISION`; en curso → `PAGO_EN_PROCESO`. Si no se puede consultar, no se da link (_fail secure_, CWE-636).
+- **Una sola preferencia por pedido.** El reintento reusa la preferencia vigente; solo crea otra si no hay, si no existe o si vence en menos de 5 minutos, y la guarda con _compare-and-set_ (`guardarPreferencia` con `anterior`). Si dos reintentos corren a la vez, gana uno y el otro devuelve el link del ganador. Verificado contra MySQL: de tres escrituras simultáneas gana exactamente una.
 - **Riesgos asumidos** (válidos **mientras el job de vencimientos concilie** y detecte `PAGO_DUPLICADO`):
 - Carrera de segundos: si la clienta paga entre la consulta a Mercado Pago y la entrega del link, puede pagar dos veces. La conciliación lo detecta y el pedido va a revisión para devolver un cobro.
 - Pestaña vieja: Mercado Pago acepta dos pagos sobre la misma preferencia. Lo limita el vencimiento de la preferencia (`expiration_date_to`) y lo detecta la conciliación.
@@ -260,7 +260,7 @@ antes de tocar código. Cada línea lleva fecha.
 
 - **2026-09** Notificación de reposición. El link "Avisarme" de las tarjetas agotadas
   abre WhatsApp: cuando vuelve el stock se avisa a mano.
-  
+
 ---
 
 ## Pendientes de decidir
@@ -270,7 +270,7 @@ antes de tocar código. Cada línea lleva fecha.
 - Archivar productos: un estado más allá de despublicado, para que un combo de
   temporada con ventas desaparezca del listado sin borrarse.
   - Pagos en efectivo (Rapipago, Pago Fácil): se acreditan días después y no encajan
-  con una reserva de una hora. Los decide la dueña.
+    con una reserva de una hora. Los decide la dueña.
 - Plazo de acreditación en Mercado Pago y estrategia de cuotas sin interés. Los
   decide la dueña, con las tarifas online.
 - Bandeja propia de avisos de pago (`notificaciones_pago`), con reintentos con
@@ -278,3 +278,27 @@ antes de tocar código. Cada línea lleva fecha.
 - Prevenir el cobro doble: antes de generar un link de pago nuevo, buscar por
   referencia y aplicar el pago aprobado si ya existe.
 - Vista en el panel de los pedidos en revisión y aviso por mail a la dueña (H5).
+
+## 2026-10-15 — Backups diarios cifrados de la base
+
+**Decisión:** servicio Railway `velua-backup` (cron 06:17 UTC) que hace mysqldump → gzip → age → Backblaze B2 (`velua-backups-rc2026`). Detalle y restauración en `ops/backup/README.md`.
+
+**Controles:**
+
+- Usuario MySQL `velua_backup`: solo `SELECT, SHOW VIEW, TRIGGER` sobre `railway.*`, máx. 2 conexiones.
+- Clave B2 `velua-railway-backup`: solo `writeFiles` sobre el bucket. Verificado: no puede listar ni leer.
+- Cifrado asimétrico (age): el servicio solo tiene la clave pública. La privada está offline (pendrive + papel).
+- Bucket privado, cifrado, Object Lock _compliance_ 30 días; ciclo de vida borra a los 31.
+- Imagen con versiones fijadas por digest, corre sin root, sin dominio público, Restart Policy `Never`.
+- El backup se descarta si mysqldump escribe algo en stderr (sale con 0 aun con errores).
+- Restauración de producción probada el 15/10: hash idéntico, 14 tablas, conteos correctos.
+
+**Riesgos aceptados:**
+
+- RPO de 24 h. Revisar cuando haya ventas reales.
+- Retención máxima de 30 días: no hay copias mensuales ni anuales.
+- Con `writeFiles` se puede _ocultar_ un archivo si se conoce su nombre exacto; el Object Lock impide eliminar la versión.
+- Perder la clave privada age = perder todos los backups. Mitigación: dos copias offline.
+- `--skip-masking-policies`: no usamos políticas de enmascaramiento (mysqldump 9.x falla con usuarios restringidos).
+
+**Pendientes:** alerta por email si el backup falla; prueba de restauración mensual; la API se conecta como `root` (crear `velua_app` antes del lanzamiento).
