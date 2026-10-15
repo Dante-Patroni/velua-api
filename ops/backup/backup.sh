@@ -55,13 +55,22 @@ if [[ "$MODO" == "real" ]]; then
   log "inicio: backup real de la base $MYSQL_DATABASE"
   # --single-transaction: copia consistente sin bloquear la tienda (InnoDB)
   # --no-tablespaces y --set-gtid-purged=OFF: evitan pedir privilegios globales (PROCESS, RELOAD)
+  # --no-tablespaces y --set-gtid-purged=OFF: evitan pedir privilegios globales (PROCESS, RELOAD)
+  # --skip-masking-policies: no usamos políticas de enmascaramiento; con un usuario restringido,
+  #   mysqldump 9.x recibe "denegado" al buscarlas y lo informa como error (ver DECISIONES.md)
   mysqldump --defaults-extra-file="$TMP/my.cnf" \
-    --single-transaction --quick --no-tablespaces --set-gtid-purged=OFF \
+    --single-transaction --quick --no-tablespaces --set-gtid-purged=OFF --skip-masking-policies \
     --triggers --hex-blob --default-character-set=utf8mb4 \
-    "$MYSQL_DATABASE" \
+       "$MYSQL_DATABASE" 2> "$TMP/mysqldump.err" \
     | gzip -9 \
     | age --encrypt --recipient "$AGE_RECIPIENT" --output "$TMP/$ARCHIVO"
   rm -f "$TMP/my.cnf"
+  # mysqldump puede informar un error y aun así salir con código 0.
+  # Cualquier mensaje en stderr invalida el backup: se descarta y no se sube.
+  if [[ -s "$TMP/mysqldump.err" ]]; then
+    cat "$TMP/mysqldump.err" >&2
+    fallar "mysqldump informó errores; el backup se descarta y no se sube"
+  fi
 else
   PREFIJO="prueba"
   ARCHIVO="prueba-${STAMP}.txt.age"
