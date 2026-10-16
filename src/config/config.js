@@ -7,6 +7,20 @@ const base = {
   define: { underscored: true, timestamps: false },
 };
 
+// Producción: datos de conexión separados (no una URL) para que la API y las
+// migraciones usen usuarios distintos sobre la misma base. Ver DECISIONES.md.
+const produccion = {
+  ...base,
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_DATABASE,
+  logging: false,
+  dialectOptions: {
+    ssl: { rejectUnauthorized: false },
+  },
+  pool: { max: 5, min: 0, acquire: 30000, idle: 10000 },
+};
+
 module.exports = {
   development: {
     ...base,
@@ -27,13 +41,19 @@ module.exports = {
     logging: false,
   },
 
+  // La API en ejecución: usuario velua_app (solo SELECT, INSERT, UPDATE, DELETE).
   production: {
-    ...base,
-    use_env_variable: "DATABASE_URL",
-    logging: false,
-    dialectOptions: {
-      ssl: { rejectUnauthorized: false },
-    },
-    pool: { max: 5, min: 0, acquire: 30000, idle: 10000 },
+    ...produccion,
+    username: process.env.DB_USERNAME,
+    password: process.env.DB_PASSWORD,
+  },
+
+  // Solo para el Pre-deploy Command de Railway: npx sequelize-cli db:migrate --env migraciones
+  // Usuario velua_migraciones: permisos de estructura, solo sobre la base de Velua.
+  migraciones: {
+    ...produccion,
+    username: process.env.DB_MIGRATION_USERNAME,
+    password: process.env.DB_MIGRATION_PASSWORD,
+    pool: { max: 1, min: 0, acquire: 30000, idle: 10000 },
   },
 };
