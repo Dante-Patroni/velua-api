@@ -302,3 +302,25 @@ antes de tocar código. Cada línea lleva fecha.
 - `--skip-masking-policies`: no usamos políticas de enmascaramiento (mysqldump 9.x falla con usuarios restringidos).
 
 **Pendientes:** alerta por email si el backup falla; prueba de restauración mensual; la API se conecta como `root` (crear `velua_app` antes del lanzamiento).
+
+## 2026-10-16 — La API y las migraciones dejan de usar root
+
+**Decisión:** la API se conecta a MySQL con `velua_app` y las migraciones del Pre-deploy Command con `velua_migraciones`. `root` queda solo para administración por `railway ssh`.
+
+| Usuario             | Uso                                              | Permisos (solo sobre `railway.*`)                                        |
+| ------------------- | ------------------------------------------------ | ------------------------------------------------------------------------ |
+| `velua_app`         | La API en ejecución                              | SELECT, INSERT, UPDATE, DELETE · máx. 10 conexiones                      |
+| `velua_migraciones` | `npx sequelize-cli db:migrate --env migraciones` | Lo anterior + CREATE, ALTER, DROP, INDEX, REFERENCES · máx. 2 conexiones |
+| `velua_backup`      | Backup diario                                    | SELECT, SHOW VIEW, TRIGGER · máx. 2 conexiones                           |
+
+**Cómo:** `config.js` en producción usa `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` y `DB_PASSWORD` (antes, `DATABASE_URL` con root). El entorno `migraciones` usa `DB_MIGRATION_USERNAME` y `DB_MIGRATION_PASSWORD`. Contraseñas generadas con `RANDOM PASSWORD`, solo en Railway. `DATABASE_URL` eliminada.
+
+**Verificación:** en local (Docker MySQL 9.7.2), 12 migraciones con `velua_migraciones`, Newman 112/112 y Jest 520/520 con `velua_app`; con `velua_app`, CREATE TABLE, DROP TABLE, CREATE USER, leer `mysql.user` y leer otra base: denegados. En producción, `SHOW GRANTS` idéntico al local y `PROCESSLIST` con la API conectada como `velua_app`.
+
+**Riesgos aceptados:**
+
+- Las credenciales de la API y de migraciones viven en el mismo servicio: quien robe las variables obtiene permisos de estructura sobre `railway` (no globales).
+- `velua_app` puede leer y modificar todos los datos de Velua: el control reduce el daño, pero no reemplaza las consultas parametrizadas.
+- TLS con `rejectUnauthorized: false`: cifra, pero no verifica el certificado. Bajo, porque la conexión va por la red privada y la base no tiene acceso público.
+
+**Pendientes:** borrar `ADMIN_PASSWORD`, `ADMIN_EMAIL` y `ADMIN_NOMBRE` de Railway y cambiar la contraseña del panel; fijar la versión de Node (Railway 20, local 22); validar las variables obligatorias al arrancar; _Watch Paths_ para la API.
