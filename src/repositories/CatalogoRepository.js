@@ -14,7 +14,7 @@ class CatalogoRepository {
 
   /**
    * @description Lista productos con sus relaciones activas (paginado y filtrado).
-   * @param {Object} _filtros - Opciones (pagina, limite, categoria, destacados, q).
+      * @param {Object} _filtros - Opciones (pagina, limite, categoria, destacados, proximamente, hoy, q).
    * @returns {Promise<{ filas: Array<Object>, total: number }>} Filas crudas y total para paginación.
    */
   async listarProductos(_filtros = {}) {

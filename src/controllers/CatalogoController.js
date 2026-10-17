@@ -41,6 +41,7 @@ class CatalogoController {
         limite: req.query.limite,
         categoria: req.query.categoria, // Ahora recibe slug, no ID
         destacados: req.query.destacados === "true",
+        proximamente: req.query.proximamente === "true",
         q: req.query.q,
         orden: req.query.orden,
       };

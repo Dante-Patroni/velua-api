@@ -56,7 +56,7 @@ class SequelizeCatalogoRepository extends CatalogoRepository {
    * Si se filtra por una categoría que tiene hijas, entran los productos de
    * todas ellas: la página de "Jabones" muestra los de sus tres colecciones.
    *
-   * @param {Object} filtros - Opciones (pagina, limite, categoria, destacados, q).
+   * @param {Object} filtros - Opciones (pagina, limite, categoria, destacados, proximamente, hoy, q).
    * @returns {Promise<{ filas: Array<Object>, total: number }>} Filas y total para la paginación.
    */
   async listarProductos(filtros = {}) {
@@ -66,6 +66,10 @@ class SequelizeCatalogoRepository extends CatalogoRepository {
     const whereProducto = { activo: true };
     if (filtros.destacados) {
       whereProducto.destacado = true;
+    }
+    if (filtros.proximamente) {
+      // Si falta la fecha, Sequelize rechaza el undefined: falla en lugar de listar todo.
+      whereProducto.disponibleDesde = { [Op.gt]: filtros.hoy };
     }
     if (filtros.q) {
       whereProducto[Op.or] = [

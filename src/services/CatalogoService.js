@@ -91,8 +91,10 @@ class CatalogoService {
     const pagina = parseInt(filtros.pagina, 10) || 1;
     const limite = parseInt(filtros.limite, 10) || 20;
 
-    const { filas, total } = await this.catalogoRepository.listarProductos(filtros);
+    // La fecha la decide el servicio, no la base ni el repositorio: así el filtro
+    // y los campos de cada producto usan el mismo "hoy".
     const hoy = this.hoy();
+    const { filas, total } = await this.catalogoRepository.listarProductos({ ...filtros, hoy });
     const datos = filas.map((json) => {
       let precioDesde = null;
       let precioAnteriorDesde = null;

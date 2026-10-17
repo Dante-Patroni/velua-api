@@ -65,13 +65,19 @@ describe("CatalogoService", () => {
   });
 
   describe("listarProductos", () => {
-    it("pasa los filtros al repositorio sin modificarlos", async () => {
+    it("pasa los filtros al repositorio sin modificarlos, más la fecha de hoy", async () => {
       const filtros = { pagina: 2, limite: 10, categoria: "jabones" };
       repositorio.listarProductos.mockResolvedValue({ filas: [], total: 0 });
 
       await servicio.listarProductos(filtros);
 
-      expect(repositorio.listarProductos).toHaveBeenCalledWith(filtros);
+      // Los filtros llegan tal cual, más la fecha de hoy que decide el servicio
+      expect(repositorio.listarProductos).toHaveBeenCalledWith({
+        ...filtros,
+        hoy: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      });
+      // Y el objeto original de la petición no se toca
+      expect(filtros).not.toHaveProperty("hoy");
     });
 
     it("toma el precio de la variante mas barata y conserva la cadena", async () => {

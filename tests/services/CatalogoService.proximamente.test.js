@@ -94,4 +94,13 @@ describe("CatalogoService, productos próximamente", () => {
 
     expect(datos[0]).toMatchObject({ proximamente: true, diasRestantes: null });
   });
+  it("pasa al repositorio la fecha de hoy para filtrar los próximos", async () => {
+    const repo = { listarProductos: jest.fn(async () => ({ filas: [], total: 0 })) };
+
+    await new CatalogoService(repo, { hoy: () => HOY }).listarProductos({ proximamente: true });
+
+    expect(repo.listarProductos).toHaveBeenCalledWith(
+      expect.objectContaining({ proximamente: true, hoy: HOY })
+    );
+  });
 });
