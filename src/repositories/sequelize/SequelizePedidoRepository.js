@@ -25,7 +25,7 @@ class SequelizePedidoTransaccion extends PedidoTransaccion {
    * La lectura con FOR UPDATE devuelve siempre el dato más reciente y, mientras dure
    * la transacción, nadie más puede modificar esas filas: el stock que se lee acá es
    * el que se va a descontar. El producto se lee aparte, sin bloquear, porque solo
-   * hace falta su nombre y si está publicado.
+   * hace falta su nombre, si está publicado y desde cuándo se puede vender.
    *
    * @param {number[]} ids - Ids de las variantes.
    * @returns {Promise<Array<Object>>} Variantes bloqueadas, con su producto.
@@ -52,7 +52,10 @@ class SequelizePedidoTransaccion extends PedidoTransaccion {
     }
 
     const productos = await sequelize.query(
-      "SELECT id, nombre, slug, activo FROM productos WHERE id IN (:ids)",
+      `SELECT id, nombre, slug, activo,
+              DATE_FORMAT(disponible_desde, '%Y-%m-%d') AS disponibleDesde
+         FROM productos
+        WHERE id IN (:ids)`,
       { ...SELECT, replacements: { ids: [...new Set(variantes.map((v) => v.productoId))] } }
     );
     const productoPorId = new Map(productos.map((p) => [p.id, p]));

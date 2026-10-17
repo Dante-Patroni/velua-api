@@ -1,4 +1,5 @@
 const { aCentavos, aImporte, porcentajeDe, redondearAlPeso } = require("../utils/dinero");
+const { estadoVenta, hoyEnArgentina } = require("./estadoVenta");
 
 /** Unidades máximas por variante en un mismo pedido. */
 const TOPE_POR_VARIANTE = 10;
@@ -14,6 +15,7 @@ const AVISOS = Object.freeze({
   VARIANTE_INEXISTENTE: "VARIANTE_INEXISTENTE",
   VARIANTE_INACTIVA: "VARIANTE_INACTIVA",
   PRODUCTO_INACTIVO: "PRODUCTO_INACTIVO",
+  PROXIMAMENTE: "PROXIMAMENTE",
   SIN_STOCK: "SIN_STOCK",
   AJUSTADO_POR_STOCK: "AJUSTADO_POR_STOCK",
   AJUSTADO_POR_TOPE: "AJUSTADO_POR_TOPE",
@@ -93,11 +95,14 @@ class Cotizador {
    *   Null o ausente significa que no hay envío gratis.
    * @param {number} [config.descuentoTransferencia] - Porcentaje de descuento por
    *   pagar con transferencia.
+   * @param {Function} [config.hoy] - Devuelve la fecha de hoy "AAAA-MM-DD" en la
+   *   zona del negocio. Se inyecta en los tests; por defecto, la de Argentina.
    */
   constructor(cotizacionRepository, config = {}) {
     this.repositorio = cotizacionRepository;
     this.umbralEnvioGratis = config.umbralEnvioGratis ?? null;
     this.descuentoTransferencia = Number(config.descuentoTransferencia ?? 0);
+    this.hoy = typeof config.hoy === "function" ? config.hoy : hoyEnArgentina;
   }
 
   /**
@@ -114,7 +119,7 @@ class Cotizador {
    * @param {number} [pedido.zonaEnvioId] - Zona elegida. Sin zona, se cotiza como retiro.
    * @param {string} [pedido.medioPago] - "transferencia" o "mercadopago".
    * @returns {Promise<Object>} Ítems cotizados, avisos y totales.
-   * @throws {Error} DATOS_INVALIDOS, CARRITO_SIN_ITEMS_VALIDOS, ZONA_INVALIDA
+   * @throws {Error} DATOS_INVALIDOS, CARRITO_SIN_ITEMS_VALIDOS, ZONA_INVALIDA, DATOS_DE_VENTA_INCOMPLETOS
    */
   async cotizar({ items, zonaEnvioId, medioPago }) {
     validarForma(items);
@@ -124,7 +129,10 @@ class Cotizador {
     );
     const porId = new Map(variantes.map((v) => [v.id, v]));
 
-    const { lineas, avisos } = this.#resolverLineas(items, porId);
+    // Una sola fecha para todo el carrito: si la cotización cruza la medianoche,
+    // todos los ítems se evalúan contra el mismo día.
+    const hoy = this.hoy();
+    const { lineas, avisos } = this.#resolverLineas(items, porId, hoy);
 
     if (lineas.length === 0) {
       throw new Error("CARRITO_SIN_ITEMS_VALIDOS");
@@ -189,9 +197,10 @@ class Cotizador {
    *
    * @param {Array<Object>} items - Ítems recibidos.
    * @param {Map<number, Object>} porId - Variantes encontradas, por id.
+   * @param {string} hoy - Fecha de hoy "AAAA-MM-DD" en la zona del negocio.
    * @returns {{lineas: Array<Object>, avisos: Array<Object>}} Líneas válidas y avisos.
    */
-  #resolverLineas(items, porId) {
+  #resolverLineas(items, porId, hoy) {
     const lineas = [];
     const avisos = [];
 
@@ -213,6 +222,16 @@ class Cotizador {
       }
       if (!variante.producto?.activo) {
         avisos.push({ varianteId, motivo: AVISOS.PRODUCTO_INACTIVO, producto: nombre });
+        continue;
+      }
+      // Falla segura: undefined no es "sin fecha" (eso es null), es un dato que
+      // no llegó. Sin él no se puede saber si el producto ya se vende.
+      const disponibleDesde = variante.producto.disponibleDesde;
+      if (disponibleDesde === undefined) {
+        throw new Error("DATOS_DE_VENTA_INCOMPLETOS");
+      }
+      if (estadoVenta({ disponibleDesde }, hoy).estado === "proximamente") {
+        avisos.push({ varianteId, motivo: AVISOS.PROXIMAMENTE, producto: nombre, disponibleDesde });
         continue;
       }
       if (variante.stock <= 0) {

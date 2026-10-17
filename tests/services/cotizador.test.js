@@ -10,7 +10,13 @@ const variante = (cambios = {}) => ({
   stock: 20,
   activa: true,
   productoId: 1,
-  producto: { id: 1, nombre: "Éclat Noir", slug: "eclat-noir", activo: true },
+  producto: {
+    id: 1,
+    nombre: "Éclat Noir",
+    slug: "eclat-noir",
+    activo: true,
+    disponibleDesde: null,
+  },
   ...cambios,
 });
 
@@ -83,6 +89,80 @@ describe("Cotizador", () => {
           expect(e.details).toHaveProperty(["items[1].cantidad"]);
         });
     });
+
+    describe("productos próximamente", () => {
+      const HOY = "2026-10-17";
+      const conFecha = (fecha, cambios = {}) =>
+        variante({ producto: { ...variante().producto, disponibleDesde: fecha }, ...cambios });
+      const otra = variante({ id: 2, nombre: "200 g" });
+      const items = [
+        { varianteId: 1, cantidad: 1 },
+        { varianteId: 2, cantidad: 1 },
+      ];
+      const cotizadorCon = (variantes, hoy = () => HOY) =>
+        new Cotizador(repositorioCon(variantes), { hoy });
+
+      it("quita el producto con fecha futura y avisa PROXIMAMENTE", async () => {
+        const r = await cotizadorCon([conFecha("2026-11-05"), otra]).cotizar({ items });
+
+        expect(r.items.map((i) => i.varianteId)).toEqual([2]);
+        expect(r.avisos).toEqual([
+          {
+            varianteId: 1,
+            motivo: AVISOS.PROXIMAMENTE,
+            producto: "Éclat Noir",
+            disponibleDesde: "2026-11-05",
+          },
+        ]);
+      });
+
+      it("rechaza el carrito si el único producto todavía no se vende", async () => {
+        await expect(
+          cotizadorCon([conFecha("2026-11-05")]).cotizar({
+            items: [{ varianteId: 1, cantidad: 1 }],
+          })
+        ).rejects.toThrow("CARRITO_SIN_ITEMS_VALIDOS");
+      });
+
+      it("vende desde el mismo día de la fecha", async () => {
+        const r = await cotizadorCon([conFecha(HOY), otra]).cotizar({ items });
+
+        expect(r.items).toHaveLength(2);
+        expect(r.avisos).toEqual([]);
+      });
+
+      it("avisa PROXIMAMENTE antes que SIN_STOCK", async () => {
+        const r = await cotizadorCon([conFecha("2026-11-05", { stock: 0 }), otra]).cotizar({
+          items,
+        });
+
+        expect(r.avisos.map((a) => a.motivo)).toEqual([AVISOS.PROXIMAMENTE]);
+      });
+
+      it("no vende si la fecha es inválida (falla segura)", async () => {
+        const r = await cotizadorCon([conFecha("2026-02-31"), otra]).cotizar({ items });
+
+        expect(r.avisos.map((a) => a.motivo)).toEqual([AVISOS.PROXIMAMENTE]);
+      });
+
+      it("rechaza la cotización si el repositorio no trajo la fecha", async () => {
+        const sinCampo = variante({
+          producto: { id: 1, nombre: "Éclat Noir", slug: "eclat-noir", activo: true },
+        });
+
+        await expect(cotizadorCon([sinCampo, otra]).cotizar({ items })).rejects.toThrow(
+          "DATOS_DE_VENTA_INCOMPLETOS"
+        );
+      });
+
+      it("calcula la fecha de hoy una sola vez por carrito", async () => {
+        const hoy = jest.fn(() => HOY);
+
+        await cotizadorCon([conFecha(HOY), otra], hoy).cotizar({ items });
+
+        expect(hoy).toHaveBeenCalledTimes(1);
+      });
+    });
   });
 
   describe("el precio sale de la base, no del carrito", () => {
@@ -107,7 +187,13 @@ describe("Cotizador", () => {
           variante({
             id: 2,
             precio: "5500.00",
-            producto: { id: 2, nombre: "Velours", slug: "velours", activo: true },
+            producto: {
+              id: 2,
+              nombre: "Velours",
+              slug: "velours",
+              activo: true,
+              disponibleDesde: null,
+            },
           }),
         ])
       );

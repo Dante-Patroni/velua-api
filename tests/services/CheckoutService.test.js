@@ -14,7 +14,13 @@ const variante = (cambios = {}) => ({
   stock: 10,
   activa: true,
   productoId: 1,
-  producto: { id: 1, nombre: "Éclat Noir", slug: "eclat-noir", activo: true },
+  producto: {
+    id: 1,
+    nombre: "Éclat Noir",
+    slug: "eclat-noir",
+    activo: true,
+    disponibleDesde: null,
+  },
   ...cambios,
 });
 
@@ -281,9 +287,15 @@ describe("CheckoutService", () => {
       // Las filas ya estan bloqueadas en orden, y el descuento sigue el mismo orden
       const repo = crearRepositorio({
         variantes: [
-          variante({ id: 3, producto: { id: 3, nombre: "C", slug: "c", activo: true } }),
+          variante({
+            id: 3,
+            producto: { id: 3, nombre: "C", slug: "c", activo: true, disponibleDesde: null },
+          }),
           variante({ id: 1 }),
-          variante({ id: 2, producto: { id: 2, nombre: "B", slug: "b", activo: true } }),
+          variante({
+            id: 2,
+            producto: { id: 2, nombre: "B", slug: "b", activo: true, disponibleDesde: null },
+          }),
         ],
       });
 

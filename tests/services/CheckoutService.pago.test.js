@@ -335,7 +335,7 @@ describe("crearPedido, con la transacción real", () => {
             stock: 10,
             activa: true,
             productoId: 1,
-            producto: { id: 1, nombre: "Éclat", slug: "eclat", activo: true },
+            producto: {  id: 1, nombre: "Éclat Noir", slug: "eclat-noir", activo: true, disponibleDesde: null },
           },
         ]),
         buscarZonaEnvio: jest.fn(),
