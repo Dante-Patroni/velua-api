@@ -1,3 +1,20 @@
+const { estadoVenta, hoyEnArgentina } = require("./estadoVenta");
+
+/**
+ * @description Campos de venta que expone el contrato. El servidor decide si un
+ * producto todavía no salió y cuántos días faltan; el frontend solo los muestra.
+ * @param {Object} producto - Producto crudo del repositorio.
+ * @param {string} hoy - Fecha de hoy "AAAA-MM-DD" en la zona del negocio.
+ * @returns {{disponibleDesde: (string|null), proximamente: boolean, diasRestantes: (number|null)}} Campos de venta.
+ */
+const camposDeVenta = (producto, hoy) => {
+  const { estado, diasRestantes } = estadoVenta(producto, hoy);
+  return {
+    disponibleDesde: producto.disponibleDesde ?? null,
+    proximamente: estado === "proximamente",
+    diasRestantes,
+  };
+};
 /**
  * @description Recorta una categoría a los campos que expone el contrato.
  * @param {Object} categoria - Categoría cruda del repositorio.
@@ -48,9 +65,13 @@ class CatalogoService {
   /**
    * @description Instancia el servicio inyectando el repositorio de catálogo.
    * @param {Object} catalogoRepository - Implementación de CatalogoRepository.
+   * @param {Object} [config] - Opciones.
+   * @param {Function} [config.hoy] - Devuelve la fecha de hoy "AAAA-MM-DD" en la
+   *   zona del negocio. Se inyecta en los tests; por defecto, la de Argentina.
    */
-  constructor(catalogoRepository) {
+  constructor(catalogoRepository, config = {}) {
     this.catalogoRepository = catalogoRepository;
+    this.hoy = typeof config.hoy === "function" ? config.hoy : hoyEnArgentina;
   }
 
   /**
@@ -71,7 +92,7 @@ class CatalogoService {
     const limite = parseInt(filtros.limite, 10) || 20;
 
     const { filas, total } = await this.catalogoRepository.listarProductos(filtros);
-
+    const hoy = this.hoy();
     const datos = filas.map((json) => {
       let precioDesde = null;
       let precioAnteriorDesde = null;
@@ -104,6 +125,7 @@ class CatalogoService {
         precioAnteriorDesde,
         hayStock,
         destacado: json.destacado,
+        ...camposDeVenta(json, hoy),
       };
     });
 
@@ -136,6 +158,7 @@ class CatalogoService {
       ingredientes: json.ingredientes,
       modoUso: json.modoUso,
       destacado: json.destacado,
+      ...camposDeVenta(json, this.hoy()),
       categoria: mapearCategoria(json.categoria),
       imagenes: json.imagenes.map((img) => ({ url: img.url, alt: img.alt })),
       variantes: json.variantes.map((v) => ({
