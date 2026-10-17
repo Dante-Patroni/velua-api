@@ -819,6 +819,13 @@
           "destacado": {
             "type": "boolean"
           },
+          "disponibleDesde": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Día desde el que se vende (AAAA-MM-DD, hora de Argentina). Null si no tiene fecha de lanzamiento.",
+            "example": "2026-11-05"
+          },
           "categoria": {
             "$ref": "#/components/schemas/Categoria"
           },
@@ -981,6 +988,13 @@
             "type": "boolean",
             "default": false
           },
+          "disponibleDesde": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Día de lanzamiento (AAAA-MM-DD, hora de Argentina). Hasta ese día el producto se muestra como Próximamente y no se puede comprar. Null o vacío la quita.",
+            "example": "2026-11-05"
+          },
           "variantes": {
             "type": "array",
             "minItems": 1,
@@ -1028,6 +1042,13 @@
           },
           "destacado": {
             "type": "boolean"
+          },
+          "disponibleDesde": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Día de lanzamiento (AAAA-MM-DD, hora de Argentina). Hasta ese día el producto se muestra como Próximamente y no se puede comprar. Null o vacío la quita.",
+            "example": "2026-11-05"
           }
         }
       },

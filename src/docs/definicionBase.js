@@ -34,6 +34,17 @@ const CAMPOS_VENTA = {
     example: 19,
   },
 };
+
+/** Fecha de lanzamiento tal como la manda el panel, en el alta y en la edición. */
+const FECHA_LANZAMIENTO_ENTRADA = {
+  type: "string",
+  format: "date",
+  nullable: true,
+  description:
+    "Día de lanzamiento (AAAA-MM-DD, hora de Argentina). Hasta ese día el producto se muestra como Próximamente y no se puede comprar. Null o vacío la quita.",
+  example: "2026-11-05",
+};
+
 module.exports = {
   openapi: "3.0.3",
   info: {
@@ -579,6 +590,7 @@ module.exports = {
           modoUso: { type: "string", nullable: true },
           activo: { type: "boolean" },
           destacado: { type: "boolean" },
+          disponibleDesde: CAMPOS_VENTA.disponibleDesde,
           categoria: { $ref: "#/components/schemas/Categoria" },
           variantes: {
             type: "array",
@@ -647,6 +659,7 @@ module.exports = {
           ingredientes: { type: "string", nullable: true },
           modoUso: { type: "string", nullable: true },
           destacado: { type: "boolean", default: false },
+          disponibleDesde: FECHA_LANZAMIENTO_ENTRADA,
           variantes: {
             type: "array",
             minItems: 1,
@@ -667,6 +680,7 @@ module.exports = {
           ingredientes: { type: "string", nullable: true },
           modoUso: { type: "string", nullable: true },
           destacado: { type: "boolean" },
+          disponibleDesde: FECHA_LANZAMIENTO_ENTRADA,
         },
       },
 
