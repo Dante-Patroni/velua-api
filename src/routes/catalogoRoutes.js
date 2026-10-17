@@ -40,6 +40,7 @@ const validarListado = [
     .isLength({ max: 80 })
     .withMessage("La búsqueda no puede superar los 80 caracteres")
     .trim(),
+  query("proximamente").optional().isIn(["true", "false"]).withMessage("Debe ser true o false"),
   query("orden")
     .optional()
     .isIn(["defecto", "precio_asc", "precio_desc", "mas_vendidos"])
@@ -107,6 +108,12 @@ router.get("/categorias", catalogoController.listarCategorias);
  *         name: destacados
  *         required: false
  *         description: Si es true, devuelve solo los productos marcados como destacados.
+ *         schema:
+ *           type: boolean
+ *       - in: query
+ *         name: proximamente
+ *         required: false
+ *         description: Si es true, devuelve solo los productos que todavía no salieron a la venta.
  *         schema:
  *           type: boolean
  *       - in: query

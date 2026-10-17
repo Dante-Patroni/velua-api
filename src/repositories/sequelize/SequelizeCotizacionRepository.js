@@ -37,7 +37,7 @@ class SequelizeCotizacionRepository extends CotizacionRepository {
         {
           model: this.models.Producto,
           as: "producto",
-          attributes: ["id", "nombre", "slug", "activo"],
+          attributes: ["id", "nombre", "slug", "activo", "disponibleDesde"],
         },
       ],
     });

@@ -72,6 +72,10 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: true,
       },
+      disponibleDesde: {
+        type: DataTypes.DATEONLY,
+        allowNull: true,
+      },
       destacado: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

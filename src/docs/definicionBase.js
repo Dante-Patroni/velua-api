@@ -6,6 +6,45 @@
  * Este archivo es la fuente de verdad de los esquemas. `docs/openapi.json` se
  * genera a partir de aca con `npm run openapi` y no se edita a mano.
  */
+
+/**
+ * Campos de venta comunes a la grilla y a la ficha. Definidos una vez para que
+ * los dos esquemas no puedan contradecirse.
+ */
+const CAMPOS_VENTA = {
+  disponibleDesde: {
+    type: "string",
+    format: "date",
+    nullable: true,
+    description:
+      "Día desde el que se vende (AAAA-MM-DD, hora de Argentina). Null si no tiene fecha de lanzamiento.",
+    example: "2026-11-05",
+  },
+  proximamente: {
+    type: "boolean",
+    description:
+      "True si todavía no salió a la venta. Mostrar el aviso y no ofrecer agregar al carrito.",
+  },
+  diasRestantes: {
+    type: "integer",
+    nullable: true,
+    minimum: 1,
+    description:
+      "Días que faltan. Null si no es próximamente o si la fecha no es válida. Lo calcula el servidor: no usar el reloj del navegador.",
+    example: 19,
+  },
+};
+
+/** Fecha de lanzamiento tal como la manda el panel, en el alta y en la edición. */
+const FECHA_LANZAMIENTO_ENTRADA = {
+  type: "string",
+  format: "date",
+  nullable: true,
+  description:
+    "Día de lanzamiento (AAAA-MM-DD, hora de Argentina). Hasta ese día el producto se muestra como Próximamente y no se puede comprar. Null o vacío la quita.",
+  example: "2026-11-05",
+};
+
 module.exports = {
   openapi: "3.0.3",
   info: {
@@ -298,9 +337,21 @@ module.exports = {
           },
           destacado: {
             type: "boolean",
+            ...CAMPOS_VENTA,
           },
         },
-        required: ["id", "nombre", "slug", "categoria", "precioDesde", "hayStock", "destacado"],
+        required: [
+          "id",
+          "nombre",
+          "slug",
+          "categoria",
+          "precioDesde",
+          "hayStock",
+          "destacado",
+          "disponibleDesde",
+          "proximamente",
+          "diasRestantes",
+        ],
       },
       ProductoDetalle: {
         type: "object",
@@ -337,6 +388,7 @@ module.exports = {
           },
           destacado: {
             type: "boolean",
+            ...CAMPOS_VENTA,
           },
           categoria: {
             $ref: "#/components/schemas/Categoria",
@@ -357,7 +409,18 @@ module.exports = {
             minItems: 1,
           },
         },
-        required: ["id", "nombre", "slug", "categoria", "imagenes", "variantes", "destacado"],
+        required: [
+          "id",
+          "nombre",
+          "slug",
+          "categoria",
+          "imagenes",
+          "variantes",
+          "destacado",
+          "disponibleDesde",
+          "proximamente",
+          "diasRestantes",
+        ],
       },
       LoginEntrada: {
         type: "object",
@@ -527,6 +590,7 @@ module.exports = {
           modoUso: { type: "string", nullable: true },
           activo: { type: "boolean" },
           destacado: { type: "boolean" },
+          disponibleDesde: CAMPOS_VENTA.disponibleDesde,
           categoria: { $ref: "#/components/schemas/Categoria" },
           variantes: {
             type: "array",
@@ -595,6 +659,7 @@ module.exports = {
           ingredientes: { type: "string", nullable: true },
           modoUso: { type: "string", nullable: true },
           destacado: { type: "boolean", default: false },
+          disponibleDesde: FECHA_LANZAMIENTO_ENTRADA,
           variantes: {
             type: "array",
             minItems: 1,
@@ -615,6 +680,7 @@ module.exports = {
           ingredientes: { type: "string", nullable: true },
           modoUso: { type: "string", nullable: true },
           destacado: { type: "boolean" },
+          disponibleDesde: FECHA_LANZAMIENTO_ENTRADA,
         },
       },
 
@@ -688,17 +754,23 @@ module.exports = {
               "VARIANTE_INEXISTENTE",
               "VARIANTE_INACTIVA",
               "PRODUCTO_INACTIVO",
+              "PROXIMAMENTE",
               "SIN_STOCK",
               "AJUSTADO_POR_STOCK",
               "AJUSTADO_POR_TOPE",
             ],
             description:
-              "Los cuatro primeros sacan el producto del carrito. Los dos ultimos reducen la cantidad: AJUSTADO_POR_STOCK es un limite fisico, AJUSTADO_POR_TOPE es comercial y conviene invitar a escribir por WhatsApp.",
+              "Los cinco primeros sacan el producto del carrito. Los dos ultimos reducen la cantidad: AJUSTADO_POR_STOCK es un limite fisico, AJUSTADO_POR_TOPE es comercial y conviene invitar a escribir por WhatsApp.",
           },
           producto: { type: "string", description: "Nombre, para poder nombrarlo en el aviso." },
           pedida: { type: "integer", description: "Cantidad que habia en el carrito." },
           disponible: { type: "integer", description: "Solo en AJUSTADO_POR_STOCK." },
           maximo: { type: "integer", description: "Solo en AJUSTADO_POR_TOPE." },
+          disponibleDesde: {
+            type: "string",
+            format: "date",
+            description: "Solo en PROXIMAMENTE. Día desde el que se puede comprar.",
+          },
         },
       },
       TotalesCotizacion: {

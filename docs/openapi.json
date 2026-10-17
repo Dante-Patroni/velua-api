@@ -334,7 +334,25 @@
             "description": "True si al menos una variante activa tiene stock."
           },
           "destacado": {
-            "type": "boolean"
+            "type": "boolean",
+            "disponibleDesde": {
+              "type": "string",
+              "format": "date",
+              "nullable": true,
+              "description": "Día desde el que se vende (AAAA-MM-DD, hora de Argentina). Null si no tiene fecha de lanzamiento.",
+              "example": "2026-11-05"
+            },
+            "proximamente": {
+              "type": "boolean",
+              "description": "True si todavía no salió a la venta. Mostrar el aviso y no ofrecer agregar al carrito."
+            },
+            "diasRestantes": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 1,
+              "description": "Días que faltan. Null si no es próximamente o si la fecha no es válida. Lo calcula el servidor: no usar el reloj del navegador.",
+              "example": 19
+            }
           }
         },
         "required": [
@@ -344,7 +362,10 @@
           "categoria",
           "precioDesde",
           "hayStock",
-          "destacado"
+          "destacado",
+          "disponibleDesde",
+          "proximamente",
+          "diasRestantes"
         ]
       },
       "ProductoDetalle": {
@@ -381,7 +402,25 @@
             "nullable": true
           },
           "destacado": {
-            "type": "boolean"
+            "type": "boolean",
+            "disponibleDesde": {
+              "type": "string",
+              "format": "date",
+              "nullable": true,
+              "description": "Día desde el que se vende (AAAA-MM-DD, hora de Argentina). Null si no tiene fecha de lanzamiento.",
+              "example": "2026-11-05"
+            },
+            "proximamente": {
+              "type": "boolean",
+              "description": "True si todavía no salió a la venta. Mostrar el aviso y no ofrecer agregar al carrito."
+            },
+            "diasRestantes": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 1,
+              "description": "Días que faltan. Null si no es próximamente o si la fecha no es válida. Lo calcula el servidor: no usar el reloj del navegador.",
+              "example": 19
+            }
           },
           "categoria": {
             "$ref": "#/components/schemas/Categoria"
@@ -409,7 +448,10 @@
           "categoria",
           "imagenes",
           "variantes",
-          "destacado"
+          "destacado",
+          "disponibleDesde",
+          "proximamente",
+          "diasRestantes"
         ]
       },
       "LoginEntrada": {
@@ -777,6 +819,13 @@
           "destacado": {
             "type": "boolean"
           },
+          "disponibleDesde": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Día desde el que se vende (AAAA-MM-DD, hora de Argentina). Null si no tiene fecha de lanzamiento.",
+            "example": "2026-11-05"
+          },
           "categoria": {
             "$ref": "#/components/schemas/Categoria"
           },
@@ -939,6 +988,13 @@
             "type": "boolean",
             "default": false
           },
+          "disponibleDesde": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Día de lanzamiento (AAAA-MM-DD, hora de Argentina). Hasta ese día el producto se muestra como Próximamente y no se puede comprar. Null o vacío la quita.",
+            "example": "2026-11-05"
+          },
           "variantes": {
             "type": "array",
             "minItems": 1,
@@ -986,6 +1042,13 @@
           },
           "destacado": {
             "type": "boolean"
+          },
+          "disponibleDesde": {
+            "type": "string",
+            "format": "date",
+            "nullable": true,
+            "description": "Día de lanzamiento (AAAA-MM-DD, hora de Argentina). Hasta ese día el producto se muestra como Próximamente y no se puede comprar. Null o vacío la quita.",
+            "example": "2026-11-05"
           }
         }
       },
@@ -1120,11 +1183,12 @@
               "VARIANTE_INEXISTENTE",
               "VARIANTE_INACTIVA",
               "PRODUCTO_INACTIVO",
+              "PROXIMAMENTE",
               "SIN_STOCK",
               "AJUSTADO_POR_STOCK",
               "AJUSTADO_POR_TOPE"
             ],
-            "description": "Los cuatro primeros sacan el producto del carrito. Los dos ultimos reducen la cantidad: AJUSTADO_POR_STOCK es un limite fisico, AJUSTADO_POR_TOPE es comercial y conviene invitar a escribir por WhatsApp."
+            "description": "Los cinco primeros sacan el producto del carrito. Los dos ultimos reducen la cantidad: AJUSTADO_POR_STOCK es un limite fisico, AJUSTADO_POR_TOPE es comercial y conviene invitar a escribir por WhatsApp."
           },
           "producto": {
             "type": "string",
@@ -1141,6 +1205,11 @@
           "maximo": {
             "type": "integer",
             "description": "Solo en AJUSTADO_POR_TOPE."
+          },
+          "disponibleDesde": {
+            "type": "string",
+            "format": "date",
+            "description": "Solo en PROXIMAMENTE. Día desde el que se puede comprar."
           }
         }
       },
@@ -1935,6 +2004,15 @@
             "name": "destacados",
             "required": false,
             "description": "Si es true, devuelve solo los productos marcados como destacados.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "proximamente",
+            "required": false,
+            "description": "Si es true, devuelve solo los productos que todavía no salieron a la venta.",
             "schema": {
               "type": "boolean"
             }

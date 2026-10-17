@@ -79,6 +79,11 @@ const campos = {
       .optional()
       .isBoolean({ strict: true })
       .withMessage("Tiene que ser true o false"),
+  disponibleDesde: () =>
+    body("disponibleDesde")
+      .optional({ values: "falsy" })
+      .matches(/^\d{4}-\d{2}-\d{2}$/)
+      .withMessage("Tiene que ser una fecha con formato AAAA-MM-DD"),
 };
 /* eslint-enable jsdoc/require-jsdoc */
 
@@ -132,6 +137,7 @@ const validarCrear = [
   campos.ingredientes(),
   campos.modoUso(),
   campos.destacado(),
+  campos.disponibleDesde(),
   body("variantes").isArray({ min: 1 }).withMessage("Cargá al menos una variante"),
   ...camposVariante("variantes.*"),
   manejarErroresValidacion,
@@ -147,6 +153,7 @@ const validarActualizar = [
   campos.ingredientes(),
   campos.modoUso(),
   campos.destacado(),
+  campos.disponibleDesde(),
   manejarErroresValidacion,
 ];
 
