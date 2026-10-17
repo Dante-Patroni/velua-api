@@ -1,4 +1,5 @@
 const { generarSlug, generarSlugUnico } = require("../utils/slug");
+const { esFechaDia } = require("./estadoVenta");
 
 const LARGO_SLUG = 160;
 
@@ -50,6 +51,25 @@ const compararImportes = (a, b) => {
 };
 
 /**
+ * @description Valida la fecha de lanzamiento. Vacía o null la quita. La regla
+ * de qué es una fecha válida es la misma que usa el cotizador para leerla.
+ * @param {*} valor - Fecha ingresada.
+ * @returns {string|null} Fecha AAAA-MM-DD, o null si no tiene.
+ * @throws {Error} DATOS_INVALIDOS si no es una fecha real.
+ */
+const fechaDisponibleValida = (valor) => {
+  if (valor === undefined || valor === null || valor === "") {
+    return null;
+  }
+  if (!esFechaDia(valor)) {
+    throw datosInvalidos({
+      disponibleDesde: "Tiene que ser una fecha real con formato AAAA-MM-DD",
+    });
+  }
+  return valor;
+};
+
+/**
  * @description Recorta una variante al formato del panel. A diferencia de la
  * tienda, acá sí se expone el stock real y el estado.
  * @param {Object} variante - Variante cruda del repositorio.
@@ -81,6 +101,7 @@ const mapearProductoAdmin = (producto) => ({
   modoUso: producto.modoUso ?? null,
   activo: Boolean(producto.activo),
   destacado: Boolean(producto.destacado),
+  disponibleDesde: producto.disponibleDesde ?? null,
   categoria: producto.categoria
     ? {
         id: producto.categoria.id,
@@ -177,6 +198,7 @@ class ProductoAdminService {
    * @param {string} [datos.ingredientes] - Listado de la etiqueta.
    * @param {string} [datos.modoUso] - Cómo se usa.
    * @param {boolean} [datos.destacado] - Si aparece en la portada.
+   * @param {string|null} [datos.disponibleDesde] - Día de lanzamiento (AAAA-MM-DD). Hasta ese día no se vende.
    * @param {Array<Object>} datos.variantes - Variantes, al menos una.
    * @returns {Promise<Object>} Producto creado.
    * @throws {Error} DATOS_INVALIDOS, SIN_VARIANTES, CONFLICTO_DE_DATOS
@@ -190,11 +212,13 @@ class ProductoAdminService {
     ingredientes,
     modoUso,
     destacado = false,
+    disponibleDesde,
     variantes,
   }) {
     if (!Array.isArray(variantes) || variantes.length === 0) {
       throw new Error("SIN_VARIANTES");
     }
+    const fechaLanzamiento = fechaDisponibleValida(disponibleDesde);
     if (!(await this.productoRepository.existeCategoria(categoriaId))) {
       throw datosInvalidos({ categoriaId: "La categoría no existe" });
     }
@@ -229,6 +253,7 @@ class ProductoAdminService {
         modoUso: modoUso?.trim() || null,
         activo: true,
         destacado: Boolean(destacado),
+        disponibleDesde: fechaLanzamiento,
       },
       preparadas
     );
@@ -249,6 +274,7 @@ class ProductoAdminService {
    * @param {string} [cambios.ingredientes] - Listado de la etiqueta.
    * @param {string} [cambios.modoUso] - Cómo se usa.
    * @param {boolean} [cambios.destacado] - Si aparece en la portada.
+   * @param {string|null} [cambios.disponibleDesde] - Día de lanzamiento. Null o vacío lo quita.
    * @returns {Promise<Object>} Producto actualizado.
    * @throws {Error} NO_ENCONTRADO, DATOS_INVALIDOS, CONFLICTO_DE_DATOS
    */
@@ -267,6 +293,9 @@ class ProductoAdminService {
     }
     if (cambios.destacado !== undefined) {
       aplicar.destacado = Boolean(cambios.destacado);
+    }
+    if (cambios.disponibleDesde !== undefined) {
+      aplicar.disponibleDesde = fechaDisponibleValida(cambios.disponibleDesde);
     }
     if (cambios.categoriaId !== undefined && cambios.categoriaId !== actual.categoriaId) {
       if (!(await this.productoRepository.existeCategoria(cambios.categoriaId))) {
