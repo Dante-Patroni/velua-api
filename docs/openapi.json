@@ -1795,6 +1795,19 @@
           },
           "404": {
             "$ref": "#/components/responses/NoEncontrado"
+          },
+          "429": {
+            "description": "Demasiadas consultas de numeros inexistentes desde la misma direccion. Solo cuentan las fallidas: consultar un pedido propio no suma.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "LIMITE_SUPERADO"
+                }
+              }
+            }
           }
         }
       }

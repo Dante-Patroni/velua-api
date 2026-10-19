@@ -60,4 +60,26 @@ const limitadorArrepentimiento = rateLimit({
   handler: handlerLimiteSuperado,
 });
 
-module.exports = { limitadorLogin, limitadorGlobal, limitadorPedidos, limitadorArrepentimiento };
+/**
+ * @description Límite para consultar un pedido por su número. Cuenta solo las
+ * consultas que fallan (número inexistente): una clienta consulta su propio
+ * pedido, que existe, y nunca llega al límite aunque la página de resultado
+ * consulte cada pocos segundos. Quien prueba números al azar falla casi siempre y
+ * se frena enseguida.
+ */
+const limitadorConsultaPedidos = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: process.env.NODE_ENV === "production" ? 20 : 1000,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: handlerLimiteSuperado,
+});
+
+module.exports = {
+  limitadorLogin,
+  limitadorGlobal,
+  limitadorPedidos,
+  limitadorArrepentimiento,
+  limitadorConsultaPedidos,
+};
