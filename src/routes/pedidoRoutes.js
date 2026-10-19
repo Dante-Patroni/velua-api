@@ -7,7 +7,10 @@ const { CheckoutService } = require("../services/CheckoutService");
 const { TOPE_ITEMS } = require("../services/cotizador");
 const PedidoController = require("../controllers/PedidoController");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
-const { limitadorPedidos } = require("../middlewares/rateLimitMiddleware");
+const {
+  limitadorPedidos,
+  limitadorConsultaPedidos,
+} = require("../middlewares/rateLimitMiddleware");
 const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
 const { PedidoEstadoService } = require("../services/PedidoEstadoService");
 const { PagoWebhookService } = require("../services/PagoWebhookService");
@@ -193,8 +196,18 @@ router.post("/pedidos", limitadorPedidos, validarPedido, controller.crear);
  *               $ref: '#/components/schemas/PedidoPublico'
  *       404:
  *         $ref: '#/components/responses/NoEncontrado'
+ *       429:
+ *         description: >
+ *           Demasiadas consultas de numeros inexistentes desde la misma direccion.
+ *           Solo cuentan las fallidas: consultar un pedido propio no suma.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: LIMITE_SUPERADO
  */
-router.get("/pedidos/:numero", controller.consultar);
+router.get("/pedidos/:numero", limitadorConsultaPedidos, controller.consultar);
 
 /**
  * @openapi
