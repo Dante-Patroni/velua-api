@@ -273,6 +273,43 @@
             }
           ]
         },
+                {
+          "name": "GET /productos?destacados=1 (rechazado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?destacados=1",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "destacados",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Solo se aceptan true o false. Antes, 1 pasaba la validación y el filtro se ignoraba sin avisar."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test('Indica el campo destacados', () => {",
+                  "    const cuerpo = pm.response.json();",
+                  "    pm.expect(cuerpo.error).to.eql('DATOS_INVALIDOS');",
+                  "    pm.expect(cuerpo.details).to.have.property('destacados');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+
         {
           "name": "GET /productos filtrado por categoria",
           "request": {

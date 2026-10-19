@@ -33,7 +33,7 @@ const validarListado = [
     .isString()
     .isLength({ max: 80 })
     .withMessage("El slug de categoría no puede superar los 80 caracteres"),
-  query("destacados").optional().isBoolean().withMessage("Debe ser true o false").toBoolean(),
+  query("destacados").optional().isIn(["true", "false"]).withMessage("Debe ser true o false"),
   query("q")
     .optional()
     .isString()
