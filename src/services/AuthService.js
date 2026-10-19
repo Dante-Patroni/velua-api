@@ -36,7 +36,7 @@ class AuthService {
    * @param {string} email - Mail ingresado.
    * @param {string} password - Contraseña ingresada.
    * @returns {Promise<{token: string, usuario: Object}>} Token y datos públicos del usuario.
-   * @throws {Error} CREDENCIALES_INVALIDAS, USUARIO_INACTIVO
+   * @throws {Error} CREDENCIALES_INVALIDAS, USUARIO_INACTIVO, DATOS_DE_SESION_INCOMPLETOS
    */
   async login(email, password) {
     const emailNormalizado = String(email).trim().toLowerCase();
@@ -52,12 +52,20 @@ class AuthService {
       throw new Error("USUARIO_INACTIVO");
     }
 
+    // Sin la versión, el token saldría sin sv y el middleware lo rechazaría siempre.
+    // Se corta acá, antes de registrar el acceso, con un error que se ve en el log.
+    if (!Number.isInteger(usuario.versionSesion)) {
+     throw new Error("DATOS_DE_SESION_INCOMPLETOS");
+    }
+
     await this.usuarioRepository.registrarAcceso(usuario.id);
 
     const permisos = permisosDeRol(usuario.rol);
-    const token = jwt.sign({ id: usuario.id, rol: usuario.rol, permisos }, this.jwtSecret, {
-      expiresIn: this.duracion,
-    });
+    const token = jwt.sign(
+      { id: usuario.id, rol: usuario.rol, permisos, sv: usuario.versionSesion },
+      this.jwtSecret,
+      { expiresIn: this.duracion }
+    );
 
     return { token, usuario: this.#datosPublicos(usuario, permisos) };
   }

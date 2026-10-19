@@ -18,6 +18,7 @@ const usuarioCrudo = (cambios = {}) => ({
   rol: "admin",
   activo: true,
   ultimoAcceso: null,
+  versionSesion: 0,
   creadoEn: "2026-09-01T10:00:00.000Z",
   ...cambios,
 });
@@ -139,6 +140,26 @@ describe("AuthService", () => {
 
       expect(contenido).not.toHaveProperty("passwordHash");
       expect(contenido).not.toHaveProperty("email");
+    });
+
+    it("firma el token con la versión de sesión del usuario", async () => {
+      repositorio.buscarPorEmail.mockResolvedValue(usuarioCrudo({ versionSesion: 3 }));
+
+      const { token } = await servicio.login("duena@velua.com.ar", "clave-correcta");
+      const contenido = jwt.verify(token, SECRETO);
+
+      expect(contenido.sv).toBe(3);
+    });
+
+    it("falla de forma segura si el repositorio no trae la versión de sesión", async () => {
+      const sinVersion = usuarioCrudo();
+      delete sinVersion.versionSesion;
+      repositorio.buscarPorEmail.mockResolvedValue(sinVersion);
+
+      await expect(servicio.login("duena@velua.com.ar", "clave-correcta")).rejects.toThrow(
+        "DATOS_DE_SESION_INCOMPLETOS"
+      );
+      expect(repositorio.registrarAcceso).not.toHaveBeenCalled();
     });
 
     it("el token expira", async () => {
