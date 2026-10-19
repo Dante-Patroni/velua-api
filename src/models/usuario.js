@@ -44,6 +44,12 @@ module.exports = (sequelize) => {
         allowNull: true,
         field: "ultimo_acceso",
       },
+      versionSesion: {
+        type: DataTypes.INTEGER.UNSIGNED,
+        allowNull: false,
+        defaultValue: 0,
+        field: "version_sesion",
+      },
     },
     {
       sequelize,
