@@ -1,5 +1,5 @@
 const { manejarErrorHttp } = require("../middlewares/errorMapper");
-const { COOKIE_SESION } = require("../middlewares/authMiddleware");
+const { COOKIE_SESION } = require("../middlewares/crearAuthMiddleware");
 
 const OCHO_HORAS_MS = 8 * 60 * 60 * 1000;
 
@@ -83,6 +83,33 @@ class AuthController {
       const usuario = await this.authService.obtenerUsuarioActual(req.usuario.id);
       res.status(200).json(usuario);
     } catch (error) {
+      manejarErrorHttp(error, res);
+    }
+  };
+
+  /**
+   * @description Cambia la contraseña y deja una cookie nueva en esta sesión.
+   * Las demás sesiones quedan revocadas.
+   * @param {import("express").Request} req - Request con contrasenaActual y contrasenaNueva.
+   * @param {import("express").Response} res - Response de Express.
+   * @returns {Promise<void>}
+   */
+  cambiarContrasena = async (req, res) => {
+    try {
+      const { contrasenaActual, contrasenaNueva } = req.body;
+      const { token } = await this.authService.cambiarContrasena(
+        req.usuario.id,
+        contrasenaActual,
+        contrasenaNueva
+      );
+
+      res.cookie(COOKIE_SESION, token, { ...opcionesCookie(), maxAge: OCHO_HORAS_MS });
+      res.status(204).end();
+    } catch (error) {
+      // Solo este error cuenta para el límite de intentos.
+      if (error.message === "CONTRASENA_ACTUAL_INCORRECTA") {
+        res.locals.contrasenaActualIncorrecta = true;
+      }
       manejarErrorHttp(error, res);
     }
   };
