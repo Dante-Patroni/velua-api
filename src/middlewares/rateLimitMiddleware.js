@@ -11,11 +11,12 @@ const handlerLimiteSuperado = (req, res) => {
 };
 
 /**
- * @description Limite estricto para el login del panel. Frena fuerza bruta.
+ * @description Limite estricto para el login del panel. Frena fuerza bruta. 
+ * Fuera de producción el tope es 1000, para que la colección de Newman no se bloquee a sí misma.
  */
 const limitadorLogin = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  limit: process.env.NODE_ENV === "production" ? 10 : 1000,
   standardHeaders: "draft-7",
   legacyHeaders: false,
   handler: handlerLimiteSuperado,
