@@ -4275,7 +4275,225 @@
           ]
         }
       ]
+    },
+    {
+  "name": "Cambio de contraseña",
+  "description": "Cambia la contraseña del admin, prueba que la sesión anterior queda revocada y vuelve a la original. Deja el sistema como lo encontró.",
+  "item": [
+    {
+      "name": "POST /auth/login (cambio de contraseña)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+              "pm.collectionVariables.set('token_viejo', pm.cookies.get('velua_sesion'));",
+              "pm.collectionVariables.set('contrasena_temporal', 'newman cambio ' + Date.now());",
+              "pm.test('Guardó el token de esta sesión', () => pm.expect(pm.collectionVariables.get('token_viejo')).to.be.a('string').and.not.be.empty);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{admin_email}}\",\"password\":\"{{admin_password}}\"}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "PUT /auth/contrasena sin sesión (rechazado)",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+              "pm.test('Código NO_AUTORIZADO', () => pm.expect(pm.response.json().error).to.eql('NO_AUTORIZADO'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/auth/contrasena", "host": ["{{base_url}}"], "path": ["auth", "contrasena"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"contrasenaActual\":\"{{admin_password}}\",\"contrasenaNueva\":\"{{contrasena_temporal}}\"}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "PUT /auth/contrasena con la actual incorrecta (rechazado)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+              "pm.test('Código CONTRASENA_ACTUAL_INCORRECTA', () => pm.expect(pm.response.json().error).to.eql('CONTRASENA_ACTUAL_INCORRECTA'));",
+              "pm.test('Marca el campo contrasenaActual', () => pm.expect(pm.response.json().details).to.have.property('contrasenaActual'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/auth/contrasena", "host": ["{{base_url}}"], "path": ["auth", "contrasena"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"contrasenaActual\":\"no es la contraseña actual\",\"contrasenaNueva\":\"{{contrasena_temporal}}\"}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "PUT /auth/contrasena con una nueva común (rechazado)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+              "pm.test('Código DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));",
+              "pm.test('Explica el motivo en contrasenaNueva', () => pm.expect(pm.response.json().details.contrasenaNueva).to.be.a('string'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/auth/contrasena", "host": ["{{base_url}}"], "path": ["auth", "contrasena"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"contrasenaActual\":\"{{admin_password}}\",\"contrasenaNueva\":\"111111111111\"}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "PUT /auth/contrasena (cambio exitoso)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 204', () => pm.response.to.have.status(204));",
+              "pm.test('Dejó una cookie nueva', () => { const nueva = pm.cookies.get('velua_sesion'); pm.expect(nueva).to.be.a('string'); pm.expect(nueva).to.not.eql(pm.collectionVariables.get('token_viejo')); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/auth/contrasena", "host": ["{{base_url}}"], "path": ["auth", "contrasena"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"contrasenaActual\":\"{{admin_password}}\",\"contrasenaNueva\":\"{{contrasena_temporal}}\"}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "GET /auth/yo con el token anterior (revocado)",
+      "protocolProfileBehavior": { "disableCookies": true },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+              "pm.test('Código SESION_REVOCADA', () => pm.expect(pm.response.json().error).to.eql('SESION_REVOCADA'));"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Cookie", "value": "velua_sesion={{token_viejo}}" }],
+        "url": { "raw": "{{base_url}}/auth/yo", "host": ["{{base_url}}"], "path": ["auth", "yo"] }
+      }
+    },
+    {
+      "name": "GET /auth/yo con la cookie nueva (sigue adentro)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('Responde 200', () => pm.response.to.have.status(200));"]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": { "raw": "{{base_url}}/auth/yo", "host": ["{{base_url}}"], "path": ["auth", "yo"] }
+      }
+    },
+    {
+      "name": "PUT /auth/contrasena (volver a la original)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('Responde 204', () => pm.response.to.have.status(204));"]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/auth/contrasena", "host": ["{{base_url}}"], "path": ["auth", "contrasena"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"contrasenaActual\":\"{{contrasena_temporal}}\",\"contrasenaNueva\":\"{{admin_password}}\"}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
+    },
+    {
+      "name": "POST /auth/login con la original (restaurada)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": ["pm.test('Responde 200', () => pm.response.to.have.status(200));"]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/auth/login", "host": ["{{base_url}}"], "path": ["auth", "login"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{admin_email}}\",\"password\":\"{{admin_password}}\"}",
+          "options": { "raw": { "language": "json" } }
+        }
+      }
     }
+  ]
+}
   ],
   "variable": [
     {
