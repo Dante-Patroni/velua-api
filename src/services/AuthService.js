@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { permisosDeRol } = require("../config/permisos");
+const { motivoDeRechazo, MENSAJES_RECHAZO } = require("./politicaContrasena");
 
 /**
  * @description Costo de bcrypt. Tiene que coincidir con el que usa el seed,
@@ -52,22 +53,79 @@ class AuthService {
       throw new Error("USUARIO_INACTIVO");
     }
 
-    // Sin la versión, el token saldría sin sv y el middleware lo rechazaría siempre.
-    // Se corta acá, antes de registrar el acceso, con un error que se ve en el log.
-    if (!Number.isInteger(usuario.versionSesion)) {
-     throw new Error("DATOS_DE_SESION_INCOMPLETOS");
-    }
-
+    // Se firma antes de registrar el acceso: si no se puede emitir un token
+    // válido, no hubo acceso y no se registra.
+    const token = this.#firmarToken(usuario);
     await this.usuarioRepository.registrarAcceso(usuario.id);
 
+    return { token, usuario: this.#datosPublicos(usuario, permisosDeRol(usuario.rol)) };
+  }
+
+  /**
+   * @description Cambia la contraseña de la usuaria de la sesión. Exige la actual,
+   * aplica la política a la nueva e invalida todas las sesiones anteriores.
+   * @param {number} id - Id de la sesión actual.
+   * @param {string} contrasenaActual - Contraseña actual, para confirmar que es ella.
+   * @param {string} contrasenaNueva - Contraseña nueva.
+   * @returns {Promise<{token: string}>} Token nuevo, con la versión de sesión nueva.
+   * @throws {Error} NO_AUTORIZADO, USUARIO_INACTIVO, CONTRASENA_ACTUAL_INCORRECTA, DATOS_INVALIDOS
+   */
+  async cambiarContrasena(id, contrasenaActual, contrasenaNueva) {
+    const usuario = await this.usuarioRepository.buscarConHash(id);
+    if (!usuario) {
+      throw new Error("NO_AUTORIZADO");
+    }
+    if (!usuario.activo) {
+      throw new Error("USUARIO_INACTIVO");
+    }
+
+    // Primero la actual: con una sesión robada no se llega a la política.
+    const coincide = await bcrypt.compare(String(contrasenaActual), usuario.passwordHash);
+    if (!coincide) {
+      const error = new Error("CONTRASENA_ACTUAL_INCORRECTA");
+      error.details = { contrasenaActual: "La contraseña actual no es correcta." };
+      throw error;
+    }
+
+    const motivo = motivoDeRechazo(contrasenaNueva, {
+      actual: contrasenaActual,
+      email: usuario.email,
+    });
+    if (motivo) {
+      const error = new Error("DATOS_INVALIDOS");
+      error.details = { contrasenaNueva: MENSAJES_RECHAZO[motivo] };
+      throw error;
+    }
+
+    const hash = await bcrypt.hash(contrasenaNueva, COSTO_BCRYPT);
+    await this.usuarioRepository.cambiarContrasena(usuario.id, hash);
+
+    // La versión nueva se lee de la base, que es quien la incrementó.
+    const sesion = await this.usuarioRepository.buscarSesion(usuario.id);
+    if (!sesion) {
+      throw new Error("NO_AUTORIZADO");
+    }
+
+    return { token: this.#firmarToken(sesion) };
+  }
+
+  /**
+   * @description Firma el token de sesión. Lo usan el login y el cambio de contraseña.
+   * @param {Object} usuario - Necesita id, rol y versionSesion.
+   * @returns {string} Token firmado.
+   * @throws {Error} DATOS_DE_SESION_INCOMPLETOS si falta la versión de sesión.
+   */
+  #firmarToken(usuario) {
+    // Sin la versión, el token saldría sin sv y el middleware lo rechazaría siempre.
+    if (!Number.isInteger(usuario.versionSesion)) {
+      throw new Error("DATOS_DE_SESION_INCOMPLETOS");
+    }
     const permisos = permisosDeRol(usuario.rol);
-    const token = jwt.sign(
+    return jwt.sign(
       { id: usuario.id, rol: usuario.rol, permisos, sv: usuario.versionSesion },
       this.jwtSecret,
       { expiresIn: this.duracion }
     );
-
-    return { token, usuario: this.#datosPublicos(usuario, permisos) };
   }
 
   /**

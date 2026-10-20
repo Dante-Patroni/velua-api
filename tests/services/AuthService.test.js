@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { AuthService } = require("../../src/services/AuthService");
+const { MENSAJES_RECHAZO } = require("../../src/services/politicaContrasena");
 
 const SECRETO = "secreto-solo-para-tests";
 
@@ -32,6 +33,9 @@ describe("AuthService", () => {
       buscarPorEmail: jest.fn(),
       buscarPorId: jest.fn(),
       registrarAcceso: jest.fn().mockResolvedValue(undefined),
+      buscarConHash: jest.fn(),
+      buscarSesion: jest.fn(),
+      cambiarContrasena: jest.fn().mockResolvedValue(undefined),
     };
     servicio = new AuthService(repositorio, { jwtSecret: SECRETO, duracion: "8h" });
   });
@@ -205,6 +209,91 @@ describe("AuthService", () => {
       repositorio.buscarPorId.mockResolvedValue(usuarioCrudo({ activo: false }));
 
       await expect(servicio.obtenerUsuarioActual(7)).rejects.toThrow("USUARIO_INACTIVO");
+    });
+  });
+
+  describe("cambiarContrasena", () => {
+    const NUEVA = "lavanda en el patio de atras";
+
+    beforeEach(() => {
+      repositorio.buscarConHash.mockResolvedValue(usuarioCrudo());
+      repositorio.buscarSesion.mockResolvedValue({
+        id: 7,
+        rol: "admin",
+        activo: true,
+        versionSesion: 1,
+      });
+    });
+
+    it("guarda un hash de la nueva y devuelve un token con la versión nueva", async () => {
+      const { token } = await servicio.cambiarContrasena(7, "clave-correcta", NUEVA);
+
+      const [id, hashGuardado] = repositorio.cambiarContrasena.mock.calls[0];
+      expect(id).toBe(7);
+      expect(bcrypt.compareSync(NUEVA, hashGuardado)).toBe(true);
+      expect(jwt.verify(token, SECRETO).sv).toBe(1);
+    });
+
+    it("guarda el hash con el mismo costo que usa el login", async () => {
+      await servicio.cambiarContrasena(7, "clave-correcta", NUEVA);
+
+      const [, hashGuardado] = repositorio.cambiarContrasena.mock.calls[0];
+      expect(bcrypt.getRounds(hashGuardado)).toBe(12);
+    });
+
+    it("rechaza una contraseña actual incorrecta y no cambia nada", async () => {
+      await expect(servicio.cambiarContrasena(7, "clave-mal", NUEVA)).rejects.toMatchObject({
+        message: "CONTRASENA_ACTUAL_INCORRECTA",
+        details: { contrasenaActual: expect.any(String) },
+      });
+      expect(repositorio.cambiarContrasena).not.toHaveBeenCalled();
+    });
+
+    it("verifica la actual antes de mirar la nueva", async () => {
+      await expect(servicio.cambiarContrasena(7, "clave-mal", "corta")).rejects.toThrow(
+        "CONTRASENA_ACTUAL_INCORRECTA"
+      );
+    });
+
+    it("rechaza una nueva corta con el mensaje de la política", async () => {
+      await expect(servicio.cambiarContrasena(7, "clave-correcta", "corta")).rejects.toMatchObject({
+        message: "DATOS_INVALIDOS",
+        details: { contrasenaNueva: MENSAJES_RECHAZO.MUY_CORTA },
+      });
+      expect(repositorio.cambiarContrasena).not.toHaveBeenCalled();
+    });
+
+    it("pasa el mail de la base a la política", async () => {
+      await expect(
+        servicio.cambiarContrasena(7, "clave-correcta", "duena-cambio-de-clave")
+      ).rejects.toMatchObject({
+        details: { contrasenaNueva: MENSAJES_RECHAZO.CONTIENE_EL_MAIL },
+      });
+    });
+
+    it("rechaza una nueva igual a la actual", async () => {
+      await expect(
+        servicio.cambiarContrasena(7, "clave-correcta", "clave-correcta")
+      ).rejects.toMatchObject({
+        details: { contrasenaNueva: MENSAJES_RECHAZO.IGUAL_A_LA_ACTUAL },
+      });
+    });
+
+    it("rechaza con NO_AUTORIZADO si el usuario ya no existe", async () => {
+      repositorio.buscarConHash.mockResolvedValue(null);
+
+      await expect(servicio.cambiarContrasena(99, "clave-correcta", NUEVA)).rejects.toThrow(
+        "NO_AUTORIZADO"
+      );
+    });
+
+    it("rechaza a un usuario desactivado sin cambiar nada", async () => {
+      repositorio.buscarConHash.mockResolvedValue(usuarioCrudo({ activo: false }));
+
+      await expect(servicio.cambiarContrasena(7, "clave-correcta", NUEVA)).rejects.toThrow(
+        "USUARIO_INACTIVO"
+      );
+      expect(repositorio.cambiarContrasena).not.toHaveBeenCalled();
     });
   });
 });
