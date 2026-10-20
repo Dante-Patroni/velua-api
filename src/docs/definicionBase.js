@@ -337,8 +337,8 @@ module.exports = {
           },
           destacado: {
             type: "boolean",
-            ...CAMPOS_VENTA,
           },
+          ...CAMPOS_VENTA,
         },
         required: [
           "id",
@@ -388,8 +388,8 @@ module.exports = {
           },
           destacado: {
             type: "boolean",
-            ...CAMPOS_VENTA,
           },
+          ...CAMPOS_VENTA,
           categoria: {
             $ref: "#/components/schemas/Categoria",
           },
