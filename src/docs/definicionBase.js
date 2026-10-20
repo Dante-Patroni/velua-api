@@ -450,6 +450,20 @@ module.exports = {
           },
         },
       },
+      CambioContrasenaEntrada: {
+        type: "object",
+        required: ["contrasenaActual", "contrasenaNueva"],
+        properties: {
+          contrasenaActual: { type: "string", minLength: 1, maxLength: 128 },
+          contrasenaNueva: {
+            type: "string",
+            minLength: 12,
+            maxLength: 256,
+            description:
+              "Mínimo 12 caracteres y hasta 72 bytes. No puede ser una contraseña común ni contener el mail o el nombre de la marca. Sin reglas de mayúsculas ni símbolos.",
+          },
+        },
+      },
       CategoriaAdmin: {
         type: "object",
         description: "Categoria vista desde el panel. Incluye las inactivas.",
