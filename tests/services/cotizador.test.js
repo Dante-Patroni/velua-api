@@ -1,4 +1,4 @@
-const { Cotizador, AVISOS, TOPE_POR_VARIANTE } = require("../../src/services/cotizador");
+const { Cotizador, AVISOS, TOPE_POR_VARIANTE, imagenPrincipal } = require("../../src/services/cotizador");
 
 /**
  * Variante como la devuelve el repositorio, con su producto.
@@ -532,4 +532,69 @@ describe("Cotizador", () => {
       expect(z).not.toHaveProperty("orden");
     });
   });
+
+  describe("imagen de los ítems cotizados", () => {
+  /**
+   * @description Variante cuyo producto trae las imágenes dadas.
+   * @param {Array<Object>} imagenes - Imágenes del producto, como las trae el repositorio.
+   * @returns {Object} Variante con su producto y sus imágenes.
+   */
+  const conImagenes = (imagenes) => variante({ producto: { ...variante().producto, imagenes } });
+
+  it("devuelve la imagen de menor orden aunque lleguen desordenadas", async () => {
+    const servicio = new Cotizador(
+      repositorioCon([
+        conImagenes([
+          { url: "https://res.cloudinary.com/velua/segunda.jpg", alt: "Segunda", orden: 1 },
+          { url: "https://res.cloudinary.com/velua/principal.jpg", alt: "Principal", orden: 0 },
+        ]),
+      ])
+    );
+
+    const { items } = await servicio.cotizar({ items: [{ varianteId: 1, cantidad: 1 }] });
+
+    expect(items[0].imagen).toEqual({
+      url: "https://res.cloudinary.com/velua/principal.jpg",
+      alt: "Principal",
+    });
+  });
+
+  it("devuelve null si el producto no tiene fotos", async () => {
+    const servicio = new Cotizador(repositorioCon([conImagenes([])]));
+
+    const { items } = await servicio.cotizar({ items: [{ varianteId: 1, cantidad: 1 }] });
+
+    expect(items[0].imagen).toBeNull();
+  });
+
+  it("devuelve null si las imágenes no vinieron en la consulta, como al crear pedidos", async () => {
+    const servicio = new Cotizador(repositorioCon([variante()]));
+
+    const { items } = await servicio.cotizar({ items: [{ varianteId: 1, cantidad: 1 }] });
+
+    expect(items[0].imagen).toBeNull();
+  });
+
+  it("no expone el orden ni deja alt sin definir", () => {
+    const producto = { imagenes: [{ url: "https://res.cloudinary.com/velua/a.jpg", orden: 0 }] };
+
+    expect(imagenPrincipal(producto)).toEqual({
+      url: "https://res.cloudinary.com/velua/a.jpg",
+      alt: null,
+    });
+  });
+
+  it("no modifica el orden de las imágenes recibidas", () => {
+    const producto = {
+      imagenes: [
+        { url: "https://res.cloudinary.com/velua/b.jpg", alt: "B", orden: 1 },
+        { url: "https://res.cloudinary.com/velua/a.jpg", alt: "A", orden: 0 },
+      ],
+    };
+
+    imagenPrincipal(producto);
+
+    expect(producto.imagenes[0].orden).toBe(1);
+  });
+});
 });

@@ -23,7 +23,7 @@ class SequelizeCotizacionRepository extends CotizacionRepository {
    * distintos.
    *
    * @param {number[]} ids - Ids de las variantes.
-   * @returns {Promise<Array<Object>>} Variantes encontradas, con su producto.
+   * @returns {Promise<Array<Object>>} Variantes encontradas, con su producto y las imágenes del producto.
    */
   async buscarVariantes(ids) {
     if (!Array.isArray(ids) || ids.length === 0) {
@@ -38,6 +38,14 @@ class SequelizeCotizacionRepository extends CotizacionRepository {
           model: this.models.Producto,
           as: "producto",
           attributes: ["id", "nombre", "slug", "activo", "disponibleDesde"],
+          include: [
+            {
+              model: this.models.ImagenProducto,
+              as: "imagenes",
+              required: false,
+              attributes: ["url", "alt", "orden"],
+            },
+          ],
         },
       ],
     });
