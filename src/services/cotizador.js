@@ -22,6 +22,22 @@ const AVISOS = Object.freeze({
 });
 
 /**
+ * @description Imagen principal del producto: la de menor orden. Es un dato de
+ * presentación: si el producto no tiene fotos, o si las imágenes no vinieron en
+ * la consulta (como en la creación de pedidos), devuelve null y la cotización sigue.
+ * @param {Object} producto - Producto de la variante, con sus imágenes si las trae.
+ * @returns {{url: string, alt: string|null}|null} La imagen principal, o null.
+ */
+const imagenPrincipal = (producto) => {
+  const imagenes = Array.isArray(producto?.imagenes) ? producto.imagenes : [];
+  if (imagenes.length === 0) {
+    return null;
+  }
+  const [primera] = [...imagenes].sort((a, b) => a.orden - b.orden);
+  return { url: primera.url, alt: primera.alt ?? null };
+};
+
+/**
  * @description Crea un error de datos inválidos con el detalle por campo.
  * @param {Object} details - Mensajes por campo.
  * @returns {Error} Error con details adjunto.
@@ -152,10 +168,11 @@ class Cotizador {
     const total = redondearAlPeso(conDescuentos + envio.costoCentavos);
 
     return {
-      items: lineas.map((l) => ({
+        items: lineas.map((l) => ({
         varianteId: l.varianteId,
         productoNombre: l.productoNombre,
         productoSlug: l.productoSlug,
+        imagen: l.imagen,
         varianteNombre: l.varianteNombre,
         cantidad: l.cantidad,
         precioUnitario: aImporte(l.precioCentavos),
@@ -267,10 +284,11 @@ class Cotizador {
 
       const precioCentavos = aCentavos(variante.precio);
 
-      lineas.push({
+        lineas.push({
         varianteId,
         productoNombre: nombre,
         productoSlug: variante.producto?.slug ?? null,
+        imagen: imagenPrincipal(variante.producto),
         varianteNombre: variante.nombre,
         cantidad,
         precioCentavos,
@@ -336,4 +354,4 @@ class Cotizador {
   }
 }
 
-module.exports = { Cotizador, AVISOS, TOPE_POR_VARIANTE, TOPE_ITEMS };
+module.exports = { Cotizador, AVISOS, TOPE_POR_VARIANTE, TOPE_ITEMS, imagenPrincipal };

@@ -741,11 +741,17 @@ module.exports = {
       },
       ItemCotizado: {
         type: "object",
-        required: ["varianteId", "cantidad", "precioUnitario", "subtotal"],
+        required: ["varianteId", "cantidad", "precioUnitario", "subtotal", "imagen"],
         properties: {
           varianteId: { type: "integer" },
           productoNombre: { type: "string", example: "Éclat Noir" },
           productoSlug: { type: "string", nullable: true, example: "eclat-noir" },
+          imagen: {
+            allOf: [{ $ref: "#/components/schemas/Imagen" }],
+            nullable: true,
+            description:
+              "Foto principal del producto, la de menor orden. Null si no tiene fotos. El tamaño lo pide el frontend a Cloudinary.",
+          },
           varianteNombre: { type: "string", example: "100 g" },
           cantidad: {
             type: "integer",
