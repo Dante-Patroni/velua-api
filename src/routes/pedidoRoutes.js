@@ -159,6 +159,17 @@ const validarPedido = [
  *               $ref: '#/components/schemas/Error'
  *             example:
  *               error: TOTAL_CAMBIO
+ *       503:
+ *         description: >
+ *           PROCESADOR_NO_CONFIGURADO. Se eligió Mercado Pago y no está
+ *           configurado: no se crea el pedido ni se aparta stock. El frontend
+ *           muestra que el pago online no está disponible.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: PROCESADOR_NO_CONFIGURADO
  *       429:
  *         description: Demasiados pedidos desde la misma direccion
  *         content:

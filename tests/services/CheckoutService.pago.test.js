@@ -116,6 +116,26 @@ describe("crearPedido con Mercado Pago", () => {
       expect.anything()
     );
   });
+
+  it("sin Mercado Pago configurado, rechaza antes de crear el pedido", async () => {
+    const procesador = { configurado: false, crearPreferencia: jest.fn() };
+    const { servicio, repositorio } = armar({ procesador });
+
+    await expect(servicio.crearPedido(ENTRADA)).rejects.toThrow("PROCESADOR_NO_CONFIGURADO");
+    // Ni pedido, ni stock apartado, ni mail: la transacción no llega a abrirse
+    expect(repositorio.transaccion).not.toHaveBeenCalled();
+    expect(procesador.crearPreferencia).not.toHaveBeenCalled();
+  });
+
+  it("sin Mercado Pago configurado, la transferencia sigue funcionando", async () => {
+    const procesador = { configurado: false, crearPreferencia: jest.fn() };
+    const { servicio, repositorio } = armar({ procesador, resultado: creado("transferencia") });
+
+    const r = await servicio.crearPedido({ ...ENTRADA, medioPago: "transferencia" });
+
+    expect(repositorio.transaccion).toHaveBeenCalled();
+    expect(r.medioPago).toBe("transferencia");
+  });
 });
 
 describe("iniciarPago", () => {
@@ -335,7 +355,13 @@ describe("crearPedido, con la transacción real", () => {
             stock: 10,
             activa: true,
             productoId: 1,
-            producto: {  id: 1, nombre: "Éclat Noir", slug: "eclat-noir", activo: true, disponibleDesde: null },
+            producto: {
+              id: 1,
+              nombre: "Éclat Noir",
+              slug: "eclat-noir",
+              activo: true,
+              disponibleDesde: null,
+            },
           },
         ]),
         buscarZonaEnvio: jest.fn(),
