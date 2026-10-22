@@ -11,6 +11,7 @@ const crearRes = () => {
   const res = {};
   res.status = jest.fn(() => res);
   res.json = jest.fn(() => res);
+  res.set = jest.fn(() => res);
   return res;
 };
 
@@ -182,5 +183,24 @@ describe("authMiddleware", () => {
 
     esperarRechazo(res, 500, "ERROR_INTERNO");
     consola.mockRestore();
+  });
+
+  it("marca la respuesta como no-store cuando la sesión es válida", async () => {
+    const res = crearRes();
+
+    await middleware(reqCon(tokenDe({ id: 7, sv: 0 })), res, next);
+
+    expect(next).toHaveBeenCalled();
+    expect(res.set).toHaveBeenCalledWith("Cache-Control", "no-store");
+  });
+
+  it("marca la respuesta como no-store también cuando la rechaza", async () => {
+    const res = crearRes();
+
+    await middleware({ cookies: {} }, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.set).toHaveBeenCalledWith("Cache-Control", "no-store");
   });
 });
