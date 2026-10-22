@@ -16,6 +16,9 @@ require("dotenv").config();
 
 const BASE = process.env.VELUA_API_URL || `http://localhost:${process.env.PORT || 3000}/api/v1`;
 const SIMULTANEOS = 5;
+// Lo que se prueba son los bloqueos de MySQL, no el pago: transferencia no depende
+// de que Mercado Pago esté configurado (en el CI no lo está).
+const MEDIO_PAGO = "transferencia";
 
 /**
  * @description Corta la prueba con un mensaje y código de error.
@@ -115,10 +118,16 @@ const leerStock = async (cookie, productoId, varianteId) => {
 
   try {
     // 3. El total que vería la clienta, con retiro y sin descuento
-    const { cuerpo: cotizacion } = await pedir("/cotizar", {
+    const { status: estadoCotizacion, cuerpo: cotizacion } = await pedir("/cotizar", {
       method: "POST",
-      body: { items: [{ varianteId: v.id, cantidad: 1 }], medioPago: "mercadopago" },
+      body: { items: [{ varianteId: v.id, cantidad: 1 }], medioPago: MEDIO_PAGO },
     });
+
+    if (estadoCotizacion !== 200 || !cotizacion?.totales) {
+      throw new Error(
+        `/cotizar respondió ${estadoCotizacion} ${cotizacion?.error ?? ""} ${JSON.stringify(cotizacion?.details ?? {})}`
+      );
+    }
 
     const pedido = (n) => ({
       items: [{ varianteId: v.id, cantidad: 1 }],
@@ -128,7 +137,7 @@ const leerStock = async (cookie, productoId, varianteId) => {
         telefono: "358 400-0000",
       },
       entrega: { metodo: "retiro" },
-      medioPago: "mercadopago",
+      medioPago: MEDIO_PAGO,
       totalEsperado: cotizacion.totales.total,
     });
 
@@ -161,12 +170,13 @@ const leerStock = async (cookie, productoId, varianteId) => {
     );
 
     if (ganadores.length !== 1)
-      fallar(`Tenía que ganar exactamente uno y ganaron ${ganadores.length}`);
-    if (stockFinal !== 0) fallar(`El stock tenía que quedar en 0 y quedó en ${stockFinal}`);
+      throw new Error(`Tenía que ganar exactamente uno y ganaron ${ganadores.length}`);
+    if (stockFinal !== 0)
+      throw new Error(`El stock tenía que quedar en 0 y quedó en ${stockFinal}`);
 
     const raros = rechazos.filter((r) => !motivosValidos.includes(r.cuerpo?.error));
     if (raros.length > 0) {
-      fallar(
+      throw new Error(
         `Hubo rechazos por un motivo inesperado: ${raros.map((r) => r.cuerpo?.error).join(", ")}`
       );
     }
