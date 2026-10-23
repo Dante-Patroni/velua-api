@@ -24,6 +24,11 @@ const crearAuthMiddleware = ({ usuarioRepository, jwtSecret }) => {
   }
 
   return async (req, res, next) => {
+    // Toda respuesta que pasa por acá depende de una sesión (datos del panel, de
+    // clientes, del propio usuario): que ni el navegador ni un proxy la guarden.
+    // Va primero para cubrir también los rechazos.
+    res.set("Cache-Control", "no-store");
+
     const token = req.cookies?.[COOKIE_SESION];
     if (!token) {
       return manejarErrorHttp(new Error("NO_AUTORIZADO"), res);
