@@ -47,8 +47,21 @@ const ERROR_HTTP_MAP = {
   CATEGORIA_CON_HIJAS: 409,
   CATEGORIA_CON_PRODUCTOS: 409,
 
+  // 413
+  CUERPO_DEMASIADO_GRANDE: 413,
+
   // 502
   ERROR_AL_SUBIR: 502,
+};
+
+/**
+ * @description Errores del parser de cuerpos de Express. Traen un mensaje técnico
+ * que no es un código de dominio, así que se resuelven por su tipo antes de mirar
+ * el mensaje. Sin esto caían en 500 y se registraban con el cuerpo del cliente.
+ */
+const ERRORES_DEL_PARSER = {
+  "entity.parse.failed": "JSON_INVALIDO",
+  "entity.too.large": "CUERPO_DEMASIADO_GRANDE",
 };
 
 /**
@@ -59,16 +72,16 @@ const ERROR_HTTP_MAP = {
 function obtenerCodigoError(error) {
   if (!error) return "ERROR_INTERNO";
 
+  if (ERRORES_DEL_PARSER[error.type]) {
+    return ERRORES_DEL_PARSER[error.type];
+  }
+
   if (error.name === "SequelizeUniqueConstraintError") {
     return "CONFLICTO_DE_DATOS";
   }
 
   if (typeof error.message === "string" && error.message.trim()) {
     return error.message.trim();
-  }
-
-  if (error.type === "entity.parse.failed") {
-    return "JSON_INVALIDO";
   }
 
   return "ERROR_INTERNO";
