@@ -211,6 +211,12 @@ class CheckoutService {
    */
   async crearPedido(entrada) {
     validarCoherencia(entrada);
+    // Antes de apartar nada: si Mercado Pago no está configurado, un pedido con ese
+    // medio no se podría cobrar nunca y su reserva no vencería (el job no cancela
+    // ante la duda). Se rechaza acá: ni pedido, ni stock apartado, ni mail.
+    if (entrada.medioPago === "mercadopago" && this.procesadorPagos?.configurado === false) {
+      throw new Error("PROCESADOR_NO_CONFIGURADO");
+    }
 
     const { items, cliente, entrega, medioPago, totalEsperado, notas } = entrada;
     const envio = entrega.metodo === "envio";
