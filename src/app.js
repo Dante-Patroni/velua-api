@@ -6,10 +6,13 @@ const { crearValidadorOrigen, leerConfigCors } = require("./config/cors");
 const cookieParser = require("cookie-parser");
 const { limitadorGlobal } = require("./middlewares/rateLimitMiddleware");
 const { normalizarUnicode } = require("./middlewares/normalizarUnicode");
+const { registroPeticiones } = require("./middlewares/registroPeticiones");
 
 const app = express();
 
 app.set("trust proxy", 1);
+// Primero de todo: así también quedan registradas las peticiones que rechazan CORS o el JSON.
+app.use(registroPeticiones);
 
 app.use(cors({ origin: crearValidadorOrigen(leerConfigCors()), credentials: true }));
 
