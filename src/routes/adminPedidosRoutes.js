@@ -54,25 +54,17 @@ const validarId = [
  *       Máximo 50 por página.
  *     security:
  *       - cookieAuth: []
- *     parameters:
+  *     parameters:
  *       - in: query
  *         name: estadoPago
  *         schema:
- *           type: string
- *           enum: [pendiente, aprobado, rechazado, cancelado, devuelto]
+ *           $ref: '#/components/schemas/EstadoPago'
  *       - in: query
  *         name: estadoPedido
  *         schema:
- *           type: string
- *           enum: [nuevo, en_preparacion, enviado, entregado, cancelado]
+ *           $ref: '#/components/schemas/EstadoPedido'
  *       - $ref: '#/components/parameters/Pagina'
- *       - in: query
- *         name: limite
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 50
- *           default: 20
+ *       - $ref: '#/components/parameters/Limite'
  *     responses:
  *       200:
  *         description: Página de pedidos
@@ -85,39 +77,15 @@ const validarId = [
  *                 datos:
  *                   type: array
  *                   items:
- *                     type: object
- *                     required: [id, numero, creadoEn, clienteNombre, total, medioPago, estadoPago, estadoPedido, metodoEntrega, expiraEn]
- *                     properties:
- *                       id: { type: integer }
- *                       numero: { type: string }
- *                       creadoEn: { type: string, format: date-time }
- *                       clienteNombre: { type: string }
- *                       total: { type: string }
- *                       medioPago: { type: string, enum: [mercadopago, transferencia] }
- *                       estadoPago: { type: string }
- *                       estadoPedido: { type: string }
- *                       metodoEntrega: { type: string, enum: [envio, retiro] }
- *                       expiraEn: { type: [string, "null"], format: date-time }
+ *                     $ref: '#/components/schemas/PedidoAdminFila'
  *                 meta:
  *                   $ref: '#/components/schemas/Meta'
  *       400:
- *         description: DATOS_INVALIDOS (filtro o paginación fuera de rango)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/DatosInvalidos'
  *       401:
- *         description: Sin sesión, vencida o revocada
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/NoAutorizado'
  *       403:
- *         description: Sin permiso de ver pedidos
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/SinPermiso'
  */
 router.get(
   "/admin/pedidos",
@@ -146,104 +114,15 @@ router.get(
  *         content:
  *           application/json:
  *             schema:
- *               type: object
- *               required: [id, numero, creadoEn, clienteNombre, total, medioPago, estadoPago, estadoPedido, metodoEntrega, expiraEn, cliente, entrega, totales, pago, items, eventos]
- *               properties:
- *                 id: { type: integer }
- *                 numero: { type: string }
- *                 creadoEn: { type: string, format: date-time }
- *                 clienteNombre: { type: string }
- *                 total: { type: string }
- *                 medioPago: { type: string, enum: [mercadopago, transferencia] }
- *                 estadoPago: { type: string }
- *                 estadoPedido: { type: string }
- *                 metodoEntrega: { type: string, enum: [envio, retiro] }
- *                 expiraEn: { type: [string, "null"], format: date-time }
- *                 cliente:
- *                   type: object
- *                   properties:
- *                     nombre: { type: string }
- *                     email: { type: string }
- *                     telefono: { type: string }
- *                     documento: { type: [string, "null"] }
- *                 entrega:
- *                   type: object
- *                   properties:
- *                     metodo: { type: string, enum: [envio, retiro] }
- *                     zona: { type: [string, "null"] }
- *                     direccion:
- *                       type: [object, "null"]
- *                       properties:
- *                         calle: { type: string }
- *                         numero: { type: string }
- *                         extra: { type: [string, "null"] }
- *                         ciudad: { type: string }
- *                         provincia: { type: string }
- *                         cp: { type: string }
- *                     seguimiento: { type: [string, "null"] }
- *                 totales:
- *                   type: object
- *                   properties:
- *                     subtotal: { type: string }
- *                     descuentoCupon: { type: string }
- *                     ajusteMedioPago: { type: string, description: Descuento por medio de pago (se resta). }
- *                     costoEnvio: { type: string }
- *                     total: { type: string }
- *                 pago:
- *                   type: object
- *                   properties:
- *                     pagoId: { type: [string, "null"] }
- *                     metodo: { type: [string, "null"] }
- *                     comprobanteInformadoEn: { type: [string, "null"], format: date-time }
- *                 notasCliente: { type: [string, "null"] }
- *                 notasInternas: { type: [string, "null"] }
- *                 items:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       producto: { type: string }
- *                       variante: { type: string }
- *                       sku: { type: [string, "null"] }
- *                       precioUnitario: { type: string }
- *                       cantidad: { type: integer }
- *                       subtotal: { type: string }
- *                 eventos:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       campo: { type: string, enum: [pago, preparacion, aviso] }
- *                       estadoAnterior: { type: [string, "null"] }
- *                       estadoNuevo: { type: string }
- *                       origen: { type: string }
- *                       usuarioId: { type: [integer, "null"] }
- *                       detalle: { type: [string, "null"] }
- *                       creadoEn: { type: string, format: date-time }
+ *               $ref: '#/components/schemas/PedidoAdminDetalle'
  *       400:
- *         description: DATOS_INVALIDOS (id mal formado)
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/DatosInvalidos'
  *       401:
- *         description: Sin sesión, vencida o revocada
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/NoAutorizado'
  *       403:
- *         description: Sin permiso de ver pedidos
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/SinPermiso'
  *       404:
- *         description: NO_ENCONTRADO
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
+ *         $ref: '#/components/responses/NoEncontrado'
  */
 router.get(
   "/admin/pedidos/:id",

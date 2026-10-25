@@ -6,6 +6,7 @@
  * Este archivo es la fuente de verdad de los esquemas. `docs/openapi.json` se
  * genera a partir de aca con `npm run openapi` y no se edita a mano.
  */
+const { TRANSICIONES_PAGO, TRANSICIONES_PREPARACION } = require("../services/transicionesPedido");
 
 /**
  * Campos de venta comunes a la grilla y a la ficha. Definidos una vez para que
@@ -45,6 +46,32 @@ const FECHA_LANZAMIENTO_ENTRADA = {
   example: "2026-11-05",
 };
 
+/**
+ * Campos de un pedido comunes a la lista y al detalle del panel. Definidos una
+ * vez para que los dos esquemas no puedan contradecirse.
+ */
+const CAMPOS_PEDIDO_PANEL = {
+  id: { type: "integer", example: 12 },
+  numero: { type: "string", example: "VEL-4K7Q2X" },
+  creadoEn: { type: "string", format: "date-time" },
+  clienteNombre: {
+    type: "string",
+    description: "Lo escribe la clienta: mostrarlo siempre como texto, nunca como HTML.",
+    example: "Lucía Fernández",
+  },
+  total: { type: "string", description: "Cadena decimal. No operar en el frontend.", example: "23500.00" },
+  medioPago: { type: "string", enum: ["mercadopago", "transferencia"] },
+  estadoPago: { $ref: "#/components/schemas/EstadoPago" },
+  estadoPedido: { $ref: "#/components/schemas/EstadoPedido" },
+  metodoEntrega: { type: "string", enum: ["envio", "retiro"] },
+  expiraEn: {
+    type: "string",
+    format: "date-time",
+    nullable: true,
+    description: "Hasta cuándo queda apartado el stock. Si venció lo dice estadoPago: no usar el reloj del navegador.",
+  },
+};
+
 module.exports = {
   openapi: "3.0.3",
   info: {
@@ -81,6 +108,7 @@ module.exports = {
     { name: "Admin - Imagenes", description: "Fotos de producto: subida, orden y borrado" },
     { name: "Carrito", description: "Cotizacion del carrito y zonas de envio" },
     { name: "Pedidos", description: "Creacion de pedidos y consulta publica de su estado" },
+    { name: "Admin - Pedidos", description: "Consulta de pedidos desde el panel" },
   ],
   components: {
     parameters: {
@@ -963,6 +991,137 @@ module.exports = {
             },
           },
           totales: { $ref: "#/components/schemas/TotalesCotizacion" },
+        },
+      },
+      EstadoPago: {
+        type: "string",
+        description: "Sale de TRANSICIONES_PAGO: es la misma lista que valida la API.",
+        enum: Object.keys(TRANSICIONES_PAGO),
+      },
+      EstadoPedido: {
+        type: "string",
+        description: "Sale de TRANSICIONES_PREPARACION: es la misma lista que valida la API.",
+        enum: Object.keys(TRANSICIONES_PREPARACION),
+      },
+      PedidoAdminFila: {
+        type: "object",
+        description: "Fila de la lista de pedidos del panel. Sin contacto ni dirección: van en el detalle.",
+        required: Object.keys(CAMPOS_PEDIDO_PANEL),
+        properties: CAMPOS_PEDIDO_PANEL,
+      },
+      PedidoAdminDetalle: {
+        type: "object",
+        description:
+          "Detalle de un pedido en el panel. No incluye datos internos del procesador de pagos. Lo que escribe la clienta (nombre, dirección, notas) se muestra siempre como texto.",
+        required: [
+          ...Object.keys(CAMPOS_PEDIDO_PANEL),
+          "cliente",
+          "entrega",
+          "totales",
+          "pago",
+          "notasCliente",
+          "notasInternas",
+          "items",
+          "eventos",
+        ],
+        properties: {
+          ...CAMPOS_PEDIDO_PANEL,
+          cliente: {
+            type: "object",
+            required: ["nombre", "email", "telefono", "documento"],
+            properties: {
+              nombre: { type: "string" },
+              email: { type: "string", format: "email" },
+              telefono: { type: "string" },
+              documento: { type: "string", nullable: true },
+            },
+          },
+          entrega: {
+            type: "object",
+            required: ["metodo", "zona", "direccion", "seguimiento"],
+            properties: {
+              metodo: { type: "string", enum: ["envio", "retiro"] },
+              zona: { type: "string", nullable: true, description: "Nombre de la zona. Null si es para retirar." },
+              direccion: {
+                type: "object",
+                nullable: true,
+                description: "Null si es para retirar. La base no exige cada campo: mostrar un guion si alguno falta.",
+                required: ["calle", "numero", "extra", "ciudad", "provincia", "cp"],
+                properties: {
+                  calle: { type: "string", nullable: true },
+                  numero: { type: "string", nullable: true },
+                  extra: { type: "string", nullable: true },
+                  ciudad: { type: "string", nullable: true },
+                  provincia: { type: "string", nullable: true },
+                  cp: { type: "string", nullable: true },
+                },
+              },
+              seguimiento: { type: "string", nullable: true },
+            },
+          },
+          totales: {
+            type: "object",
+            description: "Todos como cadena decimal. No operar en el frontend.",
+            required: ["subtotal", "descuentoCupon", "ajusteMedioPago", "costoEnvio", "total"],
+            properties: {
+              subtotal: { type: "string", example: "36500.00" },
+              descuentoCupon: { type: "string", example: "0.00" },
+              ajusteMedioPago: {
+                type: "string",
+                description: "Descuento por medio de pago. Se RESTA del subtotal.",
+                example: "3650.00",
+              },
+              costoEnvio: { type: "string", example: "6500.00" },
+              total: { type: "string", example: "39350.00" },
+            },
+          },
+          pago: {
+            type: "object",
+            required: ["pagoId", "metodo", "comprobanteInformadoEn"],
+            properties: {
+              pagoId: { type: "string", nullable: true, description: "Id del pago en Mercado Pago." },
+              metodo: { type: "string", nullable: true },
+              comprobanteInformadoEn: {
+                type: "string",
+                format: "date-time",
+                nullable: true,
+                description: "Cuándo la clienta avisó que transfirió.",
+              },
+            },
+          },
+          notasCliente: { type: "string", nullable: true },
+          notasInternas: { type: "string", nullable: true },
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["producto", "variante", "sku", "precioUnitario", "cantidad", "subtotal"],
+              properties: {
+                producto: { type: "string" },
+                variante: { type: "string" },
+                sku: { type: "string", nullable: true },
+                precioUnitario: { type: "string" },
+                cantidad: { type: "integer" },
+                subtotal: { type: "string" },
+              },
+            },
+          },
+          eventos: {
+            type: "array",
+            items: {
+              type: "object",
+              required: ["campo", "estadoAnterior", "estadoNuevo", "origen", "usuarioId", "detalle", "creadoEn"],
+              properties: {
+                campo: { type: "string", enum: ["pago", "preparacion", "aviso"] },
+                estadoAnterior: { type: "string", nullable: true },
+                estadoNuevo: { type: "string" },
+                origen: { type: "string", enum: ["checkout", "webhook", "job", "panel", "cliente"] },
+                usuarioId: { type: "integer", nullable: true },
+                detalle: { type: "string", nullable: true },
+                creadoEn: { type: "string", format: "date-time" },
+              },
+            },
+          },
         },
       },
     },
