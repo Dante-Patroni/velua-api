@@ -4493,7 +4493,357 @@
       }
     }
   ]
-}
+},
+    {
+      "name": "Admin - Pedidos",
+      "description": "Consulta de pedidos del panel (t13a). Usa el pedido que crea el grupo Pedidos (ped_numero).",
+      "item": [
+        {
+          "name": "GET /admin/pedidos sin sesion",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('No se guarda en caché', () => pm.expect(pm.response.headers.get('Cache-Control')).to.eql('no-store'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login (pedidos del panel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{admin_email}}\",\"password\":\"{{admin_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "El grupo hace su propio login para no depender del orden de los demas grupos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Tiene permiso de ver pedidos', () => pm.expect(pm.response.json().permisos).to.include('PEDIDOS_VER'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Trae la primera página de 20', () => pm.expect(r.meta).to.include({ pagina: 1, limite: 20 }));",
+                  "pm.test('La lista muestra lo mínimo: sin mail, teléfono ni dirección', () => r.datos.forEach((d) => pm.expect(Object.keys(d).sort()).to.eql([\"clienteNombre\", \"creadoEn\", \"estadoPago\", \"estadoPedido\", \"expiraEn\", \"id\", \"medioPago\", \"metodoEntrega\", \"numero\", \"total\"])));",
+                  "const p = r.datos.find((d) => d.numero === pm.collectionVariables.get('ped_numero'));",
+                  "pm.test('Incluye el pedido creado en el grupo Pedidos', () => pm.expect(p).to.be.an('object'));",
+                  "if (p) pm.collectionVariables.set('ped_id', p.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos filtrado y paginado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos?estadoPago=pendiente&limite=1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos"
+              ],
+              "query": [
+                {
+                  "key": "estadoPago",
+                  "value": "pendiente"
+                },
+                {
+                  "key": "limite",
+                  "value": "1"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Respeta el límite', () => { pm.expect(r.meta.limite).to.eql(1); pm.expect(r.datos.length).to.be.at.most(1); });",
+                  "pm.test('Solo trae el estado pedido', () => r.datos.forEach((d) => pm.expect(d.estadoPago).to.eql('pendiente')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos con limite mayor al maximo",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos?limite=51",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos"
+              ],
+              "query": [
+                {
+                  "key": "limite",
+                  "value": "51"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el límite', () => pm.expect(pm.response.json().details).to.have.property('limite'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos con estado inventado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos?estadoPedido=inventado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos"
+              ],
+              "query": [
+                {
+                  "key": "estadoPedido",
+                  "value": "inventado"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el estado', () => pm.expect(pm.response.json().details).to.have.property('estadoPedido'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos/{id}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Es el pedido creado', () => pm.expect(r.numero).to.eql(pm.collectionVariables.get('ped_numero')));",
+                  "pm.test('Trae el contacto', () => pm.expect(r.cliente).to.have.all.keys('nombre', 'email', 'telefono', 'documento'));",
+                  "pm.test('Trae los totales con los descuentos', () => pm.expect(r.totales).to.have.all.keys('subtotal', 'descuentoCupon', 'ajusteMedioPago', 'costoEnvio', 'total'));",
+                  "pm.test('Trae los ítems y el historial', () => { pm.expect(r.items.length).to.be.at.least(1); pm.expect(r.eventos[0].estadoNuevo).to.eql('pendiente'); });",
+                  "pm.test('No expone la preferencia de Mercado Pago', () => pm.expect(pm.response.text()).to.not.include('mpPreferenceId'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos/{id} inexistente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/999999",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "999999"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Dice NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos/{id} mal formado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/abc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "abc"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el id', () => pm.expect(pm.response.json().details).to.have.property('id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (pedidos del panel)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cierra la sesión', () => pm.expect(pm.response.code).to.be.oneOf([200, 204]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
   ],
   "variable": [
     {
