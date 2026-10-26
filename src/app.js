@@ -7,10 +7,11 @@ const cookieParser = require("cookie-parser");
 const { limitadorGlobal } = require("./middlewares/rateLimitMiddleware");
 const { normalizarUnicode } = require("./middlewares/normalizarUnicode");
 const { registroPeticiones } = require("./middlewares/registroPeticiones");
+const { leerSaltosProxy } = require("./config/proxy");
 
 const app = express();
 
-app.set("trust proxy", 1);
+app.set("trust proxy", leerSaltosProxy(process.env.TRUST_PROXY_SALTOS));
 // Primero de todo: así también quedan registradas las peticiones que rechazan CORS o el JSON.
 app.use(registroPeticiones);
 
