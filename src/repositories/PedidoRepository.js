@@ -51,7 +51,27 @@ class PedidoRepository {
   async guardarPreferencia(_pedidoId, _preferenciaId, _opciones) {
     throw new Error("Metodo guardarPreferencia no implementado");
   }
+
+  /**
+   * @description Lista pedidos para el panel, del más nuevo al más viejo.
+   * @param {{estadoPago: string|null, estadoPedido: string|null, pagina: number,
+   *   limite: number}} _filtros - Filtros y página.
+   * @returns {Promise<{filas: Object[], total: number}>} Una página y el total.
+   */
+  async listarParaPanel(_filtros) {
+    throw new Error("Metodo listarParaPanel no implementado");
+  }
+
+  /**
+   * @description Busca un pedido por id con sus ítems, eventos y zona de envío.
+   * @param {number} _id - Id del pedido.
+   * @returns {Promise<Object|null>} Pedido crudo, o null si no existe.
+   */
+  async buscarParaPanel(_id) {
+    throw new Error("Metodo buscarParaPanel no implementado");
+  }
 }
+
 /**
  * @description Interfaz del repositorio que se usa dentro de una transacción.
  *

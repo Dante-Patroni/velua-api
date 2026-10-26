@@ -279,6 +279,63 @@ class SequelizePedidoRepository extends PedidoRepository {
   }
 
   /**
+   * @description Lista pedidos para el panel. Pide a la base solo las columnas de
+   * la lista: los datos de contacto no salen de MySQL si no hacen falta.
+   * @param {{estadoPago: string|null, estadoPedido: string|null, pagina: number,
+   *   limite: number}} filtros - Filtros y página.
+   * @returns {Promise<{filas: Object[], total: number}>} Una página y el total.
+   */
+  async listarParaPanel({ estadoPago, estadoPedido, pagina, limite }) {
+    const where = {};
+    if (estadoPago) where.estadoPago = estadoPago;
+    if (estadoPedido) where.estadoPedido = estadoPedido;
+
+    const { rows, count } = await this.models.Pedido.findAndCountAll({
+      attributes: [
+        "id",
+        "numero",
+        "creadoEn",
+        "clienteNombre",
+        "total",
+        "medioPago",
+        "estadoPago",
+        "estadoPedido",
+        "metodoEntrega",
+        "expiraEn",
+      ],
+      where,
+      order: [
+        ["creadoEn", "DESC"],
+        ["id", "DESC"],
+      ],
+      limit: limite,
+      offset: (pagina - 1) * limite,
+    });
+    return { filas: rows.map((r) => r.toJSON()), total: count };
+  }
+
+  /**
+   * @description Busca un pedido por id con sus ítems, su historial de eventos y
+   * el nombre de la zona de envío.
+   * @param {number} id - Id del pedido.
+   * @returns {Promise<Object|null>} Pedido crudo, o null.
+   */
+  async buscarParaPanel(id) {
+    const pedido = await this.models.Pedido.findByPk(id, {
+      include: [
+        { model: this.models.PedidoItem, as: "items" },
+        { model: this.models.PedidoEvento, as: "eventos" },
+        { model: this.models.ZonaEnvio, as: "zonaEnvio", attributes: ["id", "nombre"] },
+      ],
+      order: [
+        [{ model: this.models.PedidoItem, as: "items" }, "id", "ASC"],
+        [{ model: this.models.PedidoEvento, as: "eventos" }, "id", "ASC"],
+      ],
+    });
+    return pedido ? pedido.toJSON() : null;
+  }
+
+  /**
    * @description Lista los pedidos con la reserva vencida, con los datos que el job
    * necesita para decidir qué hacer con cada uno.
    * @param {Date} ahora - Momento de referencia.
