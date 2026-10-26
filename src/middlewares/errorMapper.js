@@ -97,6 +97,11 @@ function manejarErrorHttp(error, res) {
   const codigo = obtenerCodigoError(error);
   const status = ERROR_HTTP_MAP[codigo] || 500;
 
+  // Para el registro de peticiones: el código de error, nunca el mensaje ni el detalle.
+  if (res.locals) {
+    res.locals.codigoError = status === 500 ? "ERROR_INTERNO" : codigo;
+  }
+
   if (status === 500) {
     // OJO: nunca loguear el error crudo de un proveedor de pagos.
     // Puede traer el access token o el payload completo. Ver AGENTS.md 4.6.

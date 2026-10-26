@@ -7,6 +7,9 @@ const rateLimit = require("express-rate-limit");
  * @returns {import("express").Response} Respuesta 429 con codigo de dominio.
  */
 const handlerLimiteSuperado = (req, res) => {
+  // El registro de peticiones lee el código de acá. Este handler responde sin pasar
+  // por manejarErrorHttp: sin esta línea, el 429 quedaría registrado con error null.
+  res.locals.codigoError = "LIMITE_SUPERADO";
   return res.status(429).json({ error: "LIMITE_SUPERADO" });
 };
 
@@ -110,6 +113,7 @@ const limitadorCambioContrasena = rateLimit({
 });
 
 module.exports = {
+  handlerLimiteSuperado,
   limitadorLogin,
   limitadorGlobal,
   limitadorPedidos,
