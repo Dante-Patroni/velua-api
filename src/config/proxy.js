@@ -8,6 +8,11 @@
  *
  * Solo se acepta un entero de 0 a 3. Nunca `true`: confiar en cualquier proxy
  * deja que el cliente elija su IP mandando su propio X-Forwarded-For.
+ *  
+ * Tampoco hay que poner MÁS saltos de los que hay delante de la API: el que
+ * sobra lo cuenta Express sobre X-Forwarded-For, y ese valor lo escribe la
+ * clienta. Con un salto de más, cualquiera elige su IP y esquiva los
+ * limitadores. Poner de menos es seguro (se registra la IP de un proxy).
  */
 const SALTOS_POR_DEFECTO = 1;
 const SALTOS_VALIDOS = /^[0-3]$/;
