@@ -10,6 +10,10 @@ contraseña, la restablece a mano el administrador. El login muestra
 - Tener a mano el mail exacto de la cuenta.
 
 ## Pasos
+
+0. Comprobar la cuenta en Railway → MySQL → Data:
+   `SELECT id, nombre, rol, activo FROM usuarios WHERE email = '<mail>';`
+   Tiene que devolver 1 fila con `activo = 1`. Si no, no seguir.
 1. En velua-api, en tu máquina: `node scripts/hash-contrasena.js`.
    - Pide el mail y una contraseña temporal **por teclado, sin mostrarla**. No
      pasarla como argumento: quedaría en el historial y en la lista de procesos.
