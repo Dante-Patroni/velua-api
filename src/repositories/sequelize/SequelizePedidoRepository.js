@@ -237,6 +237,23 @@ class SequelizePedidoTransaccion extends PedidoTransaccion {
       transaction: this.t,
     });
   }
+  
+  /**
+   * @description Guarda el código de seguimiento del envío.
+   *
+   * Recibe solo el código y arma el objeto acá: aunque quien llame pase algo de
+   * más, este método no puede tocar otra columna del pedido.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {string} seguimiento - Código del correo, ya validado.
+   * @returns {Promise<void>}
+   */
+  async guardarSeguimiento(pedidoId, seguimiento) {
+    await this.models.Pedido.update(
+      { seguimiento },
+      { where: { id: pedidoId }, transaction: this.t }
+    );
+  }
 }
 
 /**
