@@ -10,6 +10,10 @@ const RESULTADOS_PAGO = Object.freeze(["aprobado", "rechazado"]);
 /** Estados de preparación a los que se avanza a mano desde el panel. */
 const AVANCES_PREPARACION = Object.freeze(["en_preparacion", "enviado", "entregado"]);
 
+
+/** Código de seguimiento del correo: letras, números y guiones. La columna admite 120. */
+const SEGUIMIENTO_VALIDO = /^[A-Za-z0-9-]{6,40}$/;
+
 /** Estados de pago en los que se puede cancelar a mano. Un pago aprobado se devuelve (t13c). */
 const PAGOS_CANCELABLES = Object.freeze(["pendiente", "rechazado"]);
 
@@ -502,4 +506,4 @@ class PedidoEstadoService {
   }
 }
 
-module.exports = { PedidoEstadoService, estaVencido, AVANCES_PREPARACION };
+module.exports = { PedidoEstadoService, estaVencido, AVANCES_PREPARACION, SEGUIMIENTO_VALIDO };
