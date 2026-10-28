@@ -237,7 +237,6 @@ class SequelizePedidoTransaccion extends PedidoTransaccion {
       transaction: this.t,
     });
   }
-  
   /**
    * @description Guarda el código de seguimiento del envío.
    *

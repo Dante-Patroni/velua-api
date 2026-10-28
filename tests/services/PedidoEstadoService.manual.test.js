@@ -374,4 +374,42 @@ describe("cancelarManual", () => {
     expect(repo.estado.pedidos[0].estadoPago).toBe("pendiente");
     expect(repo.estado.eventos).toEqual([]);
   });
+
+
+  test("no cancela un pedido con link de Mercado Pago", async () => {
+    const repo = sinPagar({ mpPreferenceId: "pref-123", expiraEn: new Date("2026-10-07T15:30:00.000Z") });
+
+    await expect(
+      servicio(repo).cancelarManual(1, { motivo: MOTIVO, usuarioId: ADMIN }),
+    ).rejects.toThrow("PAGO_EN_CURSO");
+
+    expect(repo.tx.reponerStock).not.toHaveBeenCalled();
+  });
+
+  test("tampoco con la reserva vencida: puede haber un pago en proceso", async () => {
+    const repo = sinPagar({ mpPreferenceId: "pref-123", expiraEn: new Date("2026-10-07T14:00:00.000Z") });
+
+    await expect(
+      servicio(repo).cancelarManual(1, { motivo: MOTIVO, usuarioId: ADMIN }),
+    ).rejects.toThrow("PAGO_EN_CURSO");
+
+    expect(repo.estado.pedidos[0].estadoPago).toBe("pendiente");
+  });
+
+  test("cancela un pedido de Mercado Pago que nunca tuvo link", async () => {
+    const repo = sinPagar({ mpPreferenceId: null });
+
+    const r = await servicio(repo).cancelarManual(1, { motivo: MOTIVO, usuarioId: ADMIN });
+
+    expect(r.cancelado).toBe(true);
+  });
+
+  test("un motivo con punto final no queda con dos puntos", async () => {
+    const repo = sinPagar();
+
+    await servicio(repo).cancelarManual(1, { motivo: "Pidió cancelar.", usuarioId: ADMIN });
+
+    expect(repo.estado.eventos[0].detalle).toContain("Motivo: Pidió cancelar.");
+    expect(repo.estado.eventos[0].detalle).not.toContain("..");
+  });
 });

@@ -188,6 +188,11 @@ pedido que cumple todo esto:
   (el booleano, no el texto): la dueña revisó el banco y el dinero no llegó. Sin eso,
   `COMPROBANTE_INFORMADO`.
 
+- El pedido nunca tuvo link de Mercado Pago. Si lo tuvo, `PAGO_EN_CURSO`: lo cancela
+  el job de vencimiento, que antes consulta a Mercado Pago, porque un pago en proceso
+  puede aprobarse después del vencimiento. Los pedidos que el job deja para revisión
+  se resuelven aparte (t54).
+
 Cancelar dos veces no es un error y no repone dos veces.
 
 ### Interfaz del servicio
@@ -224,6 +229,7 @@ Los cambios de pago (webhook y vencimiento) están en `registrarResultadoPago` y
 | `SEGUIMIENTO_REQUERIDO` | 400  |
 | `PEDIDO_PAGADO`         | 409  |
 | `COMPROBANTE_INFORMADO` | 409  |
+| `PAGO_EN_CURSO`         | 409  |
 
 ---
 
@@ -241,3 +247,4 @@ Estos casos son obligatorios, están en el `AGENTS.md` sección 10:
   confirmación.
 - El motivo de una cancelación no aparece en el mail a la clienta.
 - El operador no tiene `PEDIDOS_CANCELAR`.
+- No se cancela a mano un pedido con link de Mercado Pago, aunque haya vencido.

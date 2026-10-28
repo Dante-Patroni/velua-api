@@ -4,7 +4,11 @@ const { body, param, query } = require("express-validator");
 const db = require("../models");
 const SequelizePedidoRepository = require("../repositories/sequelize/SequelizePedidoRepository");
 const { PedidoAdminService } = require("../services/PedidoAdminService");
-  const { PedidoEstadoService, AVANCES_PREPARACION, SEGUIMIENTO_VALIDO } = require("../services/PedidoEstadoService");
+const {
+  PedidoEstadoService,
+  AVANCES_PREPARACION,
+  SEGUIMIENTO_VALIDO,
+} = require("../services/PedidoEstadoService");
 const PedidoAdminController = require("../controllers/PedidoAdminController");
 const { authMiddleware } = require("../middlewares/authMiddleware");
 const { soloPermisos } = require("../middlewares/roleMiddleware");
@@ -231,6 +235,8 @@ router.patch(
  *       pagado se devuelve primero. Devuelve el stock una sola vez y encola un mail
  *       a la clienta, sin el motivo. Si la clienta informó una transferencia, hace
  *       falta confirmaSinPago en true. Cancelar dos veces no es un error.
+ *       Un pedido con link de Mercado Pago no se cancela a mano: lo cancela el job
+ *       al vencer, después de consultar a Mercado Pago.
  *     security:
  *       - cookieAuth: []
  *     parameters:
@@ -268,8 +274,9 @@ router.patch(
  *         $ref: '#/components/responses/NoEncontrado'
  *       409:
  *         description: >
- *           PEDIDO_PAGADO (primero hay que devolver el pago) o
- *           COMPROBANTE_INFORMADO (falta confirmaSinPago).
+ *           PEDIDO_PAGADO (primero hay que devolver el pago), COMPROBANTE_INFORMADO
+ *           (falta confirmaSinPago) o PAGO_EN_CURSO (el pedido tiene link de
+ *           Mercado Pago: lo cancela el job).
  *         content:
  *           application/json:
  *             schema:
@@ -281,6 +288,9 @@ router.patch(
  *               comprobante:
  *                 value:
  *                   error: COMPROBANTE_INFORMADO
+ *               enCurso:
+ *                 value:
+ *                   error: PAGO_EN_CURSO
  */
 router.post(
   "/admin/pedidos/:id/cancelacion",

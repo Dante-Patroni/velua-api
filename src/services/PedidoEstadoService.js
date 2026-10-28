@@ -338,20 +338,20 @@ class PedidoEstadoService {
   }
 
   /**
- * @description Avanza la preparación de un pedido desde el panel.
- *
- * Reglas de docs/maquina-estados.md: solo se avanza con el pago aprobado, y a
- * "enviado" hace falta el código de seguimiento si el método es envío. Repetir el
- * estado actual (un doble clic) no hace nada y no es un error.
- *
- * @param {number} pedidoId - Id del pedido.
- * @param {Object} cambio - Datos del cambio.
- * @param {string} cambio.hacia - en_preparacion, enviado o entregado.
- * @param {string|null} [cambio.seguimiento] - Código del correo, ya validado.
- * @param {number} cambio.usuarioId - Quién lo hace, para la bitácora.
- * @returns {Promise<{cambiado: boolean, numero: string, motivo?: string}>} Si el estado cambió y el número del pedido; motivo YA_REGISTRADO si ya estaba en ese estado.
- * @throws {Error} NO_ENCONTRADO, TRANSICION_INVALIDA, PAGO_NO_APROBADO, SEGUIMIENTO_REQUERIDO
- */
+   * @description Avanza la preparación de un pedido desde el panel.
+   *
+   * Reglas de docs/maquina-estados.md: solo se avanza con el pago aprobado, y a
+   * "enviado" hace falta el código de seguimiento si el método es envío. Repetir el
+   * estado actual (un doble clic) no hace nada y no es un error.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} cambio - Datos del cambio.
+   * @param {string} cambio.hacia - en_preparacion, enviado o entregado.
+   * @param {string|null} [cambio.seguimiento] - Código del correo, ya validado.
+   * @param {number} cambio.usuarioId - Quién lo hace, para la bitácora.
+   * @returns {Promise<{cambiado: boolean, numero: string, motivo?: string}>} Si el estado cambió y el número del pedido; motivo YA_REGISTRADO si ya estaba en ese estado.
+   * @throws {Error} NO_ENCONTRADO, TRANSICION_INVALIDA, PAGO_NO_APROBADO, SEGUIMIENTO_REQUERIDO
+   */
   async cambiarEstadoPreparacion(pedidoId, { hacia, seguimiento = null, usuarioId }) {
     if (!AVANCES_PREPARACION.includes(hacia)) {
       throw new Error("TRANSICION_INVALIDA");
@@ -426,7 +426,7 @@ class PedidoEstadoService {
    * @param {boolean} [cancelacion.confirmaSinPago] - Verificó que la transferencia avisada no llegó.
    * @param {number} cancelacion.usuarioId - Quién cancela, para la bitácora.
    * @returns {Promise<{cancelado: boolean, numero: string, motivo?: string}>} Si se canceló y el número del pedido; motivo YA_CANCELADO si ya estaba cancelado.
-   * @throws {Error} DATOS_INVALIDOS, NO_ENCONTRADO, PEDIDO_PAGADO, COMPROBANTE_INFORMADO, TRANSICION_INVALIDA
+   * @throws {Error} DATOS_INVALIDOS, NO_ENCONTRADO, PEDIDO_PAGADO, COMPROBANTE_INFORMADO, TRANSICION_INVALIDA, PAGO_EN_CURSO
    */
   async cancelarManual(pedidoId, { motivo, confirmaSinPago = false, usuarioId }) {
     const motivoLimpio = String(motivo ?? "").trim();
@@ -453,6 +453,12 @@ class PedidoEstadoService {
       if (pedido.estadoPedido !== "nuevo") {
         throw new Error("TRANSICION_INVALIDA");
       }
+      // Si alguna vez se creó un link de Mercado Pago, pudo haber un pago, incluso
+      // uno en proceso que se apruebe después del vencimiento. Esos pedidos los
+      // cancela el job, que antes le pregunta a Mercado Pago.
+      if (pedido.mpPreferenceId) {
+        throw new Error("PAGO_EN_CURSO");
+      }
       if (pedido.comprobanteInformadoEn && !confirmaSinPago) {
         throw new Error("COMPROBANTE_INFORMADO");
       }
@@ -476,7 +482,7 @@ class PedidoEstadoService {
         estadoNuevo: "cancelado",
         origen: "panel",
         usuarioId,
-        detalle: `Cancelado a mano, stock devuelto. Motivo: ${motivoLimpio}.${confirmacion}`,
+        detalle: `Cancelado a mano, stock devuelto. Motivo: ${motivoLimpio.replace(/\.+$/, "")}.${confirmacion}`,
       });
       await tx.registrarEvento({
         pedidoId: pedido.id,
