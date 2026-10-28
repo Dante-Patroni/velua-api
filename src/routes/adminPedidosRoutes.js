@@ -1,9 +1,10 @@
 const express = require("express");
-const { param, query } = require("express-validator");
+const { body, param, query } = require("express-validator");
 
 const db = require("../models");
 const SequelizePedidoRepository = require("../repositories/sequelize/SequelizePedidoRepository");
 const { PedidoAdminService } = require("../services/PedidoAdminService");
+const { PedidoEstadoService, AVANCES_PREPARACION } = require("../services/PedidoEstadoService");
 const PedidoAdminController = require("../controllers/PedidoAdminController");
 const { authMiddleware } = require("../middlewares/authMiddleware");
 const { soloPermisos } = require("../middlewares/roleMiddleware");
@@ -13,8 +14,10 @@ const { TRANSICIONES_PAGO, TRANSICIONES_PREPARACION } = require("../services/tra
 
 const router = express.Router();
 
+const repositorio = new SequelizePedidoRepository(db);
 const controller = new PedidoAdminController(
-  new PedidoAdminService(new SequelizePedidoRepository(db))
+  new PedidoAdminService(repositorio),
+  new PedidoEstadoService(repositorio)
 );
 
 /** Máximo de pedidos por página: nadie puede pedir todos los pedidos de una vez. */
@@ -38,8 +41,43 @@ const validarListado = [
   manejarErroresValidacion,
 ];
 
-const validarId = [
-  param("id").isInt({ min: 1 }).withMessage("Id inválido").toInt(),
+/** Código de seguimiento del correo: letras, números y guiones. La columna admite 120. */
+const SEGUIMIENTO_VALIDO = /^[A-Za-z0-9-]{6,40}$/;
+
+const idRuta = param("id").isInt({ min: 1 }).withMessage("Id inválido").toInt();
+
+const validarId = [idRuta, manejarErroresValidacion];
+
+const validarPreparacion = [
+  idRuta,
+  body("estado")
+    .isString()
+    .bail()
+    .isIn(AVANCES_PREPARACION)
+    .withMessage("Estado de preparación no permitido"),
+  body("seguimiento")
+    .optional()
+    .isString()
+    .bail()
+    .trim()
+    .matches(SEGUIMIENTO_VALIDO)
+    .withMessage("El seguimiento lleva de 6 a 40 letras, números o guiones"),
+  manejarErroresValidacion,
+];
+
+const validarCancelacion = [
+  idRuta,
+  body("motivo")
+    .isString()
+    .withMessage("El motivo es obligatorio")
+    .bail()
+    .trim()
+    .isLength({ min: 5, max: 500 })
+    .withMessage("El motivo lleva de 5 a 500 caracteres"),
+  body("confirmaSinPago")
+    .optional()
+    .custom((valor) => typeof valor === "boolean")
+    .withMessage("confirmaSinPago tiene que ser true o false"),
   manejarErroresValidacion,
 ];
 /**
@@ -130,6 +168,22 @@ router.get(
   soloPermisos(PERMISOS.PEDIDOS_VER),
   validarId,
   controller.detalle
+);
+
+router.patch(
+  "/admin/pedidos/:id/preparacion",
+  authMiddleware,
+  soloPermisos(PERMISOS.PEDIDOS_GESTIONAR),
+  validarPreparacion,
+  controller.cambiarPreparacion
+);
+
+router.post(
+  "/admin/pedidos/:id/cancelacion",
+  authMiddleware,
+  soloPermisos(PERMISOS.PEDIDOS_CANCELAR),
+  validarCancelacion,
+  controller.cancelar
 );
 
 module.exports = router;

@@ -502,4 +502,4 @@ class PedidoEstadoService {
   }
 }
 
-module.exports = { PedidoEstadoService, estaVencido };
+module.exports = { PedidoEstadoService, estaVencido, AVANCES_PREPARACION };
