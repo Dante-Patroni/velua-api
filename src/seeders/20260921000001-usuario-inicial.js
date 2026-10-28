@@ -2,6 +2,7 @@
 
 const bcrypt = require("bcryptjs");
 const { COSTO_BCRYPT } = require("../services/AuthService");
+const { exigirEntornoDeDesarrollo } = require("../config/soloDesarrollo");
 
 const LARGO_MINIMO = 12;
 
@@ -52,6 +53,7 @@ module.exports = {
    * @returns {Promise<void>}
    */
   async down(queryInterface) {
+    exigirEntornoDeDesarrollo("Borrar el usuario inicial");
     const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
     if (email) {
       await queryInterface.bulkDelete("usuarios", { email }, {});
