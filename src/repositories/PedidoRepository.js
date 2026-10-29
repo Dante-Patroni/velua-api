@@ -212,6 +212,17 @@ class PedidoTransaccion {
   async guardarDatosPago(_pedidoId, _datos) {
     throw new Error("Metodo guardarDatosPago no implementado");
   }
+
+  /**
+   * @description Guarda el código de seguimiento del envío. Solo lo llama
+   * PedidoEstadoService, al pasar el pedido a enviado.
+   * @param {number} _pedidoId - Id del pedido.
+   * @param {string} _seguimiento - Código del correo, ya validado.
+   * @returns {Promise<void>}
+   */
+  async guardarSeguimiento(_pedidoId, _seguimiento) {
+    throw new Error("Metodo guardarSeguimiento no implementado");
+  }
 }
 
 module.exports = { PedidoRepository, PedidoTransaccion };

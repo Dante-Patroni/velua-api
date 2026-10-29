@@ -4531,6 +4531,100 @@
           ]
         },
         {
+          "name": "PATCH /admin/pedidos/{id}/preparacion sin sesion",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/1/preparacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "1",
+                "preparacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"estado\":\"en_preparacion\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/pedidos/{id}/cancelacion sin sesion",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/1/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "1",
+                "cancelacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\":\"Prueba sin sesión\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "POST /auth/login (pedidos del panel)",
           "request": {
             "method": "POST",
@@ -4809,6 +4903,532 @@
                 "exec": [
                   "pm.test('Responde 400', () => pm.response.to.have.status(400));",
                   "pm.test('Señala el id', () => pm.expect(pm.response.json().details).to.have.property('id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH preparacion con estado no permitido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/preparacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "preparacion"
+              ]
+            },
+            "description": "Cancelar tiene su propia ruta y su propio permiso: por esta no se puede.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"estado\":\"cancelado\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el estado', () => pm.expect(pm.response.json().details).to.have.property('estado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH preparacion con seguimiento invalido",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/preparacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "preparacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"estado\":\"enviado\",\"seguimiento\":\"AB<script>1\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el seguimiento', () => pm.expect(pm.response.json().details).to.have.property('seguimiento'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH preparacion de un pedido sin pagar",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/preparacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "preparacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"estado\":\"en_preparacion\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve PAGO_NO_APROBADO', () => pm.expect(pm.response.json().error).to.eql('PAGO_NO_APROBADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion sin motivo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "cancelacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el motivo', () => pm.expect(pm.response.json().details).to.have.property('motivo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion con un motivo de puros espacios",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "cancelacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\":\"       \"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el motivo', () => pm.expect(pm.response.json().details).to.have.property('motivo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion con confirmaSinPago como texto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "cancelacion"
+              ]
+            },
+            "description": "El texto \"true\" no es una confirmación: solo vale el booleano.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"Prueba Newman de cancelación\", \"confirmaSinPago\": \"true\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala la confirmación', () => pm.expect(pm.response.json().details).to.have.property('confirmaSinPago'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion de un pedido inexistente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/999999/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "999999",
+                "cancelacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"Prueba Newman de cancelación\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Dice NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion (cancelar el pedido de prueba)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "cancelacion"
+              ]
+            },
+            "description": "Manda campos de más (usuarioId, estadoPago): la API los ignora y el autor sale de la sesión.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"Prueba Newman de cancelación\", \"usuarioId\": 999999, \"estadoPago\": \"aprobado\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cancela el pedido creado', () => pm.expect(pm.response.json()).to.eql({ cancelado: true, numero: pm.collectionVariables.get('ped_numero') }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion otra vez",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "cancelacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"Prueba Newman de cancelación\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Avisa que ya estaba cancelado', () => pm.expect(pm.response.json()).to.include({ cancelado: false, motivo: 'YA_CANCELADO' }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos/{id} despues de cancelar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Quedó cancelado', () => { pm.expect(r.estadoPago).to.eql('cancelado'); pm.expect(r.estadoPedido).to.eql('cancelado'); });",
+                  "const delPanel = r.eventos.filter((e) => e.origen === 'panel');",
+                  "pm.test('La bitácora tiene un evento por campo, aunque se canceló dos veces', () => pm.expect(delPanel.length).to.eql(2));",
+                  "pm.test('El motivo quedó en la bitácora', () => pm.expect(delPanel.some((e) => String(e.detalle).includes('Prueba Newman de cancelación'))).to.eql(true));",
+                  "pm.test('El usuarioId del body no se usó', () => pm.expect(pm.response.text()).to.not.include('999999'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock despues de cancelar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{ped_producto_id}}"
+              ]
+            },
+            "description": "El grupo Pedidos ya había vuelto el stock al original a mano; cancelar suma la unidad apartada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "const original = Number(pm.collectionVariables.get('ped_stock_original'));",
+                  "pm.test('Devolvió la unidad una sola vez', () => pm.expect(v.stock).to.eql(original + 1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH stock (restaurar despues de cancelar)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}/variantes/{{ped_variante_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{ped_producto_id}}",
+                "variantes",
+                "{{ped_variante_id}}"
+              ]
+            },
+            "description": "Para que correr Newman muchas veces no cambie el catalogo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": {{ped_stock_original}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "pm.test('El stock volvio al original', () => pm.expect(v.stock).to.eql(Number(pm.collectionVariables.get('ped_stock_original'))));"
                 ]
               }
             }

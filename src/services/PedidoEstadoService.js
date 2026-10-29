@@ -7,6 +7,32 @@ const {
 /** Resultados del procesador que mueven el estado de pago. */
 const RESULTADOS_PAGO = Object.freeze(["aprobado", "rechazado"]);
 
+/** Estados de preparación a los que se avanza a mano desde el panel. */
+const AVANCES_PREPARACION = Object.freeze(["en_preparacion", "enviado", "entregado"]);
+
+
+/** Código de seguimiento del correo: letras, números y guiones. La columna admite 120. */
+const SEGUIMIENTO_VALIDO = /^[A-Za-z0-9-]{6,40}$/;
+
+/** Estados de pago en los que se puede cancelar a mano. Un pago aprobado se devuelve (t13c). */
+const PAGOS_CANCELABLES = Object.freeze(["pendiente", "rechazado"]);
+
+/**
+ * @description Devuelve al stock las unidades de un pedido, en orden de variante,
+ * igual que el checkout bloquea, para que dos transacciones no se traben.
+ * @param {Object} tx - Repositorio transaccional.
+ * @param {number} pedidoId - Id del pedido.
+ * @returns {Promise<void>}
+ */
+const reponerStockDelPedido = async (tx, pedidoId) => {
+  const items = (await tx.listarItems(pedidoId))
+    .filter((i) => Number.isInteger(i.varianteId))
+    .sort((a, b) => a.varianteId - b.varianteId);
+  for (const item of items) {
+    await tx.reponerStock(item.varianteId, item.cantidad);
+  }
+};
+
 /**
  * @description Indica si la reserva de un pedido está vencida y se puede cancelar.
  *
@@ -73,14 +99,7 @@ class PedidoEstadoService {
       validarTransicion("pago", pedido.estadoPago, "cancelado");
       validarTransicion("preparacion", pedido.estadoPedido, "cancelado");
 
-      // En orden de variante, igual que el checkout, para que dos transacciones
-      // que tocan las mismas variantes no se traben entre sí.
-      const items = (await tx.listarItems(pedido.id))
-        .filter((i) => Number.isInteger(i.varianteId))
-        .sort((a, b) => a.varianteId - b.varianteId);
-      for (const item of items) {
-        await tx.reponerStock(item.varianteId, item.cantidad);
-      }
+      await reponerStockDelPedido(tx, pedido.id);
 
       await tx.actualizarEstados(pedido.id, {
         estadoPago: "cancelado",
@@ -317,6 +336,180 @@ class PedidoEstadoService {
 
     return resultado;
   }
+
+  /**
+   * @description Avanza la preparación de un pedido desde el panel.
+   *
+   * Reglas de docs/maquina-estados.md: solo se avanza con el pago aprobado, y a
+   * "enviado" hace falta el código de seguimiento si el método es envío. Repetir el
+   * estado actual (un doble clic) no hace nada y no es un error.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} cambio - Datos del cambio.
+   * @param {string} cambio.hacia - en_preparacion, enviado o entregado.
+   * @param {string|null} [cambio.seguimiento] - Código del correo, ya validado.
+   * @param {number} cambio.usuarioId - Quién lo hace, para la bitácora.
+   * @returns {Promise<{cambiado: boolean, numero: string, motivo?: string}>} Si el estado cambió y el número del pedido; motivo YA_REGISTRADO si ya estaba en ese estado.
+   * @throws {Error} NO_ENCONTRADO, TRANSICION_INVALIDA, PAGO_NO_APROBADO, SEGUIMIENTO_REQUERIDO
+   */
+  async cambiarEstadoPreparacion(pedidoId, { hacia, seguimiento = null, usuarioId }) {
+    if (!AVANCES_PREPARACION.includes(hacia)) {
+      throw new Error("TRANSICION_INVALIDA");
+    }
+
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        throw new Error("NO_ENCONTRADO");
+      }
+      const { numero } = pedido;
+
+      if (pedido.estadoPedido === hacia) {
+        return { cambiado: false, numero, motivo: "YA_REGISTRADO" };
+      }
+      validarTransicion("preparacion", pedido.estadoPedido, hacia);
+      if (pedido.estadoPago !== "aprobado") {
+        throw new Error("PAGO_NO_APROBADO");
+      }
+
+      const conSeguimiento = hacia === "enviado" && pedido.metodoEntrega === "envio";
+      if (conSeguimiento && !seguimiento) {
+        throw new Error("SEGUIMIENTO_REQUERIDO");
+      }
+
+      await tx.actualizarEstados(pedido.id, { estadoPedido: hacia });
+      if (conSeguimiento) {
+        await tx.guardarSeguimiento(pedido.id, seguimiento);
+      }
+
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "preparacion",
+        estadoAnterior: pedido.estadoPedido,
+        estadoNuevo: hacia,
+        origen: "panel",
+        usuarioId,
+        detalle: conSeguimiento ? `Seguimiento ${seguimiento}` : null,
+      });
+
+      if (hacia === "enviado") {
+        await tx.encolarEmail({
+          pedidoId: pedido.id,
+          tipo: "pedido_enviado",
+          destinatario: pedido.clienteEmail,
+          datos: {
+            numero,
+            nombre: pedido.clienteNombre,
+            metodoEntrega: pedido.metodoEntrega,
+            seguimiento: conSeguimiento ? seguimiento : null,
+          },
+        });
+      }
+
+      return { cambiado: true, numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description Cancela a mano un pedido sin pagar y devuelve su stock.
+   *
+   * Solo pedidos con el pago pendiente o rechazado: uno aprobado se devuelve con su
+   * dinero (t13c). Si la clienta avisó que transfirió, hace falta confirmar que el
+   * dinero no llegó: el aviso no prueba que haya llegado, pero tampoco que no.
+   * Cancelar dos veces no repone dos veces: la segunda encuentra el pedido cancelado.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} cancelacion - Datos de la cancelación.
+   * @param {string} cancelacion.motivo - Por qué, para la bitácora. Obligatorio.
+   * @param {boolean} [cancelacion.confirmaSinPago] - Verificó que la transferencia avisada no llegó.
+   * @param {number} cancelacion.usuarioId - Quién cancela, para la bitácora.
+   * @returns {Promise<{cancelado: boolean, numero: string, motivo?: string}>} Si se canceló y el número del pedido; motivo YA_CANCELADO si ya estaba cancelado.
+   * @throws {Error} DATOS_INVALIDOS, NO_ENCONTRADO, PEDIDO_PAGADO, COMPROBANTE_INFORMADO, TRANSICION_INVALIDA, PAGO_EN_CURSO
+   */
+  async cancelarManual(pedidoId, { motivo, confirmaSinPago = false, usuarioId }) {
+    const motivoLimpio = String(motivo ?? "").trim();
+    if (motivoLimpio.length === 0) {
+      throw new Error("DATOS_INVALIDOS");
+    }
+
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        throw new Error("NO_ENCONTRADO");
+      }
+      const { numero } = pedido;
+
+      if (pedido.estadoPago === "cancelado" && pedido.estadoPedido === "cancelado") {
+        return { cancelado: false, numero, motivo: "YA_CANCELADO" };
+      }
+      if (pedido.estadoPago === "aprobado") {
+        throw new Error("PEDIDO_PAGADO");
+      }
+      if (!PAGOS_CANCELABLES.includes(pedido.estadoPago)) {
+        throw new Error("TRANSICION_INVALIDA");
+      }
+      if (pedido.estadoPedido !== "nuevo") {
+        throw new Error("TRANSICION_INVALIDA");
+      }
+      // Si alguna vez se creó un link de Mercado Pago, pudo haber un pago, incluso
+      // uno en proceso que se apruebe después del vencimiento. Esos pedidos los
+      // cancela el job, que antes le pregunta a Mercado Pago.
+      if (pedido.mpPreferenceId) {
+        throw new Error("PAGO_EN_CURSO");
+      }
+      if (pedido.comprobanteInformadoEn && !confirmaSinPago) {
+        throw new Error("COMPROBANTE_INFORMADO");
+      }
+
+      validarTransicion("pago", pedido.estadoPago, "cancelado");
+      validarTransicion("preparacion", pedido.estadoPedido, "cancelado");
+
+      await reponerStockDelPedido(tx, pedido.id);
+      await tx.actualizarEstados(pedido.id, {
+        estadoPago: "cancelado",
+        estadoPedido: "cancelado",
+      });
+
+      const confirmacion = pedido.comprobanteInformadoEn
+        ? " Comprobante informado: se confirmó que el dinero no llegó."
+        : "";
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "pago",
+        estadoAnterior: pedido.estadoPago,
+        estadoNuevo: "cancelado",
+        origen: "panel",
+        usuarioId,
+        detalle: `Cancelado a mano, stock devuelto. Motivo: ${motivoLimpio.replace(/\.+$/, "")}.${confirmacion}`,
+      });
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "preparacion",
+        estadoAnterior: pedido.estadoPedido,
+        estadoNuevo: "cancelado",
+        origen: "panel",
+        usuarioId,
+      });
+
+      await tx.encolarEmail({
+        pedidoId: pedido.id,
+        tipo: "pedido_cancelado",
+        destinatario: pedido.clienteEmail,
+        datos: {
+          numero,
+          nombre: pedido.clienteNombre,
+          medioPago: pedido.medioPago,
+          motivo: "tienda",
+        },
+      });
+
+      return { cancelado: true, numero };
+    });
+
+    return resultado;
+  }
 }
 
-module.exports = { PedidoEstadoService, estaVencido };
+module.exports = { PedidoEstadoService, estaVencido, AVANCES_PREPARACION, SEGUIMIENTO_VALIDO };

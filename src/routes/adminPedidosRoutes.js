@@ -1,9 +1,14 @@
 const express = require("express");
-const { param, query } = require("express-validator");
+const { body, param, query } = require("express-validator");
 
 const db = require("../models");
 const SequelizePedidoRepository = require("../repositories/sequelize/SequelizePedidoRepository");
 const { PedidoAdminService } = require("../services/PedidoAdminService");
+const {
+  PedidoEstadoService,
+  AVANCES_PREPARACION,
+  SEGUIMIENTO_VALIDO,
+} = require("../services/PedidoEstadoService");
 const PedidoAdminController = require("../controllers/PedidoAdminController");
 const { authMiddleware } = require("../middlewares/authMiddleware");
 const { soloPermisos } = require("../middlewares/roleMiddleware");
@@ -13,8 +18,10 @@ const { TRANSICIONES_PAGO, TRANSICIONES_PREPARACION } = require("../services/tra
 
 const router = express.Router();
 
+const repositorio = new SequelizePedidoRepository(db);
 const controller = new PedidoAdminController(
-  new PedidoAdminService(new SequelizePedidoRepository(db))
+  new PedidoAdminService(repositorio),
+  new PedidoEstadoService(repositorio)
 );
 
 /** Máximo de pedidos por página: nadie puede pedir todos los pedidos de una vez. */
@@ -38,8 +45,40 @@ const validarListado = [
   manejarErroresValidacion,
 ];
 
-const validarId = [
-  param("id").isInt({ min: 1 }).withMessage("Id inválido").toInt(),
+const idRuta = param("id").isInt({ min: 1 }).withMessage("Id inválido").toInt();
+
+const validarId = [idRuta, manejarErroresValidacion];
+
+const validarPreparacion = [
+  idRuta,
+  body("estado")
+    .isString()
+    .bail()
+    .isIn(AVANCES_PREPARACION)
+    .withMessage("Estado de preparación no permitido"),
+  body("seguimiento")
+    .optional()
+    .isString()
+    .bail()
+    .trim()
+    .matches(SEGUIMIENTO_VALIDO)
+    .withMessage("El seguimiento lleva de 6 a 40 letras, números o guiones"),
+  manejarErroresValidacion,
+];
+
+const validarCancelacion = [
+  idRuta,
+  body("motivo")
+    .isString()
+    .withMessage("El motivo es obligatorio")
+    .bail()
+    .trim()
+    .isLength({ min: 5, max: 500 })
+    .withMessage("El motivo lleva de 5 a 500 caracteres"),
+  body("confirmaSinPago")
+    .optional()
+    .custom((valor) => typeof valor === "boolean")
+    .withMessage("confirmaSinPago tiene que ser true o false"),
   manejarErroresValidacion,
 ];
 /**
@@ -130,6 +169,135 @@ router.get(
   soloPermisos(PERMISOS.PEDIDOS_VER),
   validarId,
   controller.detalle
+);
+
+/**
+ * @openapi
+ * /admin/pedidos/{id}/preparacion:
+ *   patch:
+ *     tags: [Admin - Pedidos]
+ *     summary: Avanzar la preparación de un pedido
+ *     description: >
+ *       Preparar, despachar o marcar como entregado, de a un paso y solo con el
+ *       pago aprobado. Para despachar un envío hace falta el código de seguimiento,
+ *       y al despacharlo se encola un mail a la clienta. Lo pueden hacer el admin
+ *       y el operador. Queda en el historial con el usuario de la sesión.
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/IdRuta'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/PreparacionEntrada'
+ *     responses:
+ *       200:
+ *         description: Estado actualizado, o sin cambios si ya estaba en ese estado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/PreparacionResultado'
+ *       400:
+ *         description: >
+ *           DATOS_INVALIDOS (con details), TRANSICION_INVALIDA (salto de estado),
+ *           PAGO_NO_APROBADO o SEGUIMIENTO_REQUERIDO.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: PAGO_NO_APROBADO
+ *       401:
+ *         $ref: '#/components/responses/NoAutorizado'
+ *       403:
+ *         $ref: '#/components/responses/SinPermiso'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ */
+router.patch(
+  "/admin/pedidos/:id/preparacion",
+  authMiddleware,
+  soloPermisos(PERMISOS.PEDIDOS_GESTIONAR),
+  validarPreparacion,
+  controller.cambiarPreparacion
+);
+
+/**
+ * @openapi
+ * /admin/pedidos/{id}/cancelacion:
+ *   post:
+ *     tags: [Admin - Pedidos]
+ *     summary: Cancelar un pedido sin pagar
+ *     description: >
+ *       Solo el admin. Solo pedidos nuevos con el pago pendiente o rechazado: uno
+ *       pagado se devuelve primero. Devuelve el stock una sola vez y encola un mail
+ *       a la clienta, sin el motivo. Si la clienta informó una transferencia, hace
+ *       falta confirmaSinPago en true. Cancelar dos veces no es un error.
+ *       Un pedido con link de Mercado Pago no se cancela a mano: lo cancela el job
+ *       al vencer, después de consultar a Mercado Pago.
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/IdRuta'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CancelacionEntrada'
+ *     responses:
+ *       200:
+ *         description: Pedido cancelado, o sin cambios si ya estaba cancelado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/CancelacionResultado'
+ *       400:
+ *         description: >
+ *           DATOS_INVALIDOS (con details) o TRANSICION_INVALIDA (pedido devuelto
+ *           o que ya no está en nuevo).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: DATOS_INVALIDOS
+ *               details:
+ *                 motivo: El motivo lleva de 5 a 500 caracteres
+ *       401:
+ *         $ref: '#/components/responses/NoAutorizado'
+ *       403:
+ *         $ref: '#/components/responses/SinPermiso'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ *       409:
+ *         description: >
+ *           PEDIDO_PAGADO (primero hay que devolver el pago), COMPROBANTE_INFORMADO
+ *           (falta confirmaSinPago) o PAGO_EN_CURSO (el pedido tiene link de
+ *           Mercado Pago: lo cancela el job).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               pagado:
+ *                 value:
+ *                   error: PEDIDO_PAGADO
+ *               comprobante:
+ *                 value:
+ *                   error: COMPROBANTE_INFORMADO
+ *               enCurso:
+ *                 value:
+ *                   error: PAGO_EN_CURSO
+ */
+router.post(
+  "/admin/pedidos/:id/cancelacion",
+  authMiddleware,
+  soloPermisos(PERMISOS.PEDIDOS_CANCELAR),
+  validarCancelacion,
+  controller.cancelar
 );
 
 module.exports = router;
