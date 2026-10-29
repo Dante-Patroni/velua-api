@@ -28,13 +28,13 @@ const aFilaPanel = (p) => ({
 const direccionDe = (p) =>
   p.metodoEntrega === "envio"
     ? {
-      calle: p.direccionCalle,
-      numero: p.direccionNumero,
-      extra: p.direccionExtra,
-      ciudad: p.direccionCiudad,
-      provincia: p.direccionProvincia,
-      cp: p.direccionCp,
-    }
+        calle: p.direccionCalle,
+        numero: p.direccionNumero,
+        extra: p.direccionExtra,
+        ciudad: p.direccionCiudad,
+        provincia: p.direccionProvincia,
+        cp: p.direccionCp,
+      }
     : null;
 
 /**
