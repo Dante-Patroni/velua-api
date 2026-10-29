@@ -376,7 +376,7 @@ module.exports = {
    * @param {import("sequelize").QueryInterface} queryInterface - Interfaz de consultas.
    * @returns {Promise<void>}
    */
-    async down(queryInterface) {
+  async down(queryInterface) {
     exigirEntornoDeDesarrollo("Vaciar el catálogo");
     await queryInterface.bulkDelete("zonas_envio", null, {});
     await queryInterface.bulkDelete("variantes", null, {});

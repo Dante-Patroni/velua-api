@@ -1,4 +1,5 @@
 "use strict";
+
 const { exigirEntornoDeDesarrollo } = require("../config/soloDesarrollo");
 const { aCentavos, aImporte } = require("../utils/dinero");
 
@@ -226,11 +227,8 @@ module.exports = {
    * @throws {Error} Si falta un producto o una zona del seed del catálogo.
    */
   async up(queryInterface) {
+    // Pedidos falsos en producción aparecerían como ventas reales en el panel.
     exigirEntornoDeDesarrollo("Cargar pedidos de prueba");
-    if (process.env.NODE_ENV === "production") {
-      // Pedidos falsos en producción aparecerían como ventas reales en el panel.
-      return;
-    }
 
     const seq = queryInterface.sequelize;
     const SELECT = { type: seq.QueryTypes.SELECT };
