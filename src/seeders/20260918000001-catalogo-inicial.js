@@ -1,4 +1,5 @@
 "use strict";
+const { exigirEntornoDeDesarrollo } = require("../config/soloDesarrollo");
 
 const PRECIO = "8500.00";
 
@@ -297,6 +298,7 @@ module.exports = {
    * @returns {Promise<void>}
    */
   async up(queryInterface) {
+    exigirEntornoDeDesarrollo("Cargar el catálogo de ejemplo");
     const ahora = new Date();
 
     await queryInterface.bulkInsert(
@@ -375,6 +377,7 @@ module.exports = {
    * @returns {Promise<void>}
    */
   async down(queryInterface) {
+    exigirEntornoDeDesarrollo("Vaciar el catálogo");
     await queryInterface.bulkDelete("zonas_envio", null, {});
     await queryInterface.bulkDelete("variantes", null, {});
     await queryInterface.bulkDelete("productos", null, {});
