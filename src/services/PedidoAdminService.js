@@ -28,19 +28,19 @@ const aFilaPanel = (p) => ({
 const direccionDe = (p) =>
   p.metodoEntrega === "envio"
     ? {
-        calle: p.direccionCalle,
-        numero: p.direccionNumero,
-        extra: p.direccionExtra,
-        ciudad: p.direccionCiudad,
-        provincia: p.direccionProvincia,
-        cp: p.direccionCp,
-      }
+      calle: p.direccionCalle,
+      numero: p.direccionNumero,
+      extra: p.direccionExtra,
+      ciudad: p.direccionCiudad,
+      provincia: p.direccionProvincia,
+      cp: p.direccionCp,
+    }
     : null;
 
 /**
  * @description Detalle del pedido para el panel: contacto, entrega, totales con
  * sus descuentos, pago, ítems e historial. No incluye el id de preferencia de
- * Mercado Pago: es un dato interno que el panel no necesita.
+ * Mercado Pago, que es un dato interno: solo dice si existe.
  * @param {Object} p - Pedido del repositorio, con items y eventos.
  * @returns {Object} Detalle para el panel.
  */
@@ -69,6 +69,10 @@ const aDetallePanel = (p) => ({
     pagoId: p.mpPaymentId,
     metodo: p.mpMetodo,
     comprobanteInformadoEn: p.comprobanteInformadoEn,
+    // Si existe un link de Mercado Pago, sin el id: alcanza para que el panel
+    // explique por qué no se cancela a mano (lo cancela el job, que consulta a
+    // Mercado Pago). La regla la sigue aplicando PedidoEstadoService.
+    tieneLinkMercadoPago: Boolean(p.mpPreferenceId),
   },
   notasCliente: p.notasCliente,
   notasInternas: p.notasInternas,
