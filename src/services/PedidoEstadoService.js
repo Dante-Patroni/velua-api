@@ -429,7 +429,9 @@ class PedidoEstadoService {
    * @throws {Error} DATOS_INVALIDOS, NO_ENCONTRADO, PEDIDO_PAGADO, COMPROBANTE_INFORMADO, TRANSICION_INVALIDA, PAGO_EN_CURSO
    */
   async cancelarManual(pedidoId, { motivo, confirmaSinPago = false, usuarioId }) {
-    const motivoLimpio = String(motivo ?? "").trim();
+    // Sin los puntos del final: "....." no es un motivo, y "Pidió cancelar." no
+    // tiene que quedar con dos puntos en el historial.
+    const motivoLimpio = String(motivo ?? "").trim().replace(/\.+$/, "");
     if (motivoLimpio.length === 0) {
       throw new Error("DATOS_INVALIDOS");
     }
@@ -482,7 +484,7 @@ class PedidoEstadoService {
         estadoNuevo: "cancelado",
         origen: "panel",
         usuarioId,
-        detalle: `Cancelado a mano, stock devuelto. Motivo: ${motivoLimpio.replace(/\.+$/, "")}.${confirmacion}`,
+        detalle: `Cancelado a mano, stock devuelto. Motivo: ${motivoLimpio}.${confirmacion}`,
       });
       await tx.registrarEvento({
         pedidoId: pedido.id,

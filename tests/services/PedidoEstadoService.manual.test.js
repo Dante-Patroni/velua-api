@@ -324,7 +324,7 @@ describe("cancelarManual", () => {
   test("sin motivo no cancela ni abre la transacción", async () => {
     const repo = sinPagar();
 
-    for (const motivo of ["", "   ", undefined, null]) {
+    for (const motivo of ["", "   ", undefined, null, ".....", " ... "]) {
       await expect(
         servicio(repo).cancelarManual(1, { motivo, usuarioId: ADMIN }),
       ).rejects.toThrow("DATOS_INVALIDOS");

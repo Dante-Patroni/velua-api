@@ -73,6 +73,7 @@ const validarCancelacion = [
     .withMessage("El motivo es obligatorio")
     .bail()
     .trim()
+    .customSanitizer((valor) => valor.replace(/\.+$/, ""))
     .isLength({ min: 5, max: 500 })
     .withMessage("El motivo lleva de 5 a 500 caracteres"),
   body("confirmaSinPago")
