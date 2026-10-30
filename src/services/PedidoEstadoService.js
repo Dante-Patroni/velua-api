@@ -14,6 +14,26 @@ const AVANCES_PREPARACION = Object.freeze(["en_preparacion", "enviado", "entrega
 /** Código de seguimiento del correo: letras, números y guiones. La columna admite 120. */
 const SEGUIMIENTO_VALIDO = /^[A-Za-z0-9-]{6,40}$/;
 
+
+/**
+ * @description Saca los puntos y espacios del final de un texto.
+ *
+ * Sin expresiones regulares a propósito: con /\.+$/, una tirada larga de puntos
+ * seguida de otro carácter ("....x") hace que el motor pruebe cada posición y
+ * recorra todos los puntos desde cada una. El costo crece con el cuadrado del
+ * largo (ReDoS). Recorrer desde el final es lineal para cualquier entrada.
+ *
+ * @param {string} texto - Texto a limpiar.
+ * @returns {string} El texto sin puntos ni espacios al final.
+ */
+const sinPuntosFinales = (texto) => {
+  let fin = texto.length;
+  while (fin > 0 && (texto[fin - 1] === "." || texto[fin - 1].trim() === "")) {
+    fin -= 1;
+  }
+  return texto.slice(0, fin);
+};
+
 /** Estados de pago en los que se puede cancelar a mano. Un pago aprobado se devuelve (t13c). */
 const PAGOS_CANCELABLES = Object.freeze(["pendiente", "rechazado"]);
 
@@ -429,9 +449,9 @@ class PedidoEstadoService {
    * @throws {Error} DATOS_INVALIDOS, NO_ENCONTRADO, PEDIDO_PAGADO, COMPROBANTE_INFORMADO, TRANSICION_INVALIDA, PAGO_EN_CURSO
    */
   async cancelarManual(pedidoId, { motivo, confirmaSinPago = false, usuarioId }) {
-    // Sin los puntos del final: "....." no es un motivo, y "Pidió cancelar." no
-    // tiene que quedar con dos puntos en el historial.
-    const motivoLimpio = String(motivo ?? "").trim().replace(/\.+$/, "");
+    // Sin puntos ni espacios al final: "....." no es un motivo, y "Pidió
+    // cancelar ..." no tiene que quedar como "Motivo: Pidió cancelar ..".
+    const motivoLimpio = sinPuntosFinales(String(motivo ?? "").trim());
     if (motivoLimpio.length === 0) {
       throw new Error("DATOS_INVALIDOS");
     }
@@ -494,7 +514,6 @@ class PedidoEstadoService {
         origen: "panel",
         usuarioId,
       });
-
       await tx.encolarEmail({
         pedidoId: pedido.id,
         tipo: "pedido_cancelado",
@@ -514,4 +533,4 @@ class PedidoEstadoService {
   }
 }
 
-module.exports = { PedidoEstadoService, estaVencido, AVANCES_PREPARACION, SEGUIMIENTO_VALIDO };
+module.exports = { PedidoEstadoService, estaVencido, AVANCES_PREPARACION, SEGUIMIENTO_VALIDO, sinPuntosFinales, };

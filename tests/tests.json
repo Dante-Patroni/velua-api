@@ -5135,6 +5135,99 @@
           ]
         },
         {
+          "name": "POST cancelacion con un motivo de solo puntos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "cancelacion"
+              ]
+            },
+            "description": "Los puntos del final no cuentan para el largo mínimo: la regla de la ruta, no solo la del servicio.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\":\".....\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el motivo', () => pm.expect(pm.response.json().details).to.have.property('motivo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion con un motivo demasiado largo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "cancelacion"
+              ]
+            },
+            "description": "Puntos seguidos de otro carácter: la entrada que hacía cuadrática a /\\.+$/ (ReDoS). El largo máximo se controla antes de limpiar.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"........................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................................x\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala el motivo', () => pm.expect(pm.response.json().details).to.have.property('motivo'));",
+                  "pm.test('Responde rápido: el largo se controla antes de procesar el texto', () => pm.expect(pm.response.responseTime).to.be.below(1000));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "POST cancelacion con confirmaSinPago como texto",
           "request": {
             "method": "POST",

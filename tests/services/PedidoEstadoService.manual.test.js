@@ -1,4 +1,4 @@
-const { PedidoEstadoService } = require("../../src/services/PedidoEstadoService");
+const { PedidoEstadoService, sinPuntosFinales } = require("../../src/services/PedidoEstadoService");
 
 const AHORA = new Date("2026-10-07T15:00:00.000Z");
 const ADMIN = 1;
@@ -404,12 +404,36 @@ describe("cancelarManual", () => {
     expect(r.cancelado).toBe(true);
   });
 
-  test("un motivo con punto final no queda con dos puntos", async () => {
-    const repo = sinPagar();
+  test.each(["Pidió cancelar.", "Pidió cancelar ...", "Pidió cancelar . . ."])(
+    "un motivo como %j no queda con dos puntos",
+    async (motivo) => {
+      const repo = sinPagar();
 
-    await servicio(repo).cancelarManual(1, { motivo: "Pidió cancelar.", usuarioId: ADMIN });
+      await servicio(repo).cancelarManual(1, { motivo, usuarioId: ADMIN });
 
-    expect(repo.estado.eventos[0].detalle).toContain("Motivo: Pidió cancelar.");
-    expect(repo.estado.eventos[0].detalle).not.toContain("..");
+      expect(repo.estado.eventos[0].detalle).toContain("Motivo: Pidió cancelar.");
+      expect(repo.estado.eventos[0].detalle).not.toContain("..");
+    },
+  );
+});
+
+describe("sinPuntosFinales", () => {
+  test("saca los puntos y espacios del final", () => {
+    expect(sinPuntosFinales("Pidió cancelar.")).toBe("Pidió cancelar");
+    expect(sinPuntosFinales("Pidió cancelar ...")).toBe("Pidió cancelar");
+    expect(sinPuntosFinales(".....")).toBe("");
+    expect(sinPuntosFinales("")).toBe("");
+  });
+
+  test("no toca los puntos del medio", () => {
+    expect(sinPuntosFinales("Pidió cancelar. Llamó de nuevo")).toBe("Pidió cancelar. Llamó de nuevo");
+  });
+
+  test("es lineal: las tiradas enormes de puntos no la frenan (ReDoS)", () => {
+    for (const entrada of [`${".".repeat(200_000)}x`, ".".repeat(200_000)]) {
+      const inicio = performance.now();
+      sinPuntosFinales(entrada);
+      expect(performance.now() - inicio).toBeLessThan(100);
+    }
   });
 });
