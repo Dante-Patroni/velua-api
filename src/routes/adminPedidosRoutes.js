@@ -8,6 +8,7 @@ const {
   PedidoEstadoService,
   AVANCES_PREPARACION,
   SEGUIMIENTO_VALIDO,
+  sinPuntosFinales,
 } = require("../services/PedidoEstadoService");
 const PedidoAdminController = require("../controllers/PedidoAdminController");
 const { authMiddleware } = require("../middlewares/authMiddleware");
@@ -73,7 +74,13 @@ const validarCancelacion = [
     .withMessage("El motivo es obligatorio")
     .bail()
     .trim()
-    .isLength({ min: 5, max: 500 })
+    // El largo máximo va ANTES de cualquier limpieza: ningún procesamiento
+    // corre sobre un body gigante.
+    .isLength({ max: 500 })
+    .withMessage("El motivo lleva de 5 a 500 caracteres")
+    .bail()
+    .customSanitizer(sinPuntosFinales)
+    .isLength({ min: 5 })
     .withMessage("El motivo lleva de 5 a 500 caracteres"),
   body("confirmaSinPago")
     .optional()
