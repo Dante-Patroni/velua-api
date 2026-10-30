@@ -94,8 +94,8 @@ module.exports = {
   ],
   tags: [
     {
-      name: "Admin - Pedidos",
-      description: "Consulta y gestión de pedidos desde el panel"
+      name: "Catalogo",
+      description: "Lectura publica de categorias y productos",
     },
     {
       name: "Sistema",
@@ -110,7 +110,7 @@ module.exports = {
     { name: "Admin - Imagenes", description: "Fotos de producto: subida, orden y borrado" },
     { name: "Carrito", description: "Cotizacion del carrito y zonas de envio" },
     { name: "Pedidos", description: "Creacion de pedidos y consulta publica de su estado" },
-    { name: "Admin - Pedidos", description: "Consulta de pedidos desde el panel" },
+    { name: "Admin - Pedidos", description: "Consulta y gestión de pedidos desde el panel" },
   ],
   components: {
     parameters: {
@@ -1128,68 +1128,67 @@ module.exports = {
                 creadoEn: { type: "string", format: "date-time" },
               },
             },
-
-            PreparacionEntrada: {
-              type: "object",
-              required: ["estado"],
-              properties: {
-                estado: {
-                  type: "string",
-                  enum: [...AVANCES_PREPARACION],
-                  description:
-                    "Sale de AVANCES_PREPARACION: la misma lista que valida la API. Cancelar tiene su propia ruta.",
-                },
-                seguimiento: {
-                  type: "string",
-                  pattern: SEGUIMIENTO_VALIDO.source,
-                  description:
-                    "Código del correo. Obligatorio para pasar a enviado si el método es envío. En un retiro no se guarda.",
-                  example: "AR123456789",
-                },
-              },
-            },
-            PreparacionResultado: {
-              type: "object",
-              required: ["cambiado", "numero"],
-              properties: {
-                cambiado: {
-                  type: "boolean",
-                  description: "False si el pedido ya estaba en ese estado: un doble clic no es un error.",
-                },
-                numero: { type: "string", example: "VEL-4K7Q2X" },
-                motivo: { type: "string", enum: ["YA_REGISTRADO"], description: "Solo cuando cambiado es false." },
-              },
-            },
-            CancelacionEntrada: {
-              type: "object",
-              required: ["motivo"],
-              properties: {
-                motivo: {
-                  type: "string",
-                  minLength: 5,
-                  maxLength: 500,
-                  description:
-                    "Nota interna para el historial, sin contar los espacios de los extremos. No se le manda a la clienta.",
-                  example: "La clienta pidió cancelar por WhatsApp",
-                },
-                confirmaSinPago: {
-                  type: "boolean",
-                  default: false,
-                  description:
-                    'Obligatorio en true si la clienta informó una transferencia: confirma que se revisó el banco y el dinero no llegó. Solo vale el booleano, no el texto "true".',
-                },
-              },
-            },
-            CancelacionResultado: {
-              type: "object",
-              required: ["cancelado", "numero"],
-              properties: {
-                cancelado: { type: "boolean", description: "False si ya estaba cancelado." },
-                numero: { type: "string", example: "VEL-4K7Q2X" },
-                motivo: { type: "string", enum: ["YA_CANCELADO"], description: "Solo cuando cancelado es false." },
-              },
-            },
           },
+        },
+      },
+      PreparacionEntrada: {
+        type: "object",
+        required: ["estado"],
+        properties: {
+          estado: {
+            type: "string",
+            enum: [...AVANCES_PREPARACION],
+            description:
+              "Sale de AVANCES_PREPARACION: la misma lista que valida la API. Cancelar tiene su propia ruta.",
+          },
+          seguimiento: {
+            type: "string",
+            pattern: SEGUIMIENTO_VALIDO.source,
+            description:
+              "Código del correo. Obligatorio para pasar a enviado si el método es envío. En un retiro no se guarda.",
+            example: "AR123456789",
+          },
+        },
+      },
+      PreparacionResultado: {
+        type: "object",
+        required: ["cambiado", "numero"],
+        properties: {
+          cambiado: {
+            type: "boolean",
+            description: "False si el pedido ya estaba en ese estado: un doble clic no es un error.",
+          },
+          numero: { type: "string", example: "VEL-4K7Q2X" },
+          motivo: { type: "string", enum: ["YA_REGISTRADO"], description: "Solo cuando cambiado es false." },
+        },
+      },
+      CancelacionEntrada: {
+        type: "object",
+        required: ["motivo"],
+        properties: {
+          motivo: {
+            type: "string",
+            minLength: 5,
+            maxLength: 500,
+            description:
+              "Nota interna para el historial, sin contar los espacios de los extremos. No se le manda a la clienta.",
+            example: "La clienta pidió cancelar por WhatsApp",
+          },
+          confirmaSinPago: {
+            type: "boolean",
+            default: false,
+            description:
+              'Obligatorio en true si la clienta informó una transferencia: confirma que se revisó el banco y el dinero no llegó. Solo vale el booleano, no el texto "true".',
+          },
+        },
+      },
+      CancelacionResultado: {
+        type: "object",
+        required: ["cancelado", "numero"],
+        properties: {
+          cancelado: { type: "boolean", description: "False si ya estaba cancelado." },
+          numero: { type: "string", example: "VEL-4K7Q2X" },
+          motivo: { type: "string", enum: ["YA_CANCELADO"], description: "Solo cuando cancelado es false." },
         },
       },
     },
