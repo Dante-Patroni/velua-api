@@ -153,4 +153,13 @@ describe("Contrato de pedidos del panel", () => {
     const texto = JSON.stringify(await servicioCon(pedidoConEnvio()).detalle(12));
     expect(texto).not.toContain("PREF-INTERNA-123");
   });
+
+  test("dice si hay un link de Mercado Pago, sin dar el id", async () => {
+    const conLink = await servicioCon(pedidoConEnvio()).detalle(12);
+    const sinLink = await servicioCon(pedidoParaRetirar()).detalle(12);
+
+    expect(conLink.pago.tieneLinkMercadoPago).toBe(true);
+    expect(sinLink.pago.tieneLinkMercadoPago).toBe(false);
+    expect(JSON.stringify(conLink)).not.toContain("PREF-INTERNA-123");
+  });
 });

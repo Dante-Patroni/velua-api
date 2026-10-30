@@ -1906,7 +1906,8 @@
             "required": [
               "pagoId",
               "metodo",
-              "comprobanteInformadoEn"
+              "comprobanteInformadoEn",
+              "tieneLinkMercadoPago"
             ],
             "properties": {
               "pagoId": {
@@ -1923,6 +1924,10 @@
                 "format": "date-time",
                 "nullable": true,
                 "description": "Cuándo la clienta avisó que transfirió."
+              },
+              "tieneLinkMercadoPago": {
+                "type": "boolean",
+                "description": "True si alguna vez se creó un link de pago de Mercado Pago. Un pedido así no se cancela a mano (PAGO_EN_CURSO): lo cancela el job, que consulta a Mercado Pago. Sirve para deshabilitar el botón y explicar por qué; la API rechaza igual."
               }
             }
           },

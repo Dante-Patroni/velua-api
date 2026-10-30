@@ -1079,7 +1079,7 @@ module.exports = {
           },
           pago: {
             type: "object",
-            required: ["pagoId", "metodo", "comprobanteInformadoEn"],
+            required: ["pagoId", "metodo", "comprobanteInformadoEn", "tieneLinkMercadoPago"],
             properties: {
               pagoId: { type: "string", nullable: true, description: "Id del pago en Mercado Pago." },
               metodo: { type: "string", nullable: true },
@@ -1088,6 +1088,11 @@ module.exports = {
                 format: "date-time",
                 nullable: true,
                 description: "Cuándo la clienta avisó que transfirió.",
+              },
+              tieneLinkMercadoPago: {
+                type: "boolean",
+                description:
+                  "True si alguna vez se creó un link de pago de Mercado Pago. Un pedido así no se cancela a mano (PAGO_EN_CURSO): lo cancela el job, que consulta a Mercado Pago. Sirve para deshabilitar el botón y explicar por qué; la API rechaza igual.",
               },
             },
           },
