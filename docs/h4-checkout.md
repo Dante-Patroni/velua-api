@@ -174,6 +174,26 @@ tienda no abre antes de H5, no es un problema.
 _Terminado cuando:_ un pedido por transferencia muestra las instrucciones, y avisar el
 pago impide que venza.
 
+#### Decisiones del 31/10, antes de implementar
+
+Hay tres hechos distintos: la clienta **hizo el pedido**, la clienta **avisó que transfirió** y la dueña **verificó que el dinero entró**. Solo el tercero aprueba el pago.
+
+| Situación | Qué pasa |
+|---|---|
+| La clienta aprieta "Ya transferí" | El pedido no vence. Queda en el panel hasta que la dueña confirme o cancele. |
+| La clienta manda el comprobante por WhatsApp sin apretar el botón | La dueña registra el aviso desde el panel (origen `panel`), así no vence mientras revisa el banco. |
+| La dueña ve el dinero en el banco | Confirma el pago con la casilla obligatoria "Verifiqué en el banco que entró el monto". No hace falta que haya aviso. |
+| El dinero no llegó | Cancela a mano con `confirmaSinPago` (t13b). |
+
+- **Un comprobante no es un pago.** Una captura se falsifica en un minuto. El comprobante solo frena el vencimiento; el pago se confirma mirando el banco.
+- **El aviso frena el vencimiento.** Riesgo aceptado: alguien puede crear pedidos por transferencia y avisarlos para retener stock. Se limita con el tope de pedidos por hora por IP, con la vista de pedidos avisados en el panel y, más adelante, con el mail a la dueña (t11). La alternativa, que el job cancele los pedidos avisados, puede cancelar un pedido pagado.
+- **"Ya transferí" solo funciona antes del vencimiento, y es idempotente:** un segundo aviso no agrega otro evento.
+- **Datos bancarios en variables de entorno** (`TRANSFERENCIA_ALIAS`, `TRANSFERENCIA_CBU`, `TRANSFERENCIA_TITULAR`), validadas al arrancar. Si faltan o no son válidas, la API arranca igual y el checkout rechaza la transferencia; Mercado Pago sigue funcionando. No se editan desde el panel: una sesión robada no puede cambiar a dónde transfieren las clientas.
+- **`DESCUENTO_TRANSFERENCIA` se lee una sola vez**, validado como entero de 0 a 20. Hoy se lee en dos rutas y sin validar. Un valor inválido sigue la misma regla que los datos bancarios.
+- **Confirmar el pago y registrar el aviso son solo para admin** (`PAGOS_CONFIRMAR`, PR B), en una transacción con el pedido bloqueado y con el usuario en el historial.
+- - **El aviso guarda su origen.** "Ya transferí" queda en el historial con origen `cliente`; el aviso registrado desde el panel, con origen `panel` y el usuario de la sesión. Los dos frenan el vencimiento igual.
+- **Un pedido cancelado no se recupera.** `cancelado` es terminal y su stock ya se repuso. Si el comprobante llega después de que el job lo canceló, la dueña revisa el banco y decide fuera del sistema: arma un pedido nuevo si hay stock, o devuelve la plata. Registrar el aviso desde el panel y confirmar el pago solo valen mientras el pago esté `pendiente` o `rechazado`, aunque la reserva ya haya vencido y el job todavía no haya pasado.
+
 ### 8. Cierre
 
 Colección de Newman del flujo completo, y una compra real de monto chico en producción.
