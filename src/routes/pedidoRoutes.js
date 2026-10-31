@@ -7,6 +7,7 @@ const { CheckoutService } = require("../services/CheckoutService");
 const { TOPE_ITEMS } = require("../services/cotizador");
 const PedidoController = require("../controllers/PedidoController");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
+const { configTransferencia } = require("../config/transferencia");
 const {
   limitadorPedidos,
   limitadorConsultaPedidos,
@@ -23,7 +24,7 @@ const controller = new PedidoController(
     pedidoRepository,
     {
       umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
-      descuentoTransferencia: Number(process.env.DESCUENTO_TRANSFERENCIA || 0),
+      descuentoTransferencia: configTransferencia.descuento,
     },
     undefined,
     procesadorPagos,

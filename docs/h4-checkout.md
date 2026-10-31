@@ -191,8 +191,8 @@ Hay tres hechos distintos: la clienta **hizo el pedido**, la clienta **avisó qu
 - **Datos bancarios en variables de entorno** (`TRANSFERENCIA_ALIAS`, `TRANSFERENCIA_CBU`, `TRANSFERENCIA_TITULAR`), validadas al arrancar. Si faltan o no son válidas, la API arranca igual y el checkout rechaza la transferencia; Mercado Pago sigue funcionando. No se editan desde el panel: una sesión robada no puede cambiar a dónde transfieren las clientas.
 - **`DESCUENTO_TRANSFERENCIA` se lee una sola vez**, validado como entero de 0 a 20. Hoy se lee en dos rutas y sin validar. Un valor inválido sigue la misma regla que los datos bancarios.
 - **Confirmar el pago y registrar el aviso son solo para admin** (`PAGOS_CONFIRMAR`, PR B), en una transacción con el pedido bloqueado y con el usuario en el historial.
-- - **El aviso guarda su origen.** "Ya transferí" queda en el historial con origen `cliente`; el aviso registrado desde el panel, con origen `panel` y el usuario de la sesión. Los dos frenan el vencimiento igual.
-- **Un pedido cancelado no se recupera.** `cancelado` es terminal y su stock ya se repuso. Si el comprobante llega después de que el job lo canceló, la dueña revisa el banco y decide fuera del sistema: arma un pedido nuevo si hay stock, o devuelve la plata. Registrar el aviso desde el panel y confirmar el pago solo valen mientras el pago esté `pendiente` o `rechazado`, aunque la reserva ya haya vencido y el job todavía no haya pasado.
+- **El aviso guarda su origen.** "Ya transferí" queda en el historial con origen `cliente`; el aviso registrado desde el panel, con origen `panel` y el usuario de la sesión. Los dos frenan el vencimiento igual.
+- **Un pedido cancelado no se recupera.** `cancelado` es terminal y su stock ya se repuso. Si el comprobante llega después de que el job lo canceló, la dueña revisa el banco y decide fuera del sistema: arma un pedido nuevo si hay stock, o devuelve la plata. Registrar el aviso desde el panel y confirmar el pago solo valen mientras el pedido siga sin cancelar y el pago esté `pendiente` o `rechazado`, aunque la reserva ya haya vencido y el job todavía no haya pasado.
 
 ### 8. Cierre
 

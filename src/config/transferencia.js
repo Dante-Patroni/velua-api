@@ -61,4 +61,10 @@ function leerConfigTransferencia(env = process.env) {
   });
 }
 
-module.exports = { leerConfigTransferencia, DESCUENTO_MAXIMO };
+/**
+ * Configuración de la API, leída una sola vez al cargar el módulo. Node guarda el
+ * módulo en caché: todas las rutas reciben el mismo objeto congelado.
+ */
+const configTransferencia = leerConfigTransferencia();
+
+module.exports = { leerConfigTransferencia, configTransferencia, DESCUENTO_MAXIMO };
