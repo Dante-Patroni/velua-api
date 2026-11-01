@@ -25,6 +25,7 @@ const controller = new PedidoController(
     {
       umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
       descuentoTransferencia: configTransferencia.descuento,
+      transferenciaHabilitada: configTransferencia.habilitada,
     },
     undefined,
     procesadorPagos,
@@ -162,9 +163,10 @@ const validarPedido = [
  *               error: TOTAL_CAMBIO
  *       503:
  *         description: >
- *           PROCESADOR_NO_CONFIGURADO. Se eligió Mercado Pago y no está
- *           configurado: no se crea el pedido ni se aparta stock. El frontend
- *           muestra que el pago online no está disponible.
+ *           PROCESADOR_NO_CONFIGURADO: se eligió Mercado Pago y no está
+ *           configurado. MEDIO_PAGO_NO_DISPONIBLE: se eligió transferencia y
+ *           no hay datos bancarios válidos. En los dos casos no se crea el
+ *           pedido ni se aparta stock; el frontend ofrece el otro medio.
  *         content:
  *           application/json:
  *             schema:

@@ -100,8 +100,9 @@ const entrada = (cambios = {}) => ({
   ...cambios,
 });
 
+/** Servicio con la transferencia habilitada, salvo que el test diga otra cosa. */
 const servicioCon = (repositorio, config = {}) =>
-  new CheckoutService(repositorio, config, () => AHORA);
+  new CheckoutService(repositorio, { transferenciaHabilitada: true, ...config }, () => AHORA);
 
 describe("CheckoutService", () => {
   describe("crearPedido, el camino feliz", () => {
@@ -206,6 +207,34 @@ describe("CheckoutService", () => {
       const r = await servicioCon(repo).crearPedido(entrada({ medioPago: "transferencia" }));
 
       expect(r.expiraEn.getTime() - AHORA.getTime()).toBe(24 * HORA);
+    });
+  });
+
+  describe("transferencia sin datos bancarios", () => {
+    it.each([
+      ["deshabilitada", (repo) => servicioCon(repo, { transferenciaHabilitada: false })],
+      ["sin configurar", (repo) => new CheckoutService(repo, {}, () => AHORA)],
+    ])("%s: rechaza sin crear el pedido ni apartar stock", async (_caso, armar) => {
+      const repo = crearRepositorio();
+
+      await expect(
+        armar(repo).crearPedido(entrada({ medioPago: "transferencia" }))
+      ).rejects.toThrow("MEDIO_PAGO_NO_DISPONIBLE");
+
+      expect(repo.estado.variantes[0].stock).toBe(10);
+      expect(repo.estado.pedidos).toHaveLength(0);
+      expect(repo.estado.emails).toHaveLength(0);
+    });
+
+    it("Mercado Pago sigue funcionando aunque la transferencia esté deshabilitada", async () => {
+      const repo = crearRepositorio();
+
+      const r = await servicioCon(repo, { transferenciaHabilitada: false }).crearPedido(
+        entrada({ medioPago: "mercadopago" })
+      );
+
+      expect(r.medioPago).toBe("mercadopago");
+      expect(repo.estado.pedidos).toHaveLength(1);
     });
   });
 

@@ -61,7 +61,8 @@ const armar = ({ resultado = creado(), pedido = guardado(), procesador, pagos = 
   const logger = { error: jest.fn(), info: jest.fn() };
   const pagoService = { aplicarPago: jest.fn().mockResolvedValue({}) };
   const pedidoEstadoService = { marcarRevision: jest.fn().mockResolvedValue({}) };
-  const servicio = new CheckoutService(repositorio, {}, () => AHORA, procesadorPagos, logger, {
+  const config = { transferenciaHabilitada: true };
+  const servicio = new CheckoutService(repositorio, config, () => AHORA, procesadorPagos, logger, {
     pagoService,
     pedidoEstadoService,
   });

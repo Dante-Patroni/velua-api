@@ -218,6 +218,12 @@ class CheckoutService {
       throw new Error("PROCESADOR_NO_CONFIGURADO");
     }
 
+    // Lo mismo con la transferencia sin datos bancarios válidos: la clienta no
+    // tendría a dónde transferir. Solo se acepta si la configuración lo dice.
+    if (entrada.medioPago === "transferencia" && this.config.transferenciaHabilitada !== true) {
+      throw new Error("MEDIO_PAGO_NO_DISPONIBLE");
+    }
+
     const { items, cliente, entrega, medioPago, totalEsperado, notas } = entrada;
     const envio = entrega.metodo === "envio";
 
