@@ -1611,6 +1611,12 @@
                   "    pm.expect(texto).to.not.include('Prueba Newman');",
                   "    pm.expect(texto).to.not.include('newman@');",
                   "    pm.expect(texto).to.not.include('358 400');",
+                  "});",
+                  "",
+                  "pm.test('Trae los datos para transferir y el monto del pedido', () => {",
+                  "    pm.expect(p.transferencia).to.be.an('object');",
+                  "    pm.expect(p.transferencia.cbu).to.match(/^\\d{22}$/);",
+                  "    pm.expect(p.transferencia.monto).to.eql(p.totales.total);",
                   "});"
                 ]
               }

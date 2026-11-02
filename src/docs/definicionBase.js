@@ -993,6 +993,23 @@ module.exports = {
             },
           },
           totales: { $ref: "#/components/schemas/TotalesCotizacion" },
+          transferencia: {
+            type: "object",
+            nullable: true,
+            description:
+              "Datos para transferir. Solo mientras haya que pagar: pedido por transferencia, pago pendiente o rechazado, reserva vigente (o vencida con aviso) y transferencia habilitada. En cualquier otro caso, null.",
+            required: ["alias", "cbu", "titular", "monto"],
+            properties: {
+              alias: { type: "string", example: "velua.prueba.mp" },
+              cbu: { type: "string", pattern: "^\\d{22}$", example: "0000000000000000000000" },
+              titular: { type: "string", example: "Tienda de Prueba" },
+              monto: {
+                type: "string",
+                description: "Total del pedido, con el descuento ya aplicado.",
+                example: "23500.00",
+              },
+            },
+          },  
         },
       },
       EstadoPago: {
