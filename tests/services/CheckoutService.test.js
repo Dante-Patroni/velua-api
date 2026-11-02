@@ -587,4 +587,62 @@ describe("CheckoutService", () => {
       );
     });
   });
+
+  describe("informarComprobante", () => {
+    /** Servicio con un registrarAviso falso: las reglas se prueban en PedidoEstadoService. */
+    const armar = (resultado = { registrado: true, numero: "VEL-4K7Q2X" }) => {
+      const repo = crearRepositorio();
+      repo.buscarPorNumero.mockResolvedValue({ id: 7, numero: "VEL-4K7Q2X" });
+      const pedidoEstadoService = { registrarAviso: jest.fn().mockResolvedValue(resultado) };
+      const servicio = new CheckoutService(repo, {}, () => AHORA, null, console, {
+        pedidoEstadoService,
+      });
+      return { repo, servicio, pedidoEstadoService };
+    };
+
+    it("busca el pedido por número y registra el aviso con origen cliente, sin usuario", async () => {
+      const { servicio, pedidoEstadoService } = armar();
+
+      const r = await servicio.informarComprobante("vel-4k7q2x");
+
+      expect(pedidoEstadoService.registrarAviso).toHaveBeenCalledWith(7, { origen: "cliente" });
+      expect(r).toEqual({ numero: "VEL-4K7Q2X", comprobanteInformado: true });
+    });
+
+    it("un segundo aviso responde lo mismo que el primero", async () => {
+      const { servicio } = armar({
+        registrado: false,
+        numero: "VEL-4K7Q2X",
+        motivo: "YA_INFORMADO",
+      });
+
+      await expect(servicio.informarComprobante("VEL-4K7Q2X")).resolves.toEqual({
+        numero: "VEL-4K7Q2X",
+        comprobanteInformado: true,
+      });
+    });
+
+    it("un número mal formado es NO_ENCONTRADO, sin consultar la base", async () => {
+      const { servicio, repo, pedidoEstadoService } = armar();
+
+      await expect(servicio.informarComprobante("'; DROP TABLE")).rejects.toThrow("NO_ENCONTRADO");
+      expect(repo.buscarPorNumero).not.toHaveBeenCalled();
+      expect(pedidoEstadoService.registrarAviso).not.toHaveBeenCalled();
+    });
+
+    it("un pedido inexistente es NO_ENCONTRADO, sin registrar nada", async () => {
+      const { servicio, repo, pedidoEstadoService } = armar();
+      repo.buscarPorNumero.mockResolvedValue(null);
+
+      await expect(servicio.informarComprobante("VEL-ZZZZZZ")).rejects.toThrow("NO_ENCONTRADO");
+      expect(pedidoEstadoService.registrarAviso).not.toHaveBeenCalled();
+    });
+
+    it("deja pasar los errores de las reglas, como PEDIDO_VENCIDO", async () => {
+      const { servicio, pedidoEstadoService } = armar();
+      pedidoEstadoService.registrarAviso.mockRejectedValue(new Error("PEDIDO_VENCIDO"));
+
+      await expect(servicio.informarComprobante("VEL-4K7Q2X")).rejects.toThrow("PEDIDO_VENCIDO");
+    });
+  });
 });

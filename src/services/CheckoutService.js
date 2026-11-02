@@ -590,6 +590,32 @@ class CheckoutService {
   }
 
   /**
+   * @description "Ya transferí" de la clienta. Es público, como la consulta: el
+   * número es lo único que identifica el pedido. Acá solo se busca el pedido para
+   * conocer su id; todas las reglas las decide registrarAviso, con el pedido
+   * bloqueado. Nunca recibe un usuario: el aviso queda con origen cliente.
+   *
+   * Responde lo mismo la primera vez y las siguientes: repetir el aviso no es un
+   * error y no cambia nada.
+   *
+   * @param {string} numero - Número del pedido.
+   * @returns {Promise<{numero: string, comprobanteInformado: true}>} Confirmación.
+   * @throws {Error} NO_ENCONTRADO, PEDIDO_NO_PAGABLE, PEDIDO_YA_PAGADO o PEDIDO_VENCIDO
+   */
+  async informarComprobante(numero) {
+    const pedido = await this.repositorio.buscarPorNumero(normalizarNumero(numero));
+    if (!pedido) {
+      throw new Error("NO_ENCONTRADO");
+    }
+
+    const { numero: confirmado } = await this.pedidoEstadoService.registrarAviso(pedido.id, {
+      origen: "cliente",
+    });
+
+    return { numero: confirmado, comprobanteInformado: true };
+  }
+
+  /**
    * @description Genera un número que no esté en uso. Una colisión es casi
    * imposible, pero el costo de verificar es una consulta, y el índice único de la
    * tabla queda como última barrera.
