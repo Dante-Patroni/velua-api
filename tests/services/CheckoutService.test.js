@@ -528,6 +528,56 @@ describe("CheckoutService", () => {
       expect(repo.buscarPorNumero).not.toHaveBeenCalled();
     });
 
+    describe("datos para transferir", () => {
+      const DATOS = {
+        alias: "velua.prueba.mp",
+        cbu: "0000000000000000000000",
+        titular: "Tienda de Prueba",
+      };
+      /** Pedido por transferencia, pendiente y con la reserva vigente. */
+      const vigente = (cambios = {}) => ({
+        ...pedidoGuardado,
+        expiraEn: new Date(AHORA.getTime() + HORA),
+        ...cambios,
+      });
+      const consultar = async (pedido, config = { datosTransferencia: DATOS }) => {
+        const repo = crearRepositorio();
+        repo.buscarPorNumero.mockResolvedValue(pedido);
+        return servicioCon(repo, config).consultarPorNumero("VEL-4K7Q2X");
+      };
+
+      it("con el pago pendiente y la reserva vigente, trae los datos y el monto", async () => {
+        const r = await consultar(vigente());
+
+        expect(r.transferencia).toEqual({ ...DATOS, monto: "23500.00" });
+      });
+
+      it("vencido pero con aviso, los sigue mostrando: espera a la dueña", async () => {
+        const r = await consultar(
+          vigente({ expiraEn: new Date(AHORA.getTime() - HORA), comprobanteInformadoEn: AHORA })
+        );
+
+        expect(r.transferencia).toEqual({ ...DATOS, monto: "23500.00" });
+      });
+
+      it.each([
+        ["con Mercado Pago", vigente({ medioPago: "mercadopago" }), undefined],
+        ["con el pago aprobado", vigente({ estadoPago: "aprobado" }), undefined],
+        ["cancelado", vigente({ estadoPago: "cancelado" }), undefined],
+        ["vencido sin aviso", vigente({ expiraEn: new Date(AHORA.getTime() - HORA) }), undefined],
+        [
+          "con la transferencia deshabilitada",
+          vigente(),
+          { transferenciaHabilitada: false, datosTransferencia: DATOS },
+        ],
+        ["sin datos configurados", vigente(), {}],
+      ])("%s no los muestra", async (_caso, pedido, config) => {
+        const r = await consultar(pedido, config);
+
+        expect(r.transferencia).toBeNull();
+      });
+    });
+
     it("lanza NO_ENCONTRADO si no existe", async () => {
       const repo = crearRepositorio();
       repo.buscarPorNumero.mockResolvedValue(null);

@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const { Cotizador } = require("./cotizador");
 const { aCentavos } = require("../utils/dinero");
 const { decidirReintentoMP } = require("./decidirReintentoMP");
+const { estaVencido } = require("./PedidoEstadoService");
 
 /** Una preferencia se reusa si le quedan al menos estos minutos de vida. */
 const MARGEN_PREFERENCIA_MS = 5 * 60 * 1000;
@@ -30,6 +31,27 @@ const MEDIOS = Object.keys(VENCIMIENTO_HORAS);
 
 /** Estados de pago desde los que todavía se puede pagar con Mercado Pago. */
 const ESTADOS_PAGABLES = Object.freeze(["pendiente", "rechazado"]);
+
+/**
+ * @description Datos para transferir, solo mientras la clienta tenga que pagar:
+ * pedido por transferencia, pago pendiente o rechazado y reserva vigente (o
+ * vencida pero con aviso, que espera a la dueña). En cualquier otro caso, null:
+ * no se le muestra un alias a quien ya no tiene que transferir.
+ * @param {Object} pedido - Pedido guardado.
+ * @param {Object} config - Configuración del servicio.
+ * @param {Date} ahora - Momento de referencia.
+ * @returns {{alias: string, cbu: string, titular: string, monto: string}|null} Los
+ *   datos con el total del pedido, o null.
+ */
+const datosParaTransferir = (pedido, config, ahora) => {
+  const datos = config.datosTransferencia;
+  if (config.transferenciaHabilitada !== true || !datos) return null;
+  if (pedido.medioPago !== "transferencia") return null;
+  if (!ESTADOS_PAGABLES.includes(pedido.estadoPago)) return null;
+  if (estaVencido(pedido, ahora)) return null;
+
+  return { alias: datos.alias, cbu: datos.cbu, titular: datos.titular, monto: pedido.total };
+};
 
 /**
  * @description Normaliza un número de pedido y verifica su forma.
@@ -563,6 +585,7 @@ class CheckoutService {
         costoEnvio: p.costoEnvio,
         total: p.total,
       },
+      transferencia: datosParaTransferir(p, this.config, this.ahora()),
     };
   }
 

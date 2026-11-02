@@ -26,6 +26,7 @@ const controller = new PedidoController(
       umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
       descuentoTransferencia: configTransferencia.descuento,
       transferenciaHabilitada: configTransferencia.habilitada,
+      datosTransferencia: configTransferencia.datos,
     },
     undefined,
     procesadorPagos,
