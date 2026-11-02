@@ -253,6 +253,20 @@ class SequelizePedidoTransaccion extends PedidoTransaccion {
       { where: { id: pedidoId }, transaction: this.t }
     );
   }
+
+  /**
+   * @description Guarda cuándo se avisó que la clienta transfirió. Como
+   * guardarSeguimiento, arma el objeto acá: no puede tocar otra columna.
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Date} fecha - Momento del aviso.
+   * @returns {Promise<void>}
+   */
+  async guardarAviso(pedidoId, fecha) {
+    await this.models.Pedido.update(
+      { comprobanteInformadoEn: fecha },
+      { where: { id: pedidoId }, transaction: this.t }
+    );
+  }
 }
 
 /**
