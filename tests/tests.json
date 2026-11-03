@@ -4810,6 +4810,86 @@
           ]
         },
         {
+          "name": "POST /admin/pedidos/{id}/aviso sin sesion",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/1/aviso",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "1",
+                "aviso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/pedidos/{id}/pago-confirmado sin sesion",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/1/pago-confirmado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "1",
+                "pago-confirmado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"verificadoEnBanco\": true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "POST /auth/login (pedidos del panel)",
           "request": {
             "method": "POST",
@@ -5759,7 +5839,586 @@
           ]
         },
         {
+          "name": "POST aviso de un pedido cancelado",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/aviso",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "aviso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Devuelve PEDIDO_NO_PAGABLE', () => pm.expect(pm.response.json().error).to.eql('PEDIDO_NO_PAGABLE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST pago-confirmado de un pedido cancelado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/pago-confirmado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "pago-confirmado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"verificadoEnBanco\": true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Devuelve PEDIDO_NO_PAGABLE', () => pm.expect(pm.response.json().error).to.eql('PEDIDO_NO_PAGABLE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST pago-confirmado con verificadoEnBanco como texto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/pago-confirmado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "pago-confirmado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"verificadoEnBanco\": \"true\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Marca el campo', () => pm.expect(pm.response.json().details).to.have.property('verificadoEnBanco'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos (segundo pedido, para confirmar el pago)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Confirmacion\", \"email\": \"newman-confirmacion@ejemplo.test\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Pedido de prueba que se aprueba: queda en la base, porque un pedido pagado no se cancela."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const p = pm.response.json();",
+                  "pm.test('Queda con el pago pendiente', () => pm.expect(p.estadoPago).to.eql('pendiente'));",
+                  "pm.collectionVariables.set('ped2_numero', p.numero);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos (buscar el segundo pedido)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const p = pm.response.json().datos.find((d) => d.numero === pm.collectionVariables.get('ped2_numero'));",
+                  "pm.test('Encuentra el segundo pedido', () => pm.expect(p).to.be.an('object'));",
+                  "if (p) pm.collectionVariables.set('ped2_id', p.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/pedidos/{id}/aviso",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped2_id}}/aviso",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped2_id}}",
+                "aviso"
+              ]
+            },
+            "description": "La clienta mandó el comprobante por WhatsApp sin apretar \"Ya transferí\"."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Registra el aviso', () => pm.expect(pm.response.json()).to.eql({ registrado: true, numero: pm.collectionVariables.get('ped2_numero') }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/pedidos/{id}/aviso otra vez",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped2_id}}/aviso",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped2_id}}",
+                "aviso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Avisa que ya estaba avisado', () => pm.expect(pm.response.json()).to.include({ registrado: false, motivo: 'YA_INFORMADO' }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/pedidos/{id}/pago-confirmado",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped2_id}}/pago-confirmado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped2_id}}",
+                "pago-confirmado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"verificadoEnBanco\": true, \"usuarioId\": 999999, \"estadoPago\": \"rechazado\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma el pago', () => pm.expect(pm.response.json()).to.eql({ confirmado: true, numero: pm.collectionVariables.get('ped2_numero') }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/pedidos/{id}/pago-confirmado otra vez",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped2_id}}/pago-confirmado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped2_id}}",
+                "pago-confirmado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"verificadoEnBanco\": true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Avisa que ya estaba confirmado', () => pm.expect(pm.response.json()).to.include({ confirmado: false, motivo: 'YA_CONFIRMADO' }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos/{id} despues de confirmar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped2_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped2_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json();",
+                  "pm.test('Quedó aprobado y deja de vencer', () => { pm.expect(r.estadoPago).to.eql('aprobado'); pm.expect(r.expiraEn).to.eql(null); });",
+                  "const delPanel = r.eventos.filter((e) => e.origen === 'panel');",
+                  "pm.test('El aviso y la aprobación quedaron con origen panel', () => { pm.expect(delPanel.some((e) => e.campo === 'aviso')).to.eql(true); pm.expect(delPanel.some((e) => e.campo === 'pago' && e.estadoNuevo === 'aprobado')).to.eql(true); });",
+                  "pm.test('El usuarioId del body no se usó', () => pm.expect(pm.response.text()).to.not.include('999999'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PATCH stock (restaurar despues de confirmar)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}/variantes/{{ped_variante_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{ped_producto_id}}",
+                "variantes",
+                "{{ped_variante_id}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stock\": {{ped_stock_original}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "pm.test('El stock volvio al original', () => pm.expect(v.stock).to.eql(Number(pm.collectionVariables.get('ped_stock_original'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "POST /auth/logout (pedidos del panel)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cierra la sesión', () => pm.expect(pm.response.code).to.be.oneOf([200, 204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login (operador)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{operador_email}}\",\"password\":\"{{operador_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Es operador y no tiene PAGOS_CONFIRMAR', () => { const u = pm.response.json(); pm.expect(u.rol).to.eql('operador'); pm.expect(u.permisos).to.not.include('PAGOS_CONFIRMAR'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST pago-confirmado como operador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped2_id}}/pago-confirmado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped2_id}}",
+                "pago-confirmado"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"verificadoEnBanco\": true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Aunque llame directo a la API, sin la pantalla: el permiso lo controla el servidor."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Devuelve SIN_PERMISO', () => pm.expect(pm.response.json().error).to.eql('SIN_PERMISO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST aviso como operador",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped2_id}}/aviso",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped2_id}}",
+                "aviso"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Devuelve SIN_PERMISO', () => pm.expect(pm.response.json().error).to.eql('SIN_PERMISO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (operador)",
           "request": {
             "method": "POST",
             "header": [],
