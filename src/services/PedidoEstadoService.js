@@ -433,6 +433,66 @@ class PedidoEstadoService {
   }
 
   /**
+   * @description La dueña confirma desde el panel que el dinero de una
+   * transferencia entró. Es la única forma de aprobar una transferencia: el aviso
+   * de la clienta no alcanza (docs/h4-checkout.md, decisiones del 31/10). No hace
+   * falta que haya aviso: la clienta puede transferir y no avisar.
+   *
+   * Usa los mismos efectos que una aprobación de Mercado Pago, sin sus datos.
+   * Se puede confirmar con la reserva vencida, mientras el pedido no esté cancelado.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} confirmacion - Quién confirma.
+   * @param {number} confirmacion.usuarioId - Usuario de la sesión.
+   * @param {boolean} confirmacion.verificadoEnBanco - Tiene que ser exactamente true:
+   *   la dueña afirma que miró el banco.
+   * @returns {Promise<{confirmado: boolean, numero: string, motivo?: string}>}
+   *   confirmado en false si ya estaba aprobado (motivo YA_CONFIRMADO).
+   * @throws {Error} DATOS_INVALIDOS (sin la verificación), NO_ENCONTRADO o
+   *   PEDIDO_NO_PAGABLE (no es transferencia, o está cancelado o devuelto).
+   */
+  async confirmarPagoTransferencia(pedidoId, { usuarioId, verificadoEnBanco }) {
+    if (!Number.isInteger(usuarioId)) {
+      throw new Error("confirmarPagoTransferencia: falta el usuario de la sesión");
+    }
+    if (verificadoEnBanco !== true) {
+      throw new Error("DATOS_INVALIDOS");
+    }
+
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        throw new Error("NO_ENCONTRADO");
+      }
+      const { numero } = pedido;
+
+      if (pedido.medioPago !== "transferencia") {
+        throw new Error("PEDIDO_NO_PAGABLE");
+      }
+      // Antes que el resto: un doble clic no es un error y no escribe nada.
+      if (pedido.estadoPago === "aprobado") {
+        return { confirmado: false, numero, motivo: "YA_CONFIRMADO" };
+      }
+      const confirmable =
+        ESTADOS_PAGO_VENCIBLES.includes(pedido.estadoPago) && pedido.estadoPedido !== "cancelado";
+      if (!confirmable) {
+        throw new Error("PEDIDO_NO_PAGABLE");
+      }
+
+      const sinAviso = pedido.comprobanteInformadoEn ? "" : " Sin aviso previo de la clienta.";
+      await this.#aplicarAprobacion(tx, pedido, {
+        origen: "panel",
+        usuarioId,
+        detalle: `Transferencia confirmada a mano: se verificó el ingreso en el banco.${sinAviso}`,
+      });
+
+      return { confirmado: true, numero };
+    });
+
+    return resultado;
+  }
+
+  /**
    * @description Deja un pedido para que la dueña lo revise a mano.
    *
    * Si el pedido todavía vence, deja de vencer: el stock queda apartado hasta que
