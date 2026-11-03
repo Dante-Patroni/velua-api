@@ -1624,6 +1624,174 @@
           ]
         },
         {
+          "name": "POST /pedidos/{numero}/comprobante",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos/{{ped_numero}}/comprobante",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos",
+                "{{ped_numero}}",
+                "comprobante"
+              ]
+            },
+            "description": "\"Ya transferí\" de la clienta: sin cuerpo, solo el número."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Confirma el aviso', () => pm.expect(pm.response.json()).to.eql({ numero: pm.collectionVariables.get('ped_numero'), comprobanteInformado: true }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos/{numero}/comprobante otra vez, con un cuerpo que intenta aprobar el pago",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos/{{ped_numero}}/comprobante",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos",
+                "{{ped_numero}}",
+                "comprobante"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"estadoPago\": \"aprobado\", \"usuarioId\": 1}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Responde lo mismo que la primera vez', () => pm.expect(pm.response.json()).to.eql({ numero: pm.collectionVariables.get('ped_numero'), comprobanteInformado: true }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /pedidos/{numero} despues del aviso",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos/{{ped_numero}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos",
+                "{{ped_numero}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('Queda avisado, con el pago todavía pendiente', () => {",
+                  "    pm.expect(p.comprobanteInformado).to.eql(true);",
+                  "    pm.expect(p.estadoPago).to.eql('pendiente');",
+                  "});",
+                  "pm.test('Sigue mostrando los datos para transferir', () => pm.expect(p.transferencia).to.be.an('object'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos/{numero}/comprobante con numero inexistente",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos/VEL-ZZZZZZ/comprobante",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos",
+                "VEL-ZZZZZZ",
+                "comprobante"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));",
+                  "pm.test('Devuelve NO_ENCONTRADO', () => pm.expect(pm.response.json().error).to.eql('NO_ENCONTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos/{numero}/comprobante con numero mal formado",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos/cualquier-cosa/comprobante",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos",
+                "cualquier-cosa",
+                "comprobante"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "GET stock despues del pedido",
           "request": {
             "method": "GET",
@@ -5325,6 +5493,52 @@
           ]
         },
         {
+          "name": "POST cancelacion sin confirmar la transferencia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{ped_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{ped_id}}",
+                "cancelacion"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"Prueba Newman de cancelación\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "La clienta avisó que transfirió: sin confirmaSinPago, no se cancela."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Devuelve COMPROBANTE_INFORMADO', () => pm.expect(pm.response.json().error).to.eql('COMPROBANTE_INFORMADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "POST cancelacion (cancelar el pedido de prueba)",
           "request": {
             "method": "POST",
@@ -5349,7 +5563,7 @@
             "description": "Manda campos de más (usuarioId, estadoPago): la API los ignora y el autor sale de la sesión.",
             "body": {
               "mode": "raw",
-              "raw": "{\"motivo\": \"Prueba Newman de cancelación\", \"usuarioId\": 999999, \"estadoPago\": \"aprobado\"}",
+              "raw": "{\"motivo\": \"Prueba Newman de cancelación\", \"confirmaSinPago\": true, \"usuarioId\": 999999, \"estadoPago\": \"aprobado\"}",
               "options": {
                 "raw": {
                   "language": "json"
