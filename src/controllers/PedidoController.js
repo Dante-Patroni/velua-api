@@ -62,6 +62,21 @@ class PedidoController {
       manejarErrorHttp(error, res);
     }
   };
+
+  /**
+   * @description "Ya transferí": registra que la clienta avisó la transferencia.
+   * No lee el cuerpo: solo el número de la ruta.
+   * @param {import("express").Request} req - Request con el número en la ruta.
+   * @param {import("express").Response} res - Response de Express.
+   * @returns {Promise<void>}
+   */
+  informarComprobante = async (req, res) => {
+    try {
+      res.status(200).json(await this.servicio.informarComprobante(req.params.numero));
+    } catch (error) {
+      manejarErrorHttp(error, res);
+    }
+  };
 }
 
 module.exports = PedidoController;

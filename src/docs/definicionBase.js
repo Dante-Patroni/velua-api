@@ -960,6 +960,15 @@ module.exports = {
           urlPago: { type: "string", description: "Link de pago de Mercado Pago." },
         },
       },
+      AvisoTransferencia: {
+        type: "object",
+        description: "Respuesta de \"Ya transferí\". Es la misma en el primer aviso y en los siguientes.",
+        required: ["numero", "comprobanteInformado"],
+        properties: {
+          numero: { type: "string", example: "VEL-4K7Q2X" },
+          comprobanteInformado: { type: "boolean", enum: [true] },
+        },
+      },      
       PedidoPublico: {
         type: "object",
         description: "Estado de un pedido sin ningun dato personal.",

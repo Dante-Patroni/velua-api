@@ -281,4 +281,54 @@ router.get("/pedidos/:numero", limitadorConsultaPedidos, controller.consultar);
  */
 router.post("/pedidos/:numero/pago", limitadorPedidos, controller.iniciarPago);
 
+/**
+ * @openapi
+ * /pedidos/{numero}/comprobante:
+ *   post:
+ *     tags: [Pedidos]
+ *     summary: Avisar que se hizo la transferencia ("Ya transferí")
+ *     description: >
+ *       Para un pedido por transferencia con el pago pendiente o rechazado y la
+ *       reserva vigente. Frena el vencimiento hasta que la dueña confirme el pago
+ *       o cancele el pedido; no aprueba el pago. Sin cuerpo: el comprobante se
+ *       manda por WhatsApp. Publico: el numero funciona como llave. Comparte el
+ *       limite de 10 por hora por IP con la creacion de pedidos y con el pago.
+ *
+ *       Repetir el aviso responde lo mismo y no cambia nada.
+ *     parameters:
+ *       - name: numero
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: VEL-4K7Q2X
+ *     responses:
+ *       200:
+ *         description: Aviso registrado, o ya estaba registrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AvisoTransferencia'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ *       409:
+ *         description: >
+ *           PEDIDO_NO_PAGABLE (no es por transferencia, o esta cancelado o
+ *           devuelto), PEDIDO_YA_PAGADO (la dueña ya confirmo el pago) o
+ *           PEDIDO_VENCIDO (la reserva vencio sin aviso).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Demasiados pedidos desde la misma direccion
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: LIMITE_SUPERADO
+ */
+router.post("/pedidos/:numero/comprobante", limitadorPedidos, controller.informarComprobante);
+
 module.exports = router;
