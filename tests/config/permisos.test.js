@@ -23,6 +23,7 @@ describe("permisos", () => {
     const operador = permisosDeRol("operador");
 
     for (const permiso of [
+      PERMISOS.PAGOS_CONFIRMAR,
       PERMISOS.PAGOS_DEVOLVER,
       PERMISOS.USUARIOS_GESTIONAR,
       PERMISOS.CATALOGO_BORRAR,

@@ -1235,6 +1235,35 @@ module.exports = {
           },
         },
       },
+      AvisoRegistrado: {
+        type: "object",
+        required: ["registrado", "numero"],
+        properties: {
+          registrado: { type: "boolean", description: "False si ya estaba avisado." },
+          numero: { type: "string", example: "VEL-4K7Q2X" },
+          motivo: { type: "string", enum: ["YA_INFORMADO"], description: "Solo cuando registrado es false." },
+        },
+      },
+      ConfirmacionPagoEntrada: {
+        type: "object",
+        required: ["verificadoEnBanco"],
+        properties: {
+          verificadoEnBanco: {
+            type: "boolean",
+            enum: [true],
+            description: "La dueña afirma que vio el dinero en el banco. Solo vale el booleano true.",
+          },
+        },
+      },
+      ConfirmacionPagoResultado: {
+        type: "object",
+        required: ["confirmado", "numero"],
+        properties: {
+          confirmado: { type: "boolean", description: "False si ya estaba confirmado." },
+          numero: { type: "string", example: "VEL-4K7Q2X" },
+          motivo: { type: "string", enum: ["YA_CONFIRMADO"], description: "Solo cuando confirmado es false." },
+        },
+      },      
       CancelacionResultado: {
         type: "object",
         required: ["cancelado", "numero"],
