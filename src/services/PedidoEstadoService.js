@@ -242,36 +242,36 @@ class PedidoEstadoService {
         return { cambiado: false, numero, motivo: "REQUIERE_REVISION" };
       }
 
-      await tx.actualizarEstados(pedido.id, { estadoPago: estado });
-      await tx.guardarDatosPago(pedido.id, {
-        mpPaymentId: String(pagoId),
-        mpMetodo: metodo,
-        // Aprobado: el pedido deja de vencer. Rechazado: sigue el plazo original,
-        // así la clienta puede reintentar mientras el stock esté apartado.
-        ...(estado === "aprobado" ? { expiraEn: null } : {}),
-      });
+      const datosPago = { mpPaymentId: String(pagoId), mpMetodo: metodo };
+      const detalle = `Pago ${pagoId}${metodo ? ` (${metodo})` : ""}`;
 
+      // Si el encolado del mail falla, falla todo y el procesador vuelve a avisar.
+      if (estado === "aprobado") {
+        await this.#aplicarAprobacion(tx, pedido, { origen, detalle, datosPago });
+        return { cambiado: true, numero };
+      }
+
+      // Rechazado: sigue el plazo original, así la clienta puede reintentar
+      // mientras el stock esté apartado.
+      await tx.actualizarEstados(pedido.id, { estadoPago: estado });
+      await tx.guardarDatosPago(pedido.id, datosPago);
       await tx.registrarEvento({
         pedidoId: pedido.id,
         campo: "pago",
         estadoAnterior: pedido.estadoPago,
         estadoNuevo: estado,
         origen,
-        detalle: `Pago ${pagoId}${metodo ? ` (${metodo})` : ""}`,
+        detalle,
       });
-
-      // Si el encolado falla, falla todo y el procesador vuelve a avisar.
       await tx.encolarEmail({
         pedidoId: pedido.id,
-        tipo: estado === "aprobado" ? "pago_confirmado" : "pago_rechazado",
+        tipo: "pago_rechazado",
         destinatario: pedido.clienteEmail,
         datos: {
           numero,
           nombre: pedido.clienteNombre,
           total: pedido.total,
-          ...(estado === "rechazado" && pedido.expiraEn
-            ? { expiraEn: new Date(pedido.expiraEn).toISOString() }
-            : {}),
+          ...(pedido.expiraEn ? { expiraEn: new Date(pedido.expiraEn).toISOString() } : {}),
         },
       });
 
@@ -320,6 +320,42 @@ class PedidoEstadoService {
     });
 
     return resultado;
+  }
+
+  /**
+   * @description Efectos de toda aprobación de pago, la registre Mercado Pago o la
+   * dueña: el pago pasa a aprobado, el pedido deja de vencer, queda el evento y se
+   * encola el mail de pago confirmado. Viven en un solo lugar para que las dos
+   * aprobaciones no se comporten distinto con el tiempo. Se llama siempre adentro
+   * de una transacción, con el pedido ya bloqueado y validado.
+   * @param {Object} tx - Repositorio transaccional.
+   * @param {Object} pedido - Pedido bloqueado.
+   * @param {Object} aprobacion - Quién aprueba y con qué datos.
+   * @param {string} aprobacion.origen - Origen del evento: webhook, job o panel.
+   * @param {number} [aprobacion.usuarioId] - Usuario de la sesión, solo desde el panel.
+   * @param {string} aprobacion.detalle - Texto del evento.
+   * @param {Object} [aprobacion.datosPago] - Datos del procesador (mpPaymentId,
+   *   mpMetodo). Vacío en una transferencia.
+   * @returns {Promise<void>}
+   */
+  async #aplicarAprobacion(tx, pedido, { origen, usuarioId, detalle, datosPago = {} }) {
+    await tx.actualizarEstados(pedido.id, { estadoPago: "aprobado" });
+    await tx.guardarDatosPago(pedido.id, { ...datosPago, expiraEn: null });
+    await tx.registrarEvento({
+      pedidoId: pedido.id,
+      campo: "pago",
+      estadoAnterior: pedido.estadoPago,
+      estadoNuevo: "aprobado",
+      origen,
+      ...(usuarioId === undefined ? {} : { usuarioId }),
+      detalle,
+    });
+    await tx.encolarEmail({
+      pedidoId: pedido.id,
+      tipo: "pago_confirmado",
+      destinatario: pedido.clienteEmail,
+      datos: { numero: pedido.numero, nombre: pedido.clienteNombre, total: pedido.total },
+    });
   }
 
   /**
