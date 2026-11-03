@@ -18,6 +18,8 @@ jobs:
       DB_PASSWORD: root
       DB_DATABASE: velua_test
       JWT_SECRET: secreto_solo_para_ci
+      OPERADOR_EMAIL: operador@velua.test
+      OPERADOR_PASSWORD: clave-operador-solo-para-ci      
       PORT: 3000
       ADMIN_NOMBRE: Admin de prueba
       ADMIN_EMAIL: admin@velua.test
