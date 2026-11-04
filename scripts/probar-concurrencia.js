@@ -6,6 +6,9 @@
  * repositorio en memoria no tiene bloqueos, y lo que se prueba acá son los bloqueos
  * de MySQL. Newman tampoco sirve, porque manda los requests de a uno.
  *
+ * Después dispara varios "Ya transferí" al mismo tiempo sobre el pedido ganador y
+ * verifica que quede un solo aviso: es la prueba real del bloqueo de registrarAviso.
+ *
  * Requiere el servidor corriendo y un usuario administrador en la base.
  *
  *   node scripts/probar-concurrencia.js
@@ -182,8 +185,43 @@ const leerStock = async (cookie, productoId, varianteId) => {
     }
 
     console.log("\n✓ Ganó exactamente uno y el stock no quedó negativo");
+
+    // 6. El mismo "Ya transferí" varias veces al mismo tiempo: un solo aviso
+    const { numero } = ganadores[0].cuerpo;
+    console.log(
+      `\nDisparando ${SIMULTANEOS} avisos simultáneos de "Ya transferí" para ${numero}...`
+    );
+    const avisos = await Promise.all(
+      Array.from({ length: SIMULTANEOS }, () =>
+        pedir(`/pedidos/${numero}/comprobante`, { method: "POST" })
+      )
+    );
+    avisos.forEach((r, i) => console.log(`  aviso ${i + 1}: HTTP ${r.status}`));
+    if (avisos.some((r) => r.status !== 200)) throw new Error("Algún aviso no respondió 200");
+
+    const { cuerpo: lista } = await pedir("/admin/pedidos?limite=50", { cookie });
+    const fila = lista.datos.find((p) => p.numero === numero);
+    if (!fila) throw new Error(`No encontré ${numero} en el panel`);
+    const { cuerpo: detalle } = await pedir(`/admin/pedidos/${fila.id}`, { cookie });
+    const eventosAviso = detalle.eventos.filter((e) => e.campo === "aviso");
+    console.log(`Eventos de aviso: ${eventosAviso.length}`);
+    if (eventosAviso.length !== 1) {
+      throw new Error(`Tenía que quedar un solo aviso y quedaron ${eventosAviso.length}`);
+    }
+
+    // 7. Cancelarlo, así no queda en la base un pedido avisado que nunca vence
+    const { status: estadoCancelacion } = await pedir(`/admin/pedidos/${fila.id}/cancelacion`, {
+      method: "POST",
+      body: { motivo: "Prueba de concurrencia de avisos", confirmaSinPago: true },
+      cookie,
+    });
+    if (estadoCancelacion !== 200) {
+      throw new Error(`No se pudo cancelar ${numero} (HTTP ${estadoCancelacion})`);
+    }
+
+    console.log(`\n✓ ${SIMULTANEOS} avisos simultáneos dejaron un solo evento`);
   } finally {
-    // 6. Siempre devolver el stock, pase lo que pase
+    // 8. Siempre devolver el stock, pase lo que pase
     await fijarStock(cookie, ficha.id, v.id, stockOriginal);
     console.log(`Stock restaurado a ${stockOriginal}`);
   }

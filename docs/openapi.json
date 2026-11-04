@@ -1315,7 +1315,8 @@
           "items",
           "avisos",
           "totales",
-          "envio"
+          "envio",
+          "mediosPago"
         ],
         "properties": {
           "items": {
@@ -1336,6 +1337,41 @@
           },
           "envio": {
             "$ref": "#/components/schemas/DetalleEnvio"
+          },
+          "mediosPago": {
+            "type": "object",
+            "description": "Qué medios se pueden usar hoy y el total con cada uno, calculado acá (con su descuento y su envío). El checkout ofrece solo los que vienen con disponible en true y muestra estos totales sin calcular nada.",
+            "required": [
+              "mercadopago",
+              "transferencia"
+            ],
+            "properties": {
+              "mercadopago": {
+                "$ref": "#/components/schemas/MedioPagoCotizado"
+              },
+              "transferencia": {
+                "$ref": "#/components/schemas/MedioPagoCotizado"
+              }
+            }
+          }
+        }
+      },
+      "MedioPagoCotizado": {
+        "type": "object",
+        "required": [
+          "disponible",
+          "total"
+        ],
+        "properties": {
+          "disponible": {
+            "type": "boolean",
+            "description": "False si el medio no está configurado en el servidor. No dice por qué: el motivo queda en el log."
+          },
+          "total": {
+            "type": "string",
+            "nullable": true,
+            "example": "32850.00",
+            "description": "Total con este medio, redondeado al peso. Null si no está disponible."
           }
         }
       },
@@ -1530,6 +1566,26 @@
           }
         }
       },
+      "AvisoTransferencia": {
+        "type": "object",
+        "description": "Respuesta de \"Ya transferí\". Es la misma en el primer aviso y en los siguientes.",
+        "required": [
+          "numero",
+          "comprobanteInformado"
+        ],
+        "properties": {
+          "numero": {
+            "type": "string",
+            "example": "VEL-4K7Q2X"
+          },
+          "comprobanteInformado": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
       "PedidoPublico": {
         "type": "object",
         "description": "Estado de un pedido sin ningun dato personal.",
@@ -1613,6 +1669,37 @@
           },
           "totales": {
             "$ref": "#/components/schemas/TotalesCotizacion"
+          },
+          "transferencia": {
+            "type": "object",
+            "nullable": true,
+            "description": "Datos para transferir. Solo mientras haya que pagar: pedido por transferencia, pago pendiente o rechazado, reserva vigente (o vencida con aviso) y transferencia habilitada. En cualquier otro caso, null.",
+            "required": [
+              "alias",
+              "cbu",
+              "titular",
+              "monto"
+            ],
+            "properties": {
+              "alias": {
+                "type": "string",
+                "example": "velua.prueba.mp"
+              },
+              "cbu": {
+                "type": "string",
+                "pattern": "^\\d{22}$",
+                "example": "0000000000000000000000"
+              },
+              "titular": {
+                "type": "string",
+                "example": "Tienda de Prueba"
+              },
+              "monto": {
+                "type": "string",
+                "description": "Total del pedido, con el descuento ya aplicado.",
+                "example": "23500.00"
+              }
+            }
           }
         }
       },
@@ -2301,7 +2388,7 @@
             }
           },
           "503": {
-            "description": "PROCESADOR_NO_CONFIGURADO. Se eligió Mercado Pago y no está configurado: no se crea el pedido ni se aparta stock. El frontend muestra que el pago online no está disponible.\n",
+            "description": "PROCESADOR_NO_CONFIGURADO: se eligió Mercado Pago y no está configurado. MEDIO_PAGO_NO_DISPONIBLE: se eligió transferencia y no hay datos bancarios válidos. En los dos casos no se crea el pedido ni se aparta stock; el frontend ofrece el otro medio.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -2412,6 +2499,64 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pedidos/{numero}/comprobante": {
+      "post": {
+        "tags": [
+          "Pedidos"
+        ],
+        "summary": "Avisar que se hizo la transferencia (\"Ya transferí\")",
+        "description": "Para un pedido por transferencia con el pago pendiente o rechazado y la reserva vigente. Frena el vencimiento hasta que la dueña confirme el pago o cancele el pedido; no aprueba el pago. Sin cuerpo: el comprobante se manda por WhatsApp. Publico: el numero funciona como llave. Tiene su propio limite, 20 por hora por IP, separado del de crear y pagar.\nRepetir el aviso responde lo mismo y no cambia nada.\n",
+        "parameters": [
+          {
+            "name": "numero",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "example": "VEL-4K7Q2X"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aviso registrado, o ya estaba registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AvisoTransferencia"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NoEncontrado"
+          },
+          "409": {
+            "description": "PEDIDO_NO_PAGABLE (no es por transferencia, o esta cancelado o devuelto), PEDIDO_YA_PAGADO (la dueña ya confirmo el pago) o PEDIDO_VENCIDO (la reserva vencio sin aviso).\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Demasiados avisos desde la misma direccion",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "error": "LIMITE_SUPERADO"
                 }
               }
             }

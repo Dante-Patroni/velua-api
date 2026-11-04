@@ -223,6 +223,17 @@ class PedidoTransaccion {
   async guardarSeguimiento(_pedidoId, _seguimiento) {
     throw new Error("Metodo guardarSeguimiento no implementado");
   }
+
+  /**
+   * @description Guarda cuándo se avisó que la clienta transfirió. Solo lo llama
+   * PedidoEstadoService.registrarAviso.
+   * @param {number} _pedidoId - Id del pedido.
+   * @param {Date} _fecha - Momento del aviso.
+   * @returns {Promise<void>}
+   */
+  async guardarAviso(_pedidoId, _fecha) {
+    throw new Error("Metodo guardarAviso no implementado");
+  }
 }
 
 module.exports = { PedidoRepository, PedidoTransaccion };

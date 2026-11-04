@@ -855,7 +855,7 @@ module.exports = {
       },
       Cotizacion: {
         type: "object",
-        required: ["items", "avisos", "totales", "envio"],
+        required: ["items", "avisos", "totales", "envio", "mediosPago"],
         properties: {
           items: { type: "array", items: { $ref: "#/components/schemas/ItemCotizado" } },
           avisos: {
@@ -865,6 +865,33 @@ module.exports = {
           },
           totales: { $ref: "#/components/schemas/TotalesCotizacion" },
           envio: { $ref: "#/components/schemas/DetalleEnvio" },
+          mediosPago: {
+            type: "object",
+            description:
+              "Qué medios se pueden usar hoy y el total con cada uno, calculado acá (con su descuento y su envío). El checkout ofrece solo los que vienen con disponible en true y muestra estos totales sin calcular nada.",
+            required: ["mercadopago", "transferencia"],
+            properties: {
+              mercadopago: { $ref: "#/components/schemas/MedioPagoCotizado" },
+              transferencia: { $ref: "#/components/schemas/MedioPagoCotizado" },
+            },
+          },
+        },
+      },
+      MedioPagoCotizado: {
+        type: "object",
+        required: ["disponible", "total"],
+        properties: {
+          disponible: {
+            type: "boolean",
+            description:
+              "False si el medio no está configurado en el servidor. No dice por qué: el motivo queda en el log.",
+          },
+          total: {
+            type: "string",
+            nullable: true,
+            example: "32850.00",
+            description: "Total con este medio, redondeado al peso. Null si no está disponible.",
+          },
         },
       },
 
@@ -960,6 +987,15 @@ module.exports = {
           urlPago: { type: "string", description: "Link de pago de Mercado Pago." },
         },
       },
+      AvisoTransferencia: {
+        type: "object",
+        description: "Respuesta de \"Ya transferí\". Es la misma en el primer aviso y en los siguientes.",
+        required: ["numero", "comprobanteInformado"],
+        properties: {
+          numero: { type: "string", example: "VEL-4K7Q2X" },
+          comprobanteInformado: { type: "boolean", enum: [true] },
+        },
+      },      
       PedidoPublico: {
         type: "object",
         description: "Estado de un pedido sin ningun dato personal.",
@@ -993,6 +1029,23 @@ module.exports = {
             },
           },
           totales: { $ref: "#/components/schemas/TotalesCotizacion" },
+          transferencia: {
+            type: "object",
+            nullable: true,
+            description:
+              "Datos para transferir. Solo mientras haya que pagar: pedido por transferencia, pago pendiente o rechazado, reserva vigente (o vencida con aviso) y transferencia habilitada. En cualquier otro caso, null.",
+            required: ["alias", "cbu", "titular", "monto"],
+            properties: {
+              alias: { type: "string", example: "velua.prueba.mp" },
+              cbu: { type: "string", pattern: "^\\d{22}$", example: "0000000000000000000000" },
+              titular: { type: "string", example: "Tienda de Prueba" },
+              monto: {
+                type: "string",
+                description: "Total del pedido, con el descuento ya aplicado.",
+                example: "23500.00",
+              },
+            },
+          },  
         },
       },
       EstadoPago: {

@@ -3,6 +3,7 @@ const crypto = require("crypto");
 const { Cotizador } = require("./cotizador");
 const { aCentavos } = require("../utils/dinero");
 const { decidirReintentoMP } = require("./decidirReintentoMP");
+const { estaVencido } = require("./PedidoEstadoService");
 
 /** Una preferencia se reusa si le quedan al menos estos minutos de vida. */
 const MARGEN_PREFERENCIA_MS = 5 * 60 * 1000;
@@ -30,6 +31,27 @@ const MEDIOS = Object.keys(VENCIMIENTO_HORAS);
 
 /** Estados de pago desde los que todavía se puede pagar con Mercado Pago. */
 const ESTADOS_PAGABLES = Object.freeze(["pendiente", "rechazado"]);
+
+/**
+ * @description Datos para transferir, solo mientras la clienta tenga que pagar:
+ * pedido por transferencia, pago pendiente o rechazado y reserva vigente (o
+ * vencida pero con aviso, que espera a la dueña). En cualquier otro caso, null:
+ * no se le muestra un alias a quien ya no tiene que transferir.
+ * @param {Object} pedido - Pedido guardado.
+ * @param {Object} config - Configuración del servicio.
+ * @param {Date} ahora - Momento de referencia.
+ * @returns {{alias: string, cbu: string, titular: string, monto: string}|null} Los
+ *   datos con el total del pedido, o null.
+ */
+const datosParaTransferir = (pedido, config, ahora) => {
+  const datos = config.datosTransferencia;
+  if (config.transferenciaHabilitada !== true || !datos) return null;
+  if (pedido.medioPago !== "transferencia") return null;
+  if (!ESTADOS_PAGABLES.includes(pedido.estadoPago)) return null;
+  if (estaVencido(pedido, ahora)) return null;
+
+  return { alias: datos.alias, cbu: datos.cbu, titular: datos.titular, monto: pedido.total };
+};
 
 /**
  * @description Normaliza un número de pedido y verifica su forma.
@@ -216,6 +238,12 @@ class CheckoutService {
     // ante la duda). Se rechaza acá: ni pedido, ni stock apartado, ni mail.
     if (entrada.medioPago === "mercadopago" && this.procesadorPagos?.configurado === false) {
       throw new Error("PROCESADOR_NO_CONFIGURADO");
+    }
+
+    // Lo mismo con la transferencia sin datos bancarios válidos: la clienta no
+    // tendría a dónde transferir. Solo se acepta si la configuración lo dice.
+    if (entrada.medioPago === "transferencia" && this.config.transferenciaHabilitada !== true) {
+      throw new Error("MEDIO_PAGO_NO_DISPONIBLE");
     }
 
     const { items, cliente, entrega, medioPago, totalEsperado, notas } = entrada;
@@ -557,7 +585,34 @@ class CheckoutService {
         costoEnvio: p.costoEnvio,
         total: p.total,
       },
+      transferencia: datosParaTransferir(p, this.config, this.ahora()),
     };
+  }
+
+  /**
+   * @description "Ya transferí" de la clienta. Es público, como la consulta: el
+   * número es lo único que identifica el pedido. Acá solo se busca el pedido para
+   * conocer su id; todas las reglas las decide registrarAviso, con el pedido
+   * bloqueado. Nunca recibe un usuario: el aviso queda con origen cliente.
+   *
+   * Responde lo mismo la primera vez y las siguientes: repetir el aviso no es un
+   * error y no cambia nada.
+   *
+   * @param {string} numero - Número del pedido.
+   * @returns {Promise<{numero: string, comprobanteInformado: true}>} Confirmación.
+   * @throws {Error} NO_ENCONTRADO, PEDIDO_NO_PAGABLE, PEDIDO_YA_PAGADO o PEDIDO_VENCIDO
+   */
+  async informarComprobante(numero) {
+    const pedido = await this.repositorio.buscarPorNumero(normalizarNumero(numero));
+    if (!pedido) {
+      throw new Error("NO_ENCONTRADO");
+    }
+
+    const { numero: confirmado } = await this.pedidoEstadoService.registrarAviso(pedido.id, {
+      origen: "cliente",
+    });
+
+    return { numero: confirmado, comprobanteInformado: true };
   }
 
   /**

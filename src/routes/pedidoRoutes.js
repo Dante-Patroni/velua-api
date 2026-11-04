@@ -7,15 +7,16 @@ const { CheckoutService } = require("../services/CheckoutService");
 const { TOPE_ITEMS } = require("../services/cotizador");
 const PedidoController = require("../controllers/PedidoController");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
+const { configTransferencia } = require("../config/transferencia");
 const {
   limitadorPedidos,
+  limitadorAvisos,
   limitadorConsultaPedidos,
 } = require("../middlewares/rateLimitMiddleware");
-const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
+const { procesadorPagos } = require("../pagos/procesadorCompartido");
 const { PedidoEstadoService } = require("../services/PedidoEstadoService");
 const { PagoWebhookService } = require("../services/PagoWebhookService");
 const pedidoRepository = new SequelizePedidoRepository(db);
-const procesadorPagos = new MercadoPagoProcesador();
 const pedidoEstadoService = new PedidoEstadoService(pedidoRepository);
 
 const controller = new PedidoController(
@@ -23,7 +24,9 @@ const controller = new PedidoController(
     pedidoRepository,
     {
       umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
-      descuentoTransferencia: Number(process.env.DESCUENTO_TRANSFERENCIA || 0),
+      descuentoTransferencia: configTransferencia.descuento,
+      transferenciaHabilitada: configTransferencia.habilitada,
+      datosTransferencia: configTransferencia.datos,
     },
     undefined,
     procesadorPagos,
@@ -161,9 +164,10 @@ const validarPedido = [
  *               error: TOTAL_CAMBIO
  *       503:
  *         description: >
- *           PROCESADOR_NO_CONFIGURADO. Se eligió Mercado Pago y no está
- *           configurado: no se crea el pedido ni se aparta stock. El frontend
- *           muestra que el pago online no está disponible.
+ *           PROCESADOR_NO_CONFIGURADO: se eligió Mercado Pago y no está
+ *           configurado. MEDIO_PAGO_NO_DISPONIBLE: se eligió transferencia y
+ *           no hay datos bancarios válidos. En los dos casos no se crea el
+ *           pedido ni se aparta stock; el frontend ofrece el otro medio.
  *         content:
  *           application/json:
  *             schema:
@@ -276,5 +280,55 @@ router.get("/pedidos/:numero", limitadorConsultaPedidos, controller.consultar);
  *               $ref: '#/components/schemas/Error'
  */
 router.post("/pedidos/:numero/pago", limitadorPedidos, controller.iniciarPago);
+
+/**
+ * @openapi
+ * /pedidos/{numero}/comprobante:
+ *   post:
+ *     tags: [Pedidos]
+ *     summary: Avisar que se hizo la transferencia ("Ya transferí")
+ *     description: >
+ *       Para un pedido por transferencia con el pago pendiente o rechazado y la
+ *       reserva vigente. Frena el vencimiento hasta que la dueña confirme el pago
+ *       o cancele el pedido; no aprueba el pago. Sin cuerpo: el comprobante se
+ *       manda por WhatsApp. Publico: el numero funciona como llave. Tiene su
+ *       propio limite, 20 por hora por IP, separado del de crear y pagar.
+ *
+ *       Repetir el aviso responde lo mismo y no cambia nada.
+ *     parameters:
+ *       - name: numero
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *           example: VEL-4K7Q2X
+ *     responses:
+ *       200:
+ *         description: Aviso registrado, o ya estaba registrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AvisoTransferencia'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ *       409:
+ *         description: >
+ *           PEDIDO_NO_PAGABLE (no es por transferencia, o esta cancelado o
+ *           devuelto), PEDIDO_YA_PAGADO (la dueña ya confirmo el pago) o
+ *           PEDIDO_VENCIDO (la reserva vencio sin aviso).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       429:
+ *         description: Demasiados avisos desde la misma direccion
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: LIMITE_SUPERADO
+ */
+router.post("/pedidos/:numero/comprobante", limitadorAvisos, controller.informarComprobante);
 
 module.exports = router;

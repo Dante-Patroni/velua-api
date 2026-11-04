@@ -2,7 +2,7 @@ const SequelizePedidoRepository = require("../repositories/sequelize/SequelizePe
 const { PedidoEstadoService } = require("../services/PedidoEstadoService");
 const { PagoWebhookService } = require("../services/PagoWebhookService");
 const { decidirVencimientoMP } = require("../services/decidirVencimientoMP");
-const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
+const { procesadorPagos } = require("../pagos/procesadorCompartido");
 
 /** Cada cuánto corre el job: cinco minutos. */
 const INTERVALO_MS = 5 * 60 * 1000;
@@ -236,7 +236,6 @@ class VencimientoReservas {
 const crearVencimientoReservas = (db) => {
   const pedidoRepository = new SequelizePedidoRepository(db);
   const pedidoEstadoService = new PedidoEstadoService(pedidoRepository);
-  const procesadorPagos = new MercadoPagoProcesador();
   return new VencimientoReservas({
     pedidoRepository,
     pedidoEstadoService,

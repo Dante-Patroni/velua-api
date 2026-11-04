@@ -55,6 +55,9 @@ function crearRepositorio({ pedidos = [pedido()], items = [], stock = {} } = {})
     guardarSeguimiento: jest.fn(async (id, seguimiento) => {
       buscar(id).seguimiento = seguimiento;
     }),
+    guardarAviso: jest.fn(async (id, fecha) => {
+      buscar(id).comprobanteInformadoEn = fecha;
+    }),
     registrarEvento: jest.fn(async (evento) => {
       estado.eventos.push(evento);
     }),
@@ -415,6 +418,127 @@ describe("cancelarManual", () => {
       expect(repo.estado.eventos[0].detalle).not.toContain("..");
     },
   );
+});
+
+describe("registrarAviso", () => {
+  const HORA = 60 * 60 * 1000;
+  /** Pedido por transferencia, pendiente y con la reserva vigente. */
+  const porTransferencia = (cambios = {}) =>
+    pedido({
+      medioPago: "transferencia",
+      estadoPago: "pendiente",
+      expiraEn: new Date(AHORA.getTime() + HORA),
+      ...cambios,
+    });
+  const VENCIDO = { expiraEn: new Date(AHORA.getTime() - HORA) };
+
+  test.each(["pendiente", "rechazado"])(
+    "la clienta avisa con el pago %s: guarda la fecha y un evento",
+    async (estadoPago) => {
+      const repo = crearRepositorio({ pedidos: [porTransferencia({ estadoPago })] });
+
+      const r = await servicio(repo).registrarAviso(1, { origen: "cliente" });
+
+      expect(r).toEqual({ registrado: true, numero: "VEL-AAAAAA" });
+      expect(repo.estado.pedidos[0].comprobanteInformadoEn).toEqual(AHORA);
+      expect(repo.estado.pedidos[0].estadoPago).toBe(estadoPago);
+      expect(repo.estado.eventos).toEqual([
+        {
+          pedidoId: 1,
+          campo: "aviso",
+          estadoAnterior: null,
+          estadoNuevo: "comprobante_informado",
+          origen: "cliente",
+          usuarioId: null,
+        },
+      ]);
+    }
+  );
+
+  test("bloquea el pedido antes de decidir", async () => {
+    const repo = crearRepositorio({ pedidos: [porTransferencia()] });
+
+    await servicio(repo).registrarAviso(1, { origen: "cliente" });
+
+    expect(repo.tx.bloquearPedido).toHaveBeenCalledWith(1);
+    expect(repo.tx.bloquearPedido.mock.invocationCallOrder[0]).toBeLessThan(
+      repo.tx.guardarAviso.mock.invocationCallOrder[0]
+    );
+  });
+
+  test.each([
+    ["vigente", {}],
+    ["vencido", VENCIDO],
+  ])("un segundo aviso con la reserva %s no escribe nada", async (_caso, cambios) => {
+    const avisado = porTransferencia({ comprobanteInformadoEn: AHORA, ...cambios });
+    const repo = crearRepositorio({ pedidos: [avisado] });
+
+    const r = await servicio(repo).registrarAviso(1, { origen: "cliente" });
+
+    expect(r).toEqual({ registrado: false, numero: "VEL-AAAAAA", motivo: "YA_INFORMADO" });
+    expect(repo.tx.guardarAviso).not.toHaveBeenCalled();
+    expect(repo.estado.eventos).toHaveLength(0);
+  });
+
+  test("la clienta no puede avisar con la reserva vencida", async () => {
+    const repo = crearRepositorio({ pedidos: [porTransferencia(VENCIDO)] });
+
+    await expect(servicio(repo).registrarAviso(1, { origen: "cliente" })).rejects.toThrow(
+      "PEDIDO_VENCIDO"
+    );
+    expect(repo.estado.pedidos[0].comprobanteInformadoEn).toBeNull();
+    expect(repo.estado.eventos).toHaveLength(0);
+  });
+
+  test("la dueña sí puede avisar un pedido vencido, y queda su usuario", async () => {
+    const repo = crearRepositorio({ pedidos: [porTransferencia(VENCIDO)] });
+
+    const r = await servicio(repo).registrarAviso(1, { origen: "panel", usuarioId: ADMIN });
+
+    expect(r.registrado).toBe(true);
+    expect(repo.estado.eventos[0]).toMatchObject({ origen: "panel", usuarioId: ADMIN });
+  });
+
+  test.each([
+    ["con Mercado Pago", { medioPago: "mercadopago" }, "PEDIDO_NO_PAGABLE"],
+    ["con el pago aprobado", { estadoPago: "aprobado" }, "PEDIDO_YA_PAGADO"],
+    ["cancelado", { estadoPago: "cancelado", estadoPedido: "cancelado" }, "PEDIDO_NO_PAGABLE"],
+    ["devuelto", { estadoPago: "devuelto" }, "PEDIDO_NO_PAGABLE"],
+  ])("%s responde %s sin escribir nada", async (_caso, cambios, codigo) => {
+    const repo = crearRepositorio({ pedidos: [porTransferencia(cambios)] });
+
+    await expect(
+      servicio(repo).registrarAviso(1, { origen: "panel", usuarioId: ADMIN })
+    ).rejects.toThrow(codigo);
+    expect(repo.tx.guardarAviso).not.toHaveBeenCalled();
+    expect(repo.estado.eventos).toHaveLength(0);
+  });
+
+  test("un pedido inexistente es NO_ENCONTRADO", async () => {
+    const repo = crearRepositorio({ pedidos: [] });
+
+    await expect(servicio(repo).registrarAviso(9, { origen: "cliente" })).rejects.toThrow(
+      "NO_ENCONTRADO"
+    );
+  });
+
+  test("con origen cliente, el usuario siempre queda null", async () => {
+    const repo = crearRepositorio({ pedidos: [porTransferencia()] });
+
+    await servicio(repo).registrarAviso(1, { origen: "cliente", usuarioId: 99 });
+
+    expect(repo.estado.eventos[0].usuarioId).toBeNull();
+  });
+
+  test.each([
+    ["el panel sin usuario", { origen: "panel" }],
+    ["un origen desconocido", { origen: "job" }],
+  ])("%s ni abre la transacción", async (_caso, aviso) => {
+    const repo = crearRepositorio({ pedidos: [porTransferencia()] });
+
+    await expect(servicio(repo).registrarAviso(1, aviso)).rejects.toThrow("registrarAviso");
+    expect(repo.transaccion).not.toHaveBeenCalled();
+  });
 });
 
 describe("sinPuntosFinales", () => {

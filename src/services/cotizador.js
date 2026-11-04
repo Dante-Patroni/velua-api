@@ -7,6 +7,9 @@ const TOPE_POR_VARIANTE = 10;
 /** Ítems distintos máximos en un carrito. */
 const TOPE_ITEMS = 30;
 
+/** Medios de pago de la tienda, en el orden en que se informan. */
+const MEDIOS_PAGO = Object.freeze(["mercadopago", "transferencia"]);
+
 /**
  * @description Motivos por los que un ítem se quita o se ajusta. El frontend
  * los traduce; acá nunca se arman textos para mostrar.
@@ -111,6 +114,9 @@ class Cotizador {
    *   Null o ausente significa que no hay envío gratis.
    * @param {number} [config.descuentoTransferencia] - Porcentaje de descuento por
    *   pagar con transferencia.
+   * @param {{mercadopago?: boolean, transferencia?: boolean}} [config.mediosDisponibles] -
+   *   Qué medios se pueden usar hoy. Solo cuenta un `true` explícito: lo que falte
+   *   se informa como no disponible (falla cerrado).
    * @param {Function} [config.hoy] - Devuelve la fecha de hoy "AAAA-MM-DD" en la
    *   zona del negocio. Se inyecta en los tests; por defecto, la de Argentina.
    */
@@ -118,6 +124,11 @@ class Cotizador {
     this.repositorio = cotizacionRepository;
     this.umbralEnvioGratis = config.umbralEnvioGratis ?? null;
     this.descuentoTransferencia = Number(config.descuentoTransferencia ?? 0);
+    this.mediosDisponibles = Object.freeze(
+      Object.fromEntries(
+        MEDIOS_PAGO.map((medio) => [medio, config.mediosDisponibles?.[medio] === true])
+      )
+    );
     this.hoy = typeof config.hoy === "function" ? config.hoy : hoyEnArgentina;
   }
 
@@ -134,7 +145,10 @@ class Cotizador {
    * @param {Array<{varianteId: number, cantidad: number}>} pedido.items - Carrito.
    * @param {number} [pedido.zonaEnvioId] - Zona elegida. Sin zona, se cotiza como retiro.
    * @param {string} [pedido.medioPago] - "transferencia" o "mercadopago".
-   * @returns {Promise<Object>} Ítems cotizados, avisos y totales.
+   * @returns {Promise<Object>} Ítems cotizados, avisos, totales del medio elegido y,
+   *   en `mediosPago`, si cada medio está disponible y su total. El total de cada
+   *   medio lo calcula acá, con su descuento y su envío: el envío gratis depende del
+   *   monto ya descontado, así que la diferencia entre medios no es solo el descuento.
    * @throws {Error} DATOS_INVALIDOS, CARRITO_SIN_ITEMS_VALIDOS, ZONA_INVALIDA, DATOS_DE_VENTA_INCOMPLETOS
    */
   async cotizar({ items, zonaEnvioId, medioPago }) {
@@ -163,9 +177,21 @@ class Cotizador {
     const ajustePago = this.#ajustePorMedioDePago(base, medioPago);
     const conDescuentos = base - ajustePago;
 
-    const envio = await this.#calcularEnvio(zonaEnvioId, conDescuentos);
+    const zona = await this.#buscarZona(zonaEnvioId);
+    const envio = this.#calcularEnvio(zona, conDescuentos);
 
     const total = redondearAlPeso(conDescuentos + envio.costoCentavos);
+
+    // El mismo cálculo para cada medio, con la zona ya buscada: una sola consulta.
+    const mediosPago = Object.fromEntries(
+      MEDIOS_PAGO.map((medio) => {
+        if (!this.mediosDisponibles[medio]) return [medio, { disponible: false, total: null }];
+        const conDescuentoDelMedio = base - this.#ajustePorMedioDePago(base, medio);
+        const envioDelMedio = this.#calcularEnvio(zona, conDescuentoDelMedio);
+        const totalDelMedio = redondearAlPeso(conDescuentoDelMedio + envioDelMedio.costoCentavos);
+        return [medio, { disponible: true, total: aImporte(totalDelMedio) }];
+      })
+    );
 
     return {
         items: lineas.map((l) => ({
@@ -187,6 +213,7 @@ class Cotizador {
         total: aImporte(total),
       },
       envio: envio.detalle,
+      mediosPago,
     };
   }
 
@@ -313,28 +340,40 @@ class Cotizador {
   }
 
   /**
+   * @description Busca la zona de envío elegida.
+   * @param {number} [zonaEnvioId] - Zona elegida. Sin zona, es retiro en persona.
+   * @returns {Promise<Object|null>} La zona, o null si es retiro.
+   * @throws {Error} ZONA_INVALIDA si la zona no existe o está inactiva.
+   */
+  async #buscarZona(zonaEnvioId) {
+    if (zonaEnvioId === undefined || zonaEnvioId === null) {
+      return null;
+    }
+
+    const zona = await this.repositorio.buscarZonaEnvio(Number(zonaEnvioId));
+    if (!zona) {
+      throw new Error("ZONA_INVALIDA");
+    }
+    return zona;
+  }
+
+  /**
    * @description Calcula el costo del envío.
    *
    * El envío gratis se decide sobre el monto ya descontado: si un cupón baja el
    * total por debajo del umbral, el envío se cobra. El beneficio se mide sobre
    * lo que efectivamente se paga.
    *
-   * @param {number} [zonaEnvioId] - Zona elegida. Sin zona, es retiro en persona.
+   * @param {Object|null} zona - Zona ya buscada, o null si es retiro.
    * @param {number} montoCentavos - Monto después de los descuentos.
-   * @returns {Promise<{costoCentavos: number, detalle: Object}>} Costo y detalle.
-   * @throws {Error} ZONA_INVALIDA si la zona no existe o está inactiva.
+   * @returns {{costoCentavos: number, detalle: Object}} Costo y detalle.
    */
-  async #calcularEnvio(zonaEnvioId, montoCentavos) {
-    if (zonaEnvioId === undefined || zonaEnvioId === null) {
+  #calcularEnvio(zona, montoCentavos) {
+    if (zona === null) {
       return {
         costoCentavos: 0,
         detalle: { modo: "retiro", zonaId: null, nombre: null, gratis: false },
       };
-    }
-
-    const zona = await this.repositorio.buscarZonaEnvio(Number(zonaEnvioId));
-    if (!zona) {
-      throw new Error("ZONA_INVALIDA");
     }
 
     const costo = aCentavos(zona.costo);
@@ -354,4 +393,4 @@ class Cotizador {
   }
 }
 
-module.exports = { Cotizador, AVISOS, TOPE_POR_VARIANTE, TOPE_ITEMS, imagenPrincipal };
+module.exports = { Cotizador, AVISOS, TOPE_POR_VARIANTE, TOPE_ITEMS, MEDIOS_PAGO, imagenPrincipal };

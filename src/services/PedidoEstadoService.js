@@ -7,6 +7,9 @@ const {
 /** Resultados del procesador que mueven el estado de pago. */
 const RESULTADOS_PAGO = Object.freeze(["aprobado", "rechazado"]);
 
+/** Desde dónde se puede avisar una transferencia: la clienta o la dueña. */
+const ORIGENES_AVISO = Object.freeze(["cliente", "panel"]);
+
 /** Estados de preparación a los que se avanza a mano desde el panel. */
 const AVANCES_PREPARACION = Object.freeze(["en_preparacion", "enviado", "entregado"]);
 
@@ -314,6 +317,80 @@ class PedidoEstadoService {
       });
 
       return { postergado: true, numero: pedido.numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description Registra que la clienta avisó que transfirió. Frena el
+   * vencimiento, pero no aprueba el pago: eso lo hace la dueña después de mirar
+   * el banco (docs/h4-checkout.md, decisiones del 31/10).
+   *
+   * Lo usan los dos caminos: "Ya transferí" de la clienta (origen cliente) y el
+   * aviso que registra la dueña desde el panel (origen panel). Las reglas viven
+   * solo acá, y todo se decide con el pedido bloqueado.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} aviso - Quién avisa.
+   * @param {"cliente"|"panel"} aviso.origen - Desde dónde llega el aviso.
+   * @param {number|null} [aviso.usuarioId] - Usuario de la sesión. Obligatorio
+   *   con origen panel; con origen cliente se ignora y queda null.
+   * @returns {Promise<{registrado: boolean, numero: string, motivo?: string}>}
+   *   registrado en false si ya estaba avisado (motivo YA_INFORMADO).
+   * @throws {Error} NO_ENCONTRADO, PEDIDO_NO_PAGABLE, PEDIDO_YA_PAGADO o
+   *   PEDIDO_VENCIDO (solo la clienta: la dueña puede avisar un pedido vencido
+   *   mientras no esté cancelado).
+   */
+  async registrarAviso(pedidoId, { origen, usuarioId = null }) {
+    if (!ORIGENES_AVISO.includes(origen)) {
+      throw new Error(`registrarAviso: origen desconocido (${origen})`);
+    }
+    if (origen === "panel" && !Number.isInteger(usuarioId)) {
+      throw new Error("registrarAviso: el aviso desde el panel necesita el usuario");
+    }
+    const quien = origen === "panel" ? usuarioId : null;
+
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        throw new Error("NO_ENCONTRADO");
+      }
+      const { numero } = pedido;
+
+      if (pedido.medioPago !== "transferencia") {
+        throw new Error("PEDIDO_NO_PAGABLE");
+      }
+      if (pedido.estadoPago === "aprobado") {
+        throw new Error("PEDIDO_YA_PAGADO");
+      }
+      const pagable =
+        ESTADOS_PAGO_VENCIBLES.includes(pedido.estadoPago) && pedido.estadoPedido !== "cancelado";
+      if (!pagable) {
+        throw new Error("PEDIDO_NO_PAGABLE");
+      }
+      // Antes que el vencimiento: un segundo aviso no escribe nada, aunque la
+      // reserva ya haya pasado (un pedido avisado no vence).
+      if (pedido.comprobanteInformadoEn) {
+        return { registrado: false, numero, motivo: "YA_INFORMADO" };
+      }
+
+      const ahora = this.ahora();
+      if (origen === "cliente" && estaVencido(pedido, ahora)) {
+        throw new Error("PEDIDO_VENCIDO");
+      }
+
+      await tx.guardarAviso(pedido.id, ahora);
+      await tx.registrarEvento({
+        pedidoId: pedido.id,
+        campo: "aviso",
+        estadoAnterior: null,
+        estadoNuevo: "comprobante_informado",
+        origen,
+        usuarioId: quien,
+      });
+
+      return { registrado: true, numero };
     });
 
     return resultado;

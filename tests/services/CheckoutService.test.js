@@ -100,8 +100,9 @@ const entrada = (cambios = {}) => ({
   ...cambios,
 });
 
+/** Servicio con la transferencia habilitada, salvo que el test diga otra cosa. */
 const servicioCon = (repositorio, config = {}) =>
-  new CheckoutService(repositorio, config, () => AHORA);
+  new CheckoutService(repositorio, { transferenciaHabilitada: true, ...config }, () => AHORA);
 
 describe("CheckoutService", () => {
   describe("crearPedido, el camino feliz", () => {
@@ -206,6 +207,34 @@ describe("CheckoutService", () => {
       const r = await servicioCon(repo).crearPedido(entrada({ medioPago: "transferencia" }));
 
       expect(r.expiraEn.getTime() - AHORA.getTime()).toBe(24 * HORA);
+    });
+  });
+
+  describe("transferencia sin datos bancarios", () => {
+    it.each([
+      ["deshabilitada", (repo) => servicioCon(repo, { transferenciaHabilitada: false })],
+      ["sin configurar", (repo) => new CheckoutService(repo, {}, () => AHORA)],
+    ])("%s: rechaza sin crear el pedido ni apartar stock", async (_caso, armar) => {
+      const repo = crearRepositorio();
+
+      await expect(
+        armar(repo).crearPedido(entrada({ medioPago: "transferencia" }))
+      ).rejects.toThrow("MEDIO_PAGO_NO_DISPONIBLE");
+
+      expect(repo.estado.variantes[0].stock).toBe(10);
+      expect(repo.estado.pedidos).toHaveLength(0);
+      expect(repo.estado.emails).toHaveLength(0);
+    });
+
+    it("Mercado Pago sigue funcionando aunque la transferencia esté deshabilitada", async () => {
+      const repo = crearRepositorio();
+
+      const r = await servicioCon(repo, { transferenciaHabilitada: false }).crearPedido(
+        entrada({ medioPago: "mercadopago" })
+      );
+
+      expect(r.medioPago).toBe("mercadopago");
+      expect(repo.estado.pedidos).toHaveLength(1);
     });
   });
 
@@ -499,6 +528,56 @@ describe("CheckoutService", () => {
       expect(repo.buscarPorNumero).not.toHaveBeenCalled();
     });
 
+    describe("datos para transferir", () => {
+      const DATOS = {
+        alias: "velua.prueba.mp",
+        cbu: "0000000000000000000000",
+        titular: "Tienda de Prueba",
+      };
+      /** Pedido por transferencia, pendiente y con la reserva vigente. */
+      const vigente = (cambios = {}) => ({
+        ...pedidoGuardado,
+        expiraEn: new Date(AHORA.getTime() + HORA),
+        ...cambios,
+      });
+      const consultar = async (pedido, config = { datosTransferencia: DATOS }) => {
+        const repo = crearRepositorio();
+        repo.buscarPorNumero.mockResolvedValue(pedido);
+        return servicioCon(repo, config).consultarPorNumero("VEL-4K7Q2X");
+      };
+
+      it("con el pago pendiente y la reserva vigente, trae los datos y el monto", async () => {
+        const r = await consultar(vigente());
+
+        expect(r.transferencia).toEqual({ ...DATOS, monto: "23500.00" });
+      });
+
+      it("vencido pero con aviso, los sigue mostrando: espera a la dueña", async () => {
+        const r = await consultar(
+          vigente({ expiraEn: new Date(AHORA.getTime() - HORA), comprobanteInformadoEn: AHORA })
+        );
+
+        expect(r.transferencia).toEqual({ ...DATOS, monto: "23500.00" });
+      });
+
+      it.each([
+        ["con Mercado Pago", vigente({ medioPago: "mercadopago" }), undefined],
+        ["con el pago aprobado", vigente({ estadoPago: "aprobado" }), undefined],
+        ["cancelado", vigente({ estadoPago: "cancelado" }), undefined],
+        ["vencido sin aviso", vigente({ expiraEn: new Date(AHORA.getTime() - HORA) }), undefined],
+        [
+          "con la transferencia deshabilitada",
+          vigente(),
+          { transferenciaHabilitada: false, datosTransferencia: DATOS },
+        ],
+        ["sin datos configurados", vigente(), {}],
+      ])("%s no los muestra", async (_caso, pedido, config) => {
+        const r = await consultar(pedido, config);
+
+        expect(r.transferencia).toBeNull();
+      });
+    });
+
     it("lanza NO_ENCONTRADO si no existe", async () => {
       const repo = crearRepositorio();
       repo.buscarPorNumero.mockResolvedValue(null);
@@ -506,6 +585,64 @@ describe("CheckoutService", () => {
       await expect(servicioCon(repo).consultarPorNumero("VEL-ZZZZZZ")).rejects.toThrow(
         "NO_ENCONTRADO"
       );
+    });
+  });
+
+  describe("informarComprobante", () => {
+    /** Servicio con un registrarAviso falso: las reglas se prueban en PedidoEstadoService. */
+    const armar = (resultado = { registrado: true, numero: "VEL-4K7Q2X" }) => {
+      const repo = crearRepositorio();
+      repo.buscarPorNumero.mockResolvedValue({ id: 7, numero: "VEL-4K7Q2X" });
+      const pedidoEstadoService = { registrarAviso: jest.fn().mockResolvedValue(resultado) };
+      const servicio = new CheckoutService(repo, {}, () => AHORA, null, console, {
+        pedidoEstadoService,
+      });
+      return { repo, servicio, pedidoEstadoService };
+    };
+
+    it("busca el pedido por número y registra el aviso con origen cliente, sin usuario", async () => {
+      const { servicio, pedidoEstadoService } = armar();
+
+      const r = await servicio.informarComprobante("vel-4k7q2x");
+
+      expect(pedidoEstadoService.registrarAviso).toHaveBeenCalledWith(7, { origen: "cliente" });
+      expect(r).toEqual({ numero: "VEL-4K7Q2X", comprobanteInformado: true });
+    });
+
+    it("un segundo aviso responde lo mismo que el primero", async () => {
+      const { servicio } = armar({
+        registrado: false,
+        numero: "VEL-4K7Q2X",
+        motivo: "YA_INFORMADO",
+      });
+
+      await expect(servicio.informarComprobante("VEL-4K7Q2X")).resolves.toEqual({
+        numero: "VEL-4K7Q2X",
+        comprobanteInformado: true,
+      });
+    });
+
+    it("un número mal formado es NO_ENCONTRADO, sin consultar la base", async () => {
+      const { servicio, repo, pedidoEstadoService } = armar();
+
+      await expect(servicio.informarComprobante("'; DROP TABLE")).rejects.toThrow("NO_ENCONTRADO");
+      expect(repo.buscarPorNumero).not.toHaveBeenCalled();
+      expect(pedidoEstadoService.registrarAviso).not.toHaveBeenCalled();
+    });
+
+    it("un pedido inexistente es NO_ENCONTRADO, sin registrar nada", async () => {
+      const { servicio, repo, pedidoEstadoService } = armar();
+      repo.buscarPorNumero.mockResolvedValue(null);
+
+      await expect(servicio.informarComprobante("VEL-ZZZZZZ")).rejects.toThrow("NO_ENCONTRADO");
+      expect(pedidoEstadoService.registrarAviso).not.toHaveBeenCalled();
+    });
+
+    it("deja pasar los errores de las reglas, como PEDIDO_VENCIDO", async () => {
+      const { servicio, pedidoEstadoService } = armar();
+      pedidoEstadoService.registrarAviso.mockRejectedValue(new Error("PEDIDO_VENCIDO"));
+
+      await expect(servicio.informarComprobante("VEL-4K7Q2X")).rejects.toThrow("PEDIDO_VENCIDO");
     });
   });
 });

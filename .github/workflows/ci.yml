@@ -25,6 +25,9 @@ jobs:
       CLOUDINARY_CLOUD_NAME: cuenta_de_prueba
       CLOUDINARY_API_KEY: clave_de_prueba
       CLOUDINARY_API_SECRET: secreto_de_prueba
+      TRANSFERENCIA_ALIAS: velua.prueba.ci
+      TRANSFERENCIA_CBU: "0000000000000000000000"
+      TRANSFERENCIA_TITULAR: Tienda de Prueba
 
     services:
       mysql:
