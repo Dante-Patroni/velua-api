@@ -10,6 +10,7 @@ const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { configTransferencia } = require("../config/transferencia");
 const {
   limitadorPedidos,
+  limitadorAvisos,
   limitadorConsultaPedidos,
 } = require("../middlewares/rateLimitMiddleware");
 const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
@@ -291,8 +292,8 @@ router.post("/pedidos/:numero/pago", limitadorPedidos, controller.iniciarPago);
  *       Para un pedido por transferencia con el pago pendiente o rechazado y la
  *       reserva vigente. Frena el vencimiento hasta que la dueña confirme el pago
  *       o cancele el pedido; no aprueba el pago. Sin cuerpo: el comprobante se
- *       manda por WhatsApp. Publico: el numero funciona como llave. Comparte el
- *       limite de 10 por hora por IP con la creacion de pedidos y con el pago.
+ *       manda por WhatsApp. Publico: el numero funciona como llave. Tiene su
+ *       propio limite, 20 por hora por IP, separado del de crear y pagar.
  *
  *       Repetir el aviso responde lo mismo y no cambia nada.
  *     parameters:
@@ -321,7 +322,7 @@ router.post("/pedidos/:numero/pago", limitadorPedidos, controller.iniciarPago);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *       429:
- *         description: Demasiados pedidos desde la misma direccion
+ *         description: Demasiados avisos desde la misma direccion
  *         content:
  *           application/json:
  *             schema:
@@ -329,6 +330,6 @@ router.post("/pedidos/:numero/pago", limitadorPedidos, controller.iniciarPago);
  *             example:
  *               error: LIMITE_SUPERADO
  */
-router.post("/pedidos/:numero/comprobante", limitadorPedidos, controller.informarComprobante);
+router.post("/pedidos/:numero/comprobante", limitadorAvisos, controller.informarComprobante);
 
 module.exports = router;

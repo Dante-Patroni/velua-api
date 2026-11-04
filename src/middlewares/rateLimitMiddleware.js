@@ -52,6 +52,22 @@ const limitadorPedidos = rateLimit({
 });
 
 /**
+ * @description Límite propio para "Ya transferí". Separado del de crear y pagar:
+ * detrás de una IP compartida de operadora móvil, varias clientas que compran
+ * gastaban el cupo de las que solo querían avisar, y un 429 en ese botón es el
+ * peor momento para fallar. El aviso no aparta stock y es idempotente (escribe a
+ * lo sumo una vez por pedido); el límite sigue frenando a quien prueba números al
+ * azar, que entre casi 900 millones de combinaciones (31^6) no llega a ningún lado.
+ */
+const limitadorAvisos = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: process.env.NODE_ENV === "production" ? 20 : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: handlerLimiteSuperado,
+});
+
+/**
  * @description Límite para el formulario de arrepentimiento. Es público y encola
  * mails: sin límite, alguien podría llenar la bandeja de salida y la casilla de la
  * dueña con solicitudes falsas. Una clienta real manda una, a lo sumo dos.
@@ -117,6 +133,7 @@ module.exports = {
   limitadorLogin,
   limitadorGlobal,
   limitadorPedidos,
+  limitadorAvisos,
   limitadorCambioContrasena,
   limitadorArrepentimiento,
   limitadorConsultaPedidos,
