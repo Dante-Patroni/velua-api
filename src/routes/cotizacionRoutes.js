@@ -7,7 +7,7 @@ const { Cotizador, TOPE_ITEMS } = require("../services/cotizador");
 const CotizacionController = require("../controllers/CotizacionController");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { configTransferencia } = require("../config/transferencia");
-const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
+const { procesadorPagos } = require("../pagos/procesadorCompartido");
 
 const router = express.Router();
 
@@ -18,7 +18,7 @@ const controller = new CotizacionController(
     // Los mismos criterios que usa la creación del pedido para rechazar un medio:
     // la tienda ofrece solo lo que después se va a poder cobrar.
     mediosDisponibles: {
-      mercadopago: new MercadoPagoProcesador().configurado === true,
+      mercadopago: procesadorPagos.configurado === true,
       transferencia: configTransferencia.habilitada === true,
     },
   })

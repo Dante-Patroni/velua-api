@@ -4,7 +4,7 @@ const db = require("../models");
 const SequelizePedidoRepository = require("../repositories/sequelize/SequelizePedidoRepository");
 const { PedidoEstadoService } = require("../services/PedidoEstadoService");
 const { PagoWebhookService } = require("../services/PagoWebhookService");
-const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
+const { procesadorPagos } = require("../pagos/procesadorCompartido");
 const WebhookController = require("../controllers/WebhookController");
 
 const router = express.Router();
@@ -12,7 +12,7 @@ const router = express.Router();
 const pedidoRepository = new SequelizePedidoRepository(db);
 const controller = new WebhookController(
   new PagoWebhookService({
-    procesadorPagos: new MercadoPagoProcesador(),
+    procesadorPagos,
     pedidoRepository,
     pedidoEstadoService: new PedidoEstadoService(pedidoRepository),
   })

@@ -13,11 +13,10 @@ const {
   limitadorAvisos,
   limitadorConsultaPedidos,
 } = require("../middlewares/rateLimitMiddleware");
-const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
+const { procesadorPagos } = require("../pagos/procesadorCompartido");
 const { PedidoEstadoService } = require("../services/PedidoEstadoService");
 const { PagoWebhookService } = require("../services/PagoWebhookService");
 const pedidoRepository = new SequelizePedidoRepository(db);
-const procesadorPagos = new MercadoPagoProcesador();
 const pedidoEstadoService = new PedidoEstadoService(pedidoRepository);
 
 const controller = new PedidoController(
