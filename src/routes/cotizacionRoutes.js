@@ -7,6 +7,7 @@ const { Cotizador, TOPE_ITEMS } = require("../services/cotizador");
 const CotizacionController = require("../controllers/CotizacionController");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { configTransferencia } = require("../config/transferencia");
+const { MercadoPagoProcesador } = require("../pagos/MercadoPagoProcesador");
 
 const router = express.Router();
 
@@ -14,6 +15,12 @@ const controller = new CotizacionController(
   new Cotizador(new SequelizeCotizacionRepository(db), {
     umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
     descuentoTransferencia: configTransferencia.descuento,
+    // Los mismos criterios que usa la creación del pedido para rechazar un medio:
+    // la tienda ofrece solo lo que después se va a poder cobrar.
+    mediosDisponibles: {
+      mercadopago: new MercadoPagoProcesador().configurado === true,
+      transferencia: configTransferencia.habilitada === true,
+    },
   })
 );
 

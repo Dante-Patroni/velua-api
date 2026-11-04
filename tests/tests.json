@@ -1023,6 +1023,17 @@
                   "pm.test('El ajuste se RESTA del subtotal', () => {",
                   "    const esperado = Number(t.subtotal) - Number(t.ajusteMedioPago) + Number(t.costoEnvio);",
                   "    pm.expect(Number(t.total)).to.eql(Math.round(esperado));",
+                  "});",
+                  "",
+                  "// En este entorno la transferencia está configurada (TRANSFERENCIA_*).",
+                  "const medios = pm.response.json().mediosPago;",
+                  "pm.test('Informa los dos medios de pago', () => {",
+                  "    pm.expect(medios).to.have.all.keys('mercadopago', 'transferencia');",
+                  "});",
+                  "",
+                  "pm.test('La transferencia está disponible, con el mismo total que totales', () => {",
+                  "    pm.expect(medios.transferencia.disponible).to.eql(true);",
+                  "    pm.expect(medios.transferencia.total).to.eql(t.total);",
                   "});"
                 ]
               }

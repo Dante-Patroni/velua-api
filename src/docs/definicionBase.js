@@ -855,7 +855,7 @@ module.exports = {
       },
       Cotizacion: {
         type: "object",
-        required: ["items", "avisos", "totales", "envio"],
+        required: ["items", "avisos", "totales", "envio", "mediosPago"],
         properties: {
           items: { type: "array", items: { $ref: "#/components/schemas/ItemCotizado" } },
           avisos: {
@@ -865,6 +865,33 @@ module.exports = {
           },
           totales: { $ref: "#/components/schemas/TotalesCotizacion" },
           envio: { $ref: "#/components/schemas/DetalleEnvio" },
+          mediosPago: {
+            type: "object",
+            description:
+              "Qué medios se pueden usar hoy y el total con cada uno, calculado acá (con su descuento y su envío). El checkout ofrece solo los que vienen con disponible en true y muestra estos totales sin calcular nada.",
+            required: ["mercadopago", "transferencia"],
+            properties: {
+              mercadopago: { $ref: "#/components/schemas/MedioPagoCotizado" },
+              transferencia: { $ref: "#/components/schemas/MedioPagoCotizado" },
+            },
+          },
+        },
+      },
+      MedioPagoCotizado: {
+        type: "object",
+        required: ["disponible", "total"],
+        properties: {
+          disponible: {
+            type: "boolean",
+            description:
+              "False si el medio no está configurado en el servidor. No dice por qué: el motivo queda en el log.",
+          },
+          total: {
+            type: "string",
+            nullable: true,
+            example: "32850.00",
+            description: "Total con este medio, redondeado al peso. Null si no está disponible.",
+          },
         },
       },
 

@@ -269,6 +269,93 @@ describe("Cotizador", () => {
     });
   });
 
+  describe("medios de pago disponibles", () => {
+    const DOS_MEDIOS = { mercadopago: true, transferencia: true };
+
+    it("sin configuración, informa los dos medios como no disponibles", async () => {
+      const servicio = new Cotizador(repositorioCon([variante()]), { descuentoTransferencia: 10 });
+
+      const r = await servicio.cotizar({ items: [{ varianteId: 1, cantidad: 1 }] });
+
+      expect(r.mediosPago).toEqual({
+        mercadopago: { disponible: false, total: null },
+        transferencia: { disponible: false, total: null },
+      });
+    });
+
+    it("solo un true explícito habilita un medio", async () => {
+      const servicio = new Cotizador(repositorioCon([variante()]), {
+        mediosDisponibles: { mercadopago: "true", transferencia: 1 },
+      });
+
+      const r = await servicio.cotizar({ items: [{ varianteId: 1, cantidad: 1 }] });
+
+      expect(r.mediosPago.mercadopago.disponible).toBe(false);
+      expect(r.mediosPago.transferencia.disponible).toBe(false);
+    });
+
+    it("da el total de cada medio, sea cual sea el medio elegido", async () => {
+      const servicio = new Cotizador(repositorioCon([variante()]), {
+        descuentoTransferencia: 10,
+        mediosDisponibles: DOS_MEDIOS,
+      });
+
+      for (const medioPago of [undefined, "mercadopago", "transferencia"]) {
+        const r = await servicio.cotizar({ items: [{ varianteId: 1, cantidad: 1 }], medioPago });
+
+        expect(r.mediosPago).toEqual({
+          mercadopago: { disponible: true, total: "8500.00" },
+          transferencia: { disponible: true, total: "7650.00" },
+        });
+      }
+    });
+
+    it("cada medio lleva su propio envío: el descuento puede dejarlo sin envío gratis", async () => {
+      // 8500 con Mercado Pago llega al umbral (envío gratis). Con transferencia
+      // baja a 7650 y paga el envío: la diferencia no es solo el descuento.
+      const repositorio = repositorioCon([variante()], [zona()]);
+      const servicio = new Cotizador(repositorio, {
+        descuentoTransferencia: 10,
+        umbralEnvioGratis: "8000.00",
+        mediosDisponibles: DOS_MEDIOS,
+      });
+
+      const r = await servicio.cotizar({ items: [{ varianteId: 1, cantidad: 1 }], zonaEnvioId: 1 });
+
+      expect(r.mediosPago.mercadopago.total).toBe("8500.00");
+      expect(r.mediosPago.transferencia.total).toBe("14150.00");
+      // La zona se busca una sola vez para todos los medios.
+      expect(repositorio.buscarZonaEnvio).toHaveBeenCalledTimes(1);
+    });
+
+    it("el total del medio elegido coincide con el de totales", async () => {
+      const servicio = new Cotizador(repositorioCon([variante()], [zona()]), {
+        descuentoTransferencia: 10,
+        mediosDisponibles: DOS_MEDIOS,
+      });
+
+      const r = await servicio.cotizar({
+        items: [{ varianteId: 1, cantidad: 2 }],
+        zonaEnvioId: 1,
+        medioPago: "transferencia",
+      });
+
+      expect(r.mediosPago.transferencia.total).toBe(r.totales.total);
+    });
+
+    it("un medio no disponible no trae total, aunque haya descuento configurado", async () => {
+      const servicio = new Cotizador(repositorioCon([variante()]), {
+        descuentoTransferencia: 10,
+        mediosDisponibles: { mercadopago: true },
+      });
+
+      const r = await servicio.cotizar({ items: [{ varianteId: 1, cantidad: 1 }] });
+
+      expect(r.mediosPago.mercadopago).toEqual({ disponible: true, total: "8500.00" });
+      expect(r.mediosPago.transferencia).toEqual({ disponible: false, total: null });
+    });
+  });
+
   describe("envío", () => {
     it("sin zona, cotiza como retiro y no cobra envío", async () => {
       const servicio = new Cotizador(repositorioCon([variante()], [zona()]));
