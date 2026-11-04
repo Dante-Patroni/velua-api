@@ -17,7 +17,10 @@
  */
 require("dotenv").config();
 
+const { exigirEntornoDeDesarrollo, exigirApiLocal } = require("../src/config/soloDesarrollo");
+
 const BASE = process.env.VELUA_API_URL || `http://localhost:${process.env.PORT || 3000}/api/v1`;
+const NOMBRE = "Prueba de concurrencia del checkout";
 const SIMULTANEOS = 5;
 // Lo que se prueba son los bloqueos de MySQL, no el pago: transferencia no depende
 // de que Mercado Pago esté configurado (en el CI no lo está).
@@ -32,6 +35,16 @@ const fallar = (mensaje) => {
   console.error(`\n✗ ${mensaje}`);
   process.exit(1);
 };
+
+// Estas pruebas crean pedidos y cambian stock: nunca contra una base o una API
+// reales. NODE_ENV protege la base (el script se conecta por el .env) y la URL
+// protege la API.
+try {
+  exigirEntornoDeDesarrollo(NOMBRE);
+  exigirApiLocal(NOMBRE, BASE);
+} catch (error) {
+  fallar(error.message);
+}
 
 /**
  * @description Hace una petición JSON a la API.

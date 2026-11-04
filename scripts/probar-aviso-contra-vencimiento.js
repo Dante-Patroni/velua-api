@@ -23,11 +23,14 @@
  */
 require("dotenv").config();
 
+const { exigirEntornoDeDesarrollo, exigirApiLocal } = require("../src/config/soloDesarrollo");
+
 const db = require("../src/models");
 const SequelizePedidoRepository = require("../src/repositories/sequelize/SequelizePedidoRepository");
 const { PedidoEstadoService } = require("../src/services/PedidoEstadoService");
 
 const BASE = process.env.VELUA_API_URL || `http://localhost:${process.env.PORT || 3000}/api/v1`;
+const NOMBRE = "Prueba de aviso contra vencimiento";
 // Varias vueltas: quién gana depende del momento, y conviene ver los dos caminos.
 const VUELTAS = 6;
 
@@ -40,6 +43,16 @@ const fallar = (mensaje) => {
   console.error(`\n✗ ${mensaje}`);
   process.exit(1);
 };
+
+// Estas pruebas crean pedidos y cambian stock: nunca contra una base o una API
+// reales. NODE_ENV protege la base (el script se conecta por el .env) y la URL
+// protege la API.
+try {
+  exigirEntornoDeDesarrollo(NOMBRE);
+  exigirApiLocal(NOMBRE, BASE);
+} catch (error) {
+  fallar(error.message);
+}
 
 /**
  * @description Hace una petición JSON a la API.

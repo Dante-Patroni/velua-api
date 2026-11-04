@@ -1,4 +1,8 @@
-const { ENTORNOS_DE_DESARROLLO, exigirEntornoDeDesarrollo } = require("../../src/config/soloDesarrollo");
+const {
+  ENTORNOS_DE_DESARROLLO,
+  exigirEntornoDeDesarrollo,
+  exigirApiLocal,
+} = require("../../src/config/soloDesarrollo");
 const catalogo = require("../../src/seeders/20260918000001-catalogo-inicial");
 const pedidos = require("../../src/seeders/20261004000001-pedidos-de-prueba");
 const usuario = require("../../src/seeders/20260921000001-usuario-inicial");
@@ -32,6 +36,28 @@ describe("exigirEntornoDeDesarrollo", () => {
 
   test("la lista no se puede modificar", () => {
     expect(() => ENTORNOS_DE_DESARROLLO.push("production")).toThrow(TypeError);
+  });
+});
+
+describe("exigirApiLocal", () => {
+  test.each([
+    "http://localhost:3000/api/v1",
+    "http://127.0.0.1:3000/api/v1",
+    "http://localhost/api/v1",
+    "http://localhost:3000",
+  ])("permite %s", (url) => {
+    expect(() => exigirApiLocal("x", url)).not.toThrow();
+  });
+
+  test.each([
+    "https://api.veluanature.com.ar/api/v1",
+    "http://api.veluanature.com.ar/api/v1",
+    "https://localhost:3000/api/v1",
+    "http://localhost.otro-dominio.com/api/v1",
+    "http://127.0.0.1.nip.io/api/v1",
+    "",
+  ])("corta %s", (url) => {
+    expect(() => exigirApiLocal("Prueba", url)).toThrow(/solo contra una API local/);
   });
 });
 
