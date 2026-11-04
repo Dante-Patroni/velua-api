@@ -87,6 +87,9 @@ jobs:
       - name: Prueba de concurrencia del checkout
         run: node scripts/probar-concurrencia.js
 
+      - name: Prueba de concurrencia del aviso contra el vencimiento
+        run: node scripts/probar-aviso-contra-vencimiento.js
+
       - name: Mostrar logs del servidor si falló
         if: failure()
         run: cat server.log
