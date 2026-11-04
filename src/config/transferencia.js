@@ -62,9 +62,28 @@ function leerConfigTransferencia(env = process.env) {
 }
 
 /**
+ * @description Deja en el log por qué la transferencia quedó deshabilitada. Se
+ * llama una vez, al arrancar el servidor: sin esto, el 503 MEDIO_PAGO_NO_DISPONIBLE
+ * llega sin pista de la causa. El motivo nombra la variable, nunca su valor.
+ * @param {{habilitada: boolean, motivo: string|null}} config - Resultado de
+ *   leerConfigTransferencia.
+ * @param {{warn: Function}} [logger=console] - Dónde escribir. Se inyecta en los tests.
+ * @returns {void}
+ */
+const avisarSiEstaDeshabilitada = (config, logger = console) => {
+  if (config.habilitada === true) return;
+  logger.warn(`[transferencia] deshabilitada: ${config.motivo}`);
+};
+
+/**
  * Configuración de la API, leída una sola vez al cargar el módulo. Node guarda el
  * módulo en caché: todas las rutas reciben el mismo objeto congelado.
  */
 const configTransferencia = leerConfigTransferencia();
 
-module.exports = { leerConfigTransferencia, configTransferencia, DESCUENTO_MAXIMO };
+module.exports = {
+  leerConfigTransferencia,
+  avisarSiEstaDeshabilitada,
+  configTransferencia,
+  DESCUENTO_MAXIMO,
+};

@@ -1,4 +1,7 @@
-const { leerConfigTransferencia } = require("../../src/config/transferencia");
+const {
+  leerConfigTransferencia,
+  avisarSiEstaDeshabilitada,
+} = require("../../src/config/transferencia");
 
 /** Configuración válida, con lo que se cambie en cada test. */
 const entorno = (cambios = {}) => ({
@@ -71,5 +74,46 @@ describe("leerConfigTransferencia", () => {
 
     expect(Object.isFrozen(config)).toBe(true);
     expect(Object.isFrozen(config.datos)).toBe(true);
+  });
+});
+
+describe("avisarSiEstaDeshabilitada", () => {
+  const logger = () => ({ warn: jest.fn() });
+
+  it("deshabilitada, deja el motivo en el log", () => {
+    const log = logger();
+    const config = leerConfigTransferencia(entorno({ DESCUENTO_TRANSFERENCIA: "35" }));
+
+    avisarSiEstaDeshabilitada(config, log);
+
+    expect(log.warn).toHaveBeenCalledTimes(1);
+    expect(log.warn.mock.calls[0][0]).toContain("[transferencia] deshabilitada");
+    expect(log.warn.mock.calls[0][0]).toContain("DESCUENTO_TRANSFERENCIA");
+  });
+
+  it("sin datos bancarios también lo avisa", () => {
+    const log = logger();
+
+    avisarSiEstaDeshabilitada(leerConfigTransferencia({}), log);
+
+    expect(log.warn).toHaveBeenCalledWith("[transferencia] deshabilitada: Sin datos bancarios");
+  });
+
+  it("el log nunca incluye el valor configurado", () => {
+    const log = logger();
+    const config = leerConfigTransferencia(entorno({ TRANSFERENCIA_CBU: "1234567890" }));
+
+    avisarSiEstaDeshabilitada(config, log);
+
+    expect(log.warn.mock.calls[0][0]).toContain("TRANSFERENCIA_CBU");
+    expect(log.warn.mock.calls[0][0]).not.toContain("1234567890");
+  });
+
+  it("habilitada, no escribe nada", () => {
+    const log = logger();
+
+    avisarSiEstaDeshabilitada(leerConfigTransferencia(entorno()), log);
+
+    expect(log.warn).not.toHaveBeenCalled();
   });
 });
