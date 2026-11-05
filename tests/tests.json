@@ -2015,6 +2015,84 @@
           ]
         },
         {
+          "name": "POST /pedidos con entrega en mano",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "La entrega en mano es solo de las ventas del panel; la tienda no la acepta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman\", \"email\": \"newman@ejemplo.test\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"en_mano\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo entrega.metodo', () => pm.expect(pm.response.json().details).to.have.property('entrega.metodo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /pedidos sin mail",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": ["{{base_url}}"],
+              "path": ["pedidos"]
+            },
+            "description": "El mail es opcional solo en las ventas del panel; la tienda lo sigue exigiendo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Indica el campo del mail', () => pm.expect(pm.response.json().details).to.have.property('cliente.email'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "GET /pedidos con numero inexistente",
           "request": {
             "method": "GET",
