@@ -1,7 +1,13 @@
-const { ENTORNOS_DE_DESARROLLO, exigirEntornoDeDesarrollo } = require("../../src/config/soloDesarrollo");
+const {
+  ENTORNOS_DE_DESARROLLO,
+  exigirEntornoDeDesarrollo,
+  exigirApiLocal,
+  exigirBaseLocal,
+} = require("../../src/config/soloDesarrollo");
 const catalogo = require("../../src/seeders/20260918000001-catalogo-inicial");
 const pedidos = require("../../src/seeders/20261004000001-pedidos-de-prueba");
 const usuario = require("../../src/seeders/20260921000001-usuario-inicial");
+const operador = require("../../src/seeders/20261103000001-usuario-operador-prueba");
 
 describe("exigirEntornoDeDesarrollo", () => {
   test("permite desarrollo y pruebas", () => {
@@ -31,6 +37,51 @@ describe("exigirEntornoDeDesarrollo", () => {
 
   test("la lista no se puede modificar", () => {
     expect(() => ENTORNOS_DE_DESARROLLO.push("production")).toThrow(TypeError);
+  });
+});
+
+describe("exigirApiLocal", () => {
+  test.each([
+    "http://localhost:3000/api/v1",
+    "http://127.0.0.1:3000/api/v1",
+    "http://localhost/api/v1",
+    "http://localhost:3000",
+  ])("permite %s", (url) => {
+    expect(() => exigirApiLocal("x", url)).not.toThrow();
+  });
+
+  test.each([
+    "https://api.veluanature.com.ar/api/v1",
+    "http://api.veluanature.com.ar/api/v1",
+    "https://localhost:3000/api/v1",
+    "http://localhost.otro-dominio.com/api/v1",
+    "http://127.0.0.1.nip.io/api/v1",
+    "",
+  ])("corta %s", (url) => {
+    expect(() => exigirApiLocal("Prueba", url)).toThrow(/solo contra una API local/);
+  });
+});
+
+describe("exigirBaseLocal", () => {
+  test.each([undefined, "", "localhost", "127.0.0.1", "::1"])("permite DB_HOST=%s", (host) => {
+    expect(() => exigirBaseLocal("x", { DB_HOST: host })).not.toThrow();
+  });
+
+  test.each([
+    "containers-us-west-1.railway.app",
+    "mysql.railway.internal",
+    "127.0.0.1.nip.io",
+    "10.0.0.5",
+    "LOCALHOST.example.com",
+  ])("corta DB_HOST=%s", (host) => {
+    expect(() => exigirBaseLocal("Prueba", { DB_HOST: host })).toThrow(/solo contra una base local/);
+  });
+
+  test("corta aunque NODE_ENV diga desarrollo", () => {
+    const env = { NODE_ENV: "development", DB_HOST: "mysql.railway.internal" };
+
+    expect(() => exigirEntornoDeDesarrollo("x", env)).not.toThrow();
+    expect(() => exigirBaseLocal("x", env)).toThrow();
   });
 });
 
@@ -75,6 +126,14 @@ describe("seeders en producción", () => {
     expect(qi.bulkDelete).not.toHaveBeenCalled();
   });
 
+  test("el operador de prueba no se crea ni se borra", async () => {
+    const qi = queryInterface();
+    await expect(operador.up(qi)).rejects.toThrow("production");
+    await expect(operador.down(qi)).rejects.toThrow("production");
+    expect(qi.bulkInsert).not.toHaveBeenCalled();
+    expect(qi.bulkDelete).not.toHaveBeenCalled();
+  });
+
   test("el usuario inicial se puede seguir creando en una base nueva", async () => {
     const qi = queryInterface();
     const antes = { ...process.env };
@@ -91,5 +150,76 @@ describe("seeders en producción", () => {
         else delete process.env[clave];
       }
     }
+  });
+});
+
+describe("operador de prueba", () => {
+  const VARIABLES = ["OPERADOR_EMAIL", "OPERADOR_PASSWORD"];
+  let antes;
+  const queryInterface = (existentes = []) => ({
+    bulkInsert: jest.fn(),
+    bulkDelete: jest.fn(),
+    sequelize: { query: jest.fn(async () => existentes), QueryTypes: { SELECT: "SELECT" } },
+  });
+
+  beforeEach(() => {
+    antes = { ...process.env };
+    Object.assign(process.env, {
+      NODE_ENV: "test",
+      OPERADOR_EMAIL: "  Operador@Velua.TEST ",
+      OPERADOR_PASSWORD: "clave-de-operador-solo-para-ci",
+    });
+  });
+  afterEach(() => {
+    for (const clave of [...VARIABLES, "NODE_ENV"]) {
+      if (clave in antes) process.env[clave] = antes[clave];
+      else delete process.env[clave];
+    }
+  });
+
+  test("crea un operador con el mail normalizado y la contraseña hasheada", async () => {
+    const qi = queryInterface();
+
+    await operador.up(qi);
+
+    const [[fila]] = qi.bulkInsert.mock.calls[0].slice(1);
+    expect(fila).toMatchObject({ email: "operador@velua.test", rol: "operador", activo: true });
+    expect(fila.password_hash).not.toContain("clave-de-operador");
+  });
+
+  test("si ya existe, no lo duplica", async () => {
+    const qi = queryInterface([{ id: 3 }]);
+
+    await operador.up(qi);
+
+    expect(qi.bulkInsert).not.toHaveBeenCalled();
+  });
+
+  test.each(VARIABLES)("sin %s falla con un mensaje claro y no crea nada", async (variable) => {
+    delete process.env[variable];
+    const qi = queryInterface();
+
+    await expect(operador.up(qi)).rejects.toThrow("Faltan OPERADOR_EMAIL u OPERADOR_PASSWORD");
+    expect(qi.bulkInsert).not.toHaveBeenCalled();
+  });
+
+  test("con una contraseña corta falla y no crea nada", async () => {
+    process.env.OPERADOR_PASSWORD = "corta";
+    const qi = queryInterface();
+
+    await expect(operador.up(qi)).rejects.toThrow("OPERADOR_PASSWORD");
+    expect(qi.bulkInsert).not.toHaveBeenCalled();
+  });
+
+  test("al borrar, solo toca un usuario con rol operador", async () => {
+    const qi = queryInterface();
+
+    await operador.down(qi);
+
+    expect(qi.bulkDelete).toHaveBeenCalledWith(
+      "usuarios",
+      { email: "operador@velua.test", rol: "operador" },
+      {}
+    );
   });
 });

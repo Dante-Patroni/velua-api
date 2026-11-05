@@ -58,6 +58,9 @@ function crearRepositorio({ pedidos = [pedido()], items = [], stock = {} } = {})
     guardarAviso: jest.fn(async (id, fecha) => {
       buscar(id).comprobanteInformadoEn = fecha;
     }),
+    guardarDatosPago: jest.fn(async (id, datos) => {
+      Object.assign(buscar(id), datos);
+    }),
     registrarEvento: jest.fn(async (evento) => {
       estado.eventos.push(evento);
     }),
@@ -537,6 +540,125 @@ describe("registrarAviso", () => {
     const repo = crearRepositorio({ pedidos: [porTransferencia()] });
 
     await expect(servicio(repo).registrarAviso(1, aviso)).rejects.toThrow("registrarAviso");
+    expect(repo.transaccion).not.toHaveBeenCalled();
+  });
+});
+
+describe("confirmarPagoTransferencia", () => {
+  const HORA = 60 * 60 * 1000;
+  /** Pedido por transferencia, pendiente, avisado y con la reserva vigente. */
+  const avisado = (cambios = {}) =>
+    pedido({
+      medioPago: "transferencia",
+      estadoPago: "pendiente",
+      expiraEn: new Date(AHORA.getTime() + HORA),
+      comprobanteInformadoEn: AHORA,
+      ...cambios,
+    });
+  const confirmar = (repo, datos = {}) =>
+    servicio(repo).confirmarPagoTransferencia(1, {
+      usuarioId: ADMIN,
+      verificadoEnBanco: true,
+      ...datos,
+    });
+
+  test("con el pago pendiente, lo aprueba, deja de vencer y encola el mail", async () => {
+    const repo = crearRepositorio({ pedidos: [avisado()] });
+
+    const r = await confirmar(repo);
+
+    expect(r).toEqual({ confirmado: true, numero: "VEL-AAAAAA" });
+    expect(repo.estado.pedidos[0]).toMatchObject({ estadoPago: "aprobado", expiraEn: null });
+    expect(repo.estado.eventos).toEqual([
+      expect.objectContaining({
+        campo: "pago",
+        estadoAnterior: "pendiente",
+        estadoNuevo: "aprobado",
+        origen: "panel",
+        usuarioId: ADMIN,
+      }),
+    ]);
+    expect(repo.estado.eventos[0].detalle).not.toContain("Sin aviso");
+    expect(repo.estado.emails).toEqual([
+      expect.objectContaining({ tipo: "pago_confirmado", destinatario: "valentina@ejemplo.test" }),
+    ]);
+  });
+
+  test("no guarda datos de Mercado Pago: solo termina el vencimiento", async () => {
+    const repo = crearRepositorio({ pedidos: [avisado()] });
+
+    await confirmar(repo);
+
+    expect(repo.tx.guardarDatosPago).toHaveBeenCalledWith(1, { expiraEn: null });
+  });
+
+  test("con el pago rechazado también se puede confirmar", async () => {
+    const repo = crearRepositorio({ pedidos: [avisado({ estadoPago: "rechazado" })] });
+
+    await expect(confirmar(repo)).resolves.toMatchObject({ confirmado: true });
+  });
+
+  test("sin aviso previo de la clienta, confirma y lo anota en el historial", async () => {
+    const repo = crearRepositorio({ pedidos: [avisado({ comprobanteInformadoEn: null })] });
+
+    await confirmar(repo);
+
+    expect(repo.estado.eventos[0].detalle).toContain("Sin aviso previo de la clienta");
+  });
+
+  test("con la reserva vencida, mientras no esté cancelado, se puede confirmar", async () => {
+    const vencido = avisado({ expiraEn: new Date(AHORA.getTime() - HORA) });
+    const repo = crearRepositorio({ pedidos: [vencido] });
+
+    await expect(confirmar(repo)).resolves.toMatchObject({ confirmado: true });
+  });
+
+  test("si ya estaba aprobado, responde YA_CONFIRMADO sin escribir nada", async () => {
+    const repo = crearRepositorio({ pedidos: [avisado({ estadoPago: "aprobado" })] });
+
+    const r = await confirmar(repo);
+
+    expect(r).toEqual({ confirmado: false, numero: "VEL-AAAAAA", motivo: "YA_CONFIRMADO" });
+    expect(repo.estado.eventos).toHaveLength(0);
+    expect(repo.estado.emails).toHaveLength(0);
+  });
+
+  test.each([
+    ["con Mercado Pago", { medioPago: "mercadopago", estadoPago: "pendiente" }],
+    ["cancelado", { estadoPago: "cancelado", estadoPedido: "cancelado" }],
+    ["devuelto", { estadoPago: "devuelto" }],
+  ])("%s responde PEDIDO_NO_PAGABLE sin escribir nada", async (_caso, cambios) => {
+    const repo = crearRepositorio({ pedidos: [avisado(cambios)] });
+
+    await expect(confirmar(repo)).rejects.toThrow("PEDIDO_NO_PAGABLE");
+    expect(repo.estado.eventos).toHaveLength(0);
+    expect(repo.estado.emails).toHaveLength(0);
+  });
+
+  test("un pedido inexistente es NO_ENCONTRADO", async () => {
+    const repo = crearRepositorio({ pedidos: [] });
+
+    await expect(confirmar(repo)).rejects.toThrow("NO_ENCONTRADO");
+  });
+
+  test.each([false, "true", 1, undefined])(
+    "sin verificadoEnBanco exactamente true (%j) no abre la transacción",
+    async (valor) => {
+      const repo = crearRepositorio({ pedidos: [avisado()] });
+
+      await expect(confirmar(repo, { verificadoEnBanco: valor })).rejects.toThrow(
+        "DATOS_INVALIDOS"
+      );
+      expect(repo.transaccion).not.toHaveBeenCalled();
+    }
+  );
+
+  test("sin usuario de la sesión no abre la transacción", async () => {
+    const repo = crearRepositorio({ pedidos: [avisado()] });
+
+    await expect(confirmar(repo, { usuarioId: undefined })).rejects.toThrow(
+      "confirmarPagoTransferencia"
+    );
     expect(repo.transaccion).not.toHaveBeenCalled();
   });
 });

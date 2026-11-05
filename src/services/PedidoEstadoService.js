@@ -242,36 +242,36 @@ class PedidoEstadoService {
         return { cambiado: false, numero, motivo: "REQUIERE_REVISION" };
       }
 
-      await tx.actualizarEstados(pedido.id, { estadoPago: estado });
-      await tx.guardarDatosPago(pedido.id, {
-        mpPaymentId: String(pagoId),
-        mpMetodo: metodo,
-        // Aprobado: el pedido deja de vencer. Rechazado: sigue el plazo original,
-        // así la clienta puede reintentar mientras el stock esté apartado.
-        ...(estado === "aprobado" ? { expiraEn: null } : {}),
-      });
+      const datosPago = { mpPaymentId: String(pagoId), mpMetodo: metodo };
+      const detalle = `Pago ${pagoId}${metodo ? ` (${metodo})` : ""}`;
 
+      // Si el encolado del mail falla, falla todo y el procesador vuelve a avisar.
+      if (estado === "aprobado") {
+        await this.#aplicarAprobacion(tx, pedido, { origen, detalle, datosPago });
+        return { cambiado: true, numero };
+      }
+
+      // Rechazado: sigue el plazo original, así la clienta puede reintentar
+      // mientras el stock esté apartado.
+      await tx.actualizarEstados(pedido.id, { estadoPago: estado });
+      await tx.guardarDatosPago(pedido.id, datosPago);
       await tx.registrarEvento({
         pedidoId: pedido.id,
         campo: "pago",
         estadoAnterior: pedido.estadoPago,
         estadoNuevo: estado,
         origen,
-        detalle: `Pago ${pagoId}${metodo ? ` (${metodo})` : ""}`,
+        detalle,
       });
-
-      // Si el encolado falla, falla todo y el procesador vuelve a avisar.
       await tx.encolarEmail({
         pedidoId: pedido.id,
-        tipo: estado === "aprobado" ? "pago_confirmado" : "pago_rechazado",
+        tipo: "pago_rechazado",
         destinatario: pedido.clienteEmail,
         datos: {
           numero,
           nombre: pedido.clienteNombre,
           total: pedido.total,
-          ...(estado === "rechazado" && pedido.expiraEn
-            ? { expiraEn: new Date(pedido.expiraEn).toISOString() }
-            : {}),
+          ...(pedido.expiraEn ? { expiraEn: new Date(pedido.expiraEn).toISOString() } : {}),
         },
       });
 
@@ -320,6 +320,42 @@ class PedidoEstadoService {
     });
 
     return resultado;
+  }
+
+  /**
+   * @description Efectos de toda aprobación de pago, la registre Mercado Pago o la
+   * dueña: el pago pasa a aprobado, el pedido deja de vencer, queda el evento y se
+   * encola el mail de pago confirmado. Viven en un solo lugar para que las dos
+   * aprobaciones no se comporten distinto con el tiempo. Se llama siempre adentro
+   * de una transacción, con el pedido ya bloqueado y validado.
+   * @param {Object} tx - Repositorio transaccional.
+   * @param {Object} pedido - Pedido bloqueado.
+   * @param {Object} aprobacion - Quién aprueba y con qué datos.
+   * @param {string} aprobacion.origen - Origen del evento: webhook, job o panel.
+   * @param {number} [aprobacion.usuarioId] - Usuario de la sesión, solo desde el panel.
+   * @param {string} aprobacion.detalle - Texto del evento.
+   * @param {Object} [aprobacion.datosPago] - Datos del procesador (mpPaymentId,
+   *   mpMetodo). Vacío en una transferencia.
+   * @returns {Promise<void>}
+   */
+  async #aplicarAprobacion(tx, pedido, { origen, usuarioId, detalle, datosPago = {} }) {
+    await tx.actualizarEstados(pedido.id, { estadoPago: "aprobado" });
+    await tx.guardarDatosPago(pedido.id, { ...datosPago, expiraEn: null });
+    await tx.registrarEvento({
+      pedidoId: pedido.id,
+      campo: "pago",
+      estadoAnterior: pedido.estadoPago,
+      estadoNuevo: "aprobado",
+      origen,
+      ...(usuarioId === undefined ? {} : { usuarioId }),
+      detalle,
+    });
+    await tx.encolarEmail({
+      pedidoId: pedido.id,
+      tipo: "pago_confirmado",
+      destinatario: pedido.clienteEmail,
+      datos: { numero: pedido.numero, nombre: pedido.clienteNombre, total: pedido.total },
+    });
   }
 
   /**
@@ -391,6 +427,66 @@ class PedidoEstadoService {
       });
 
       return { registrado: true, numero };
+    });
+
+    return resultado;
+  }
+
+  /**
+   * @description La dueña confirma desde el panel que el dinero de una
+   * transferencia entró. Es la única forma de aprobar una transferencia: el aviso
+   * de la clienta no alcanza (docs/h4-checkout.md, decisiones del 31/10). No hace
+   * falta que haya aviso: la clienta puede transferir y no avisar.
+   *
+   * Usa los mismos efectos que una aprobación de Mercado Pago, sin sus datos.
+   * Se puede confirmar con la reserva vencida, mientras el pedido no esté cancelado.
+   *
+   * @param {number} pedidoId - Id del pedido.
+   * @param {Object} confirmacion - Quién confirma.
+   * @param {number} confirmacion.usuarioId - Usuario de la sesión.
+   * @param {boolean} confirmacion.verificadoEnBanco - Tiene que ser exactamente true:
+   *   la dueña afirma que miró el banco.
+   * @returns {Promise<{confirmado: boolean, numero: string, motivo?: string}>}
+   *   confirmado en false si ya estaba aprobado (motivo YA_CONFIRMADO).
+   * @throws {Error} DATOS_INVALIDOS (sin la verificación), NO_ENCONTRADO o
+   *   PEDIDO_NO_PAGABLE (no es transferencia, o está cancelado o devuelto).
+   */
+  async confirmarPagoTransferencia(pedidoId, { usuarioId, verificadoEnBanco }) {
+    if (!Number.isInteger(usuarioId)) {
+      throw new Error("confirmarPagoTransferencia: falta el usuario de la sesión");
+    }
+    if (verificadoEnBanco !== true) {
+      throw new Error("DATOS_INVALIDOS");
+    }
+
+    const resultado = await this.repositorio.transaccion(async (tx) => {
+      const pedido = await tx.bloquearPedido(pedidoId);
+      if (!pedido) {
+        throw new Error("NO_ENCONTRADO");
+      }
+      const { numero } = pedido;
+
+      if (pedido.medioPago !== "transferencia") {
+        throw new Error("PEDIDO_NO_PAGABLE");
+      }
+      // Antes que el resto: un doble clic no es un error y no escribe nada.
+      if (pedido.estadoPago === "aprobado") {
+        return { confirmado: false, numero, motivo: "YA_CONFIRMADO" };
+      }
+      const confirmable =
+        ESTADOS_PAGO_VENCIBLES.includes(pedido.estadoPago) && pedido.estadoPedido !== "cancelado";
+      if (!confirmable) {
+        throw new Error("PEDIDO_NO_PAGABLE");
+      }
+
+      const sinAviso = pedido.comprobanteInformadoEn ? "" : " Sin aviso previo de la clienta.";
+      await this.#aplicarAprobacion(tx, pedido, {
+        origen: "panel",
+        usuarioId,
+        detalle: `Transferencia confirmada a mano: se verificó el ingreso en el banco.${sinAviso}`,
+      });
+
+      return { confirmado: true, numero };
     });
 
     return resultado;

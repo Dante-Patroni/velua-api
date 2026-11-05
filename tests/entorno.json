@@ -18,7 +18,19 @@
       "value": "clave-solo-para-ci",
       "type": "default",
       "enabled": true
-    }
+    },
+    {
+      "key": "operador_email",
+      "value": "operador@velua.test",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "operador_password",
+      "value": "clave-operador-solo-para-ci",
+      "type": "default",
+      "enabled": true
+    }    
   ],
   "_postman_variable_scope": "environment"
 }

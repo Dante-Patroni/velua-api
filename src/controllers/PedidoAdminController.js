@@ -94,6 +94,47 @@ class PedidoAdminController {
       manejarErrorHttp(error, res);
     }
   };
+
+  /**
+   * @description Registra desde el panel que la clienta avisó una transferencia,
+   * por ejemplo por WhatsApp. Quién lo hace sale de la sesión, nunca del body.
+   * @param {import("express").Request} req - Request con el id del pedido.
+   * @param {import("express").Response} res - Response de Express.
+   * @returns {Promise<void>}
+   */
+  registrarAviso = async (req, res) => {
+    try {
+      const { id } = matchedData(req, { locations: ["params"] });
+      const resultado = await this.estados.registrarAviso(id, {
+        origen: "panel",
+        usuarioId: req.usuario.id,
+      });
+      res.status(200).json(resultado);
+    } catch (error) {
+      manejarErrorHttp(error, res);
+    }
+  };
+
+  /**
+   * @description Confirma que el dinero de una transferencia entró. Quién lo hace
+   * sale de la sesión, nunca del body.
+   * @param {import("express").Request} req - Request con el id y la verificación.
+   * @param {import("express").Response} res - Response de Express.
+   * @returns {Promise<void>}
+   */
+  confirmarPago = async (req, res) => {
+    try {
+      const { id } = matchedData(req, { locations: ["params"] });
+      const { verificadoEnBanco } = matchedData(req, { locations: ["body"] });
+      const resultado = await this.estados.confirmarPagoTransferencia(id, {
+        usuarioId: req.usuario.id,
+        verificadoEnBanco,
+      });
+      res.status(200).json(resultado);
+    } catch (error) {
+      manejarErrorHttp(error, res);
+    }
+  };
 }
 
 module.exports = PedidoAdminController;

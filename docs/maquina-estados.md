@@ -42,15 +42,15 @@ campo obliga a inventar combinaciones absurdas.
 
 ### Transiciones legales
 
-| Desde       | Hacia       | Quién la dispara                   |
-| ----------- | ----------- | ---------------------------------- |
-| `pendiente` | `aprobado`  | Webhook del procesador             |
-| `pendiente` | `rechazado` | Webhook del procesador             |
-| `pendiente` | `cancelado` | Job de vencimiento, o admin (§5)   |
-| `rechazado` | `pendiente` | Cliente reintenta el pago          |
-| `rechazado` | `aprobado`  | Webhook, si el reintento sale bien |
-| `rechazado` | `cancelado` | Job de vencimiento, o admin (§5)   |
-| `aprobado`  | `devuelto`  | Admin, con devolución (t13c)       |
+| Desde       | Hacia       | Quién la dispara                                                     |
+| ----------- | ----------- | -------------------------------------------------------------------- |
+| `pendiente` | `aprobado`  | Webhook del procesador, o admin si es transferencia (§5)             |
+| `pendiente` | `rechazado` | Webhook del procesador                                               |
+| `pendiente` | `cancelado` | Job de vencimiento, o admin (§5)                                     |
+| `rechazado` | `pendiente` | Cliente reintenta el pago                                            |
+| `rechazado` | `aprobado`  | Webhook, si el reintento sale bien, o admin si es transferencia (§5) |
+| `rechazado` | `cancelado` | Job de vencimiento, o admin (§5)                                     |
+| `aprobado`  | `devuelto`  | Admin, con devolución (t13c)                                         |
 
 Cualquier otra combinación lanza `TRANSICION_INVALIDA`.
 
@@ -70,6 +70,13 @@ cómo averiguarlo.
 prepara y despacha, pero no toca dinero ni cancela: cancelar devuelve stock y le
 avisa a la clienta, y es una decisión de la dueña. Permisos `PAGOS_DEVOLVER` y
 `PEDIDOS_CANCELAR`.
+
+**Una transferencia la aprueba solo la dueña.** No hay procesador que avise. El
+aviso de la clienta ("Ya transferí") no cambia el estado de pago: solo frena el
+vencimiento de la reserva. El pago pasa a `aprobado` recién cuando la dueña mira el
+banco y lo confirma desde el panel, con el permiso `PAGOS_CONFIRMAR`. Se puede
+confirmar sin aviso previo (la clienta transfirió y no avisó) y con la reserva
+vencida, mientras el pedido no esté cancelado.
 
 ---
 
@@ -147,9 +154,16 @@ y un job la procesa. Si el proveedor de mail está caído, el pedido igual se re
 **Todo dentro de una transacción.** Si falla el encolado del mail, la transición no
 ocurre. No puede quedar un pedido aprobado sin su mail encolado.
 
+**Aprobar es igual venga de donde venga.** El webhook y la confirmación manual de
+una transferencia usan el mismo método privado (`#aplicarAprobacion`): el mismo mail,
+limpian `expira_en` y dejan su evento. La manual no guarda datos del procesador ni
+un número de operación del banco.
+
 **Cada evento dice quién lo hizo.** La bitácora (`pedido_eventos`) guarda el
 `origen` (`checkout`, `webhook`, `job`, `panel`, `cliente`) y, desde el panel, el
-`usuario_id` de la sesión. El usuario nunca sale del body de la petición.
+`usuario_id` de la sesión. El usuario nunca sale del body de la petición. El aviso
+de transferencia también deja evento (`campo` `aviso`, `estado_nuevo`
+`comprobante_informado`): con origen `cliente` va sin usuario.
 
 ---
 
@@ -168,10 +182,12 @@ el estado.
 
 ## 5. Cambios manuales desde el panel (t13b)
 
-| Ruta                                    | Permiso             | Quién             |
-| --------------------------------------- | ------------------- | ----------------- |
-| `PATCH /admin/pedidos/{id}/preparacion` | `PEDIDOS_GESTIONAR` | admin y operador  |
-| `POST /admin/pedidos/{id}/cancelacion`  | `PEDIDOS_CANCELAR`  | solo admin        |
+| Ruta                                       | Permiso             | Quién            |
+| ------------------------------------------ | ------------------- | ---------------- |
+| `PATCH /admin/pedidos/{id}/preparacion`    | `PEDIDOS_GESTIONAR` | admin y operador |
+| `POST /admin/pedidos/{id}/cancelacion`     | `PEDIDOS_CANCELAR`  | solo admin       |
+| `POST /admin/pedidos/{id}/aviso`           | `PAGOS_CONFIRMAR`   | solo admin       |
+| `POST /admin/pedidos/{id}/pago-confirmado` | `PAGOS_CONFIRMAR`   | solo admin       |
 
 **Preparar, despachar y entregar.** Solo `en_preparacion`, `enviado` o `entregado`.
 El seguimiento lleva de 6 a 40 letras, números o guiones (`SEGUIMIENTO_VALIDO`).
@@ -195,6 +211,20 @@ pedido que cumple todo esto:
 
 Cancelar dos veces no es un error y no repone dos veces.
 
+**Registrar el aviso.** Para la clienta que avisa por WhatsApp sin apretar "Ya
+transferí". Mismas reglas que el aviso público (`POST /pedidos/{numero}/comprobante`),
+con una diferencia: la dueña lo puede registrar con la reserva vencida, mientras el
+pedido no esté cancelado. Es solo admin porque un pedido avisado deja de vencer y no
+se cancela sin `confirmaSinPago`. Avisar dos veces no es un error: `YA_INFORMADO`,
+sin evento nuevo.
+
+**Confirmar el pago.** Solo transferencias, con el pago `pendiente` o `rechazado` y
+el pedido sin cancelar; si no, `PEDIDO_NO_PAGABLE`. La petición trae
+`verificadoEnBanco: true` (el booleano, no el texto): la dueña afirma que el dinero
+entró. Sin eso, 400 `DATOS_INVALIDOS`. Cualquier otro campo del cuerpo se ignora: el
+usuario sale de la sesión y el estado lo decide el servicio. Confirmar dos veces no
+es un error: `YA_CONFIRMADO`, sin un segundo mail.
+
 ### Interfaz del servicio
 
 ```js
@@ -215,6 +245,24 @@ cambiarEstadoPreparacion(pedidoId, cambio);
  * @throws {Error} DATOS_INVALIDOS, NO_ENCONTRADO, PEDIDO_PAGADO, COMPROBANTE_INFORMADO, TRANSICION_INVALIDA
  */
 cancelarManual(pedidoId, cancelacion);
+
+/**
+ * @description Registra que la clienta avisó que transfirió. No cambia el pago.
+ * @param {number} pedidoId - Id del pedido.
+ * @param {{origen: "cliente"|"panel", usuarioId?: number}} aviso - usuarioId solo desde el panel.
+ * @returns {Promise<{registrado: boolean, numero: string, motivo?: "YA_INFORMADO"}>}
+ * @throws {Error} NO_ENCONTRADO, PEDIDO_NO_PAGABLE, PEDIDO_YA_PAGADO, PEDIDO_VENCIDO (solo la clienta)
+ */
+registrarAviso(pedidoId, aviso);
+
+/**
+ * @description Aprueba a mano el pago de una transferencia verificada en el banco.
+ * @param {number} pedidoId - Id del pedido.
+ * @param {{usuarioId: number, verificadoEnBanco: boolean}} confirmacion
+ * @returns {Promise<{confirmado: boolean, numero: string, motivo?: "YA_CONFIRMADO"}>}
+ * @throws {Error} DATOS_INVALIDOS, NO_ENCONTRADO, PEDIDO_NO_PAGABLE
+ */
+confirmarPagoTransferencia(pedidoId, confirmacion);
 ```
 
 Los cambios de pago (webhook y vencimiento) están en `registrarResultadoPago` y
@@ -230,6 +278,9 @@ Los cambios de pago (webhook y vencimiento) están en `registrarResultadoPago` y
 | `PEDIDO_PAGADO`         | 409  |
 | `COMPROBANTE_INFORMADO` | 409  |
 | `PAGO_EN_CURSO`         | 409  |
+| `PEDIDO_NO_PAGABLE`     | 409  |
+| `PEDIDO_YA_PAGADO`      | 409  |
+| `PEDIDO_VENCIDO`        | 409  |
 
 ---
 
@@ -248,3 +299,7 @@ Estos casos son obligatorios, están en el `AGENTS.md` sección 10:
 - El motivo de una cancelación no aparece en el mail a la clienta.
 - El operador no tiene `PEDIDOS_CANCELAR`.
 - No se cancela a mano un pedido con link de Mercado Pago, aunque haya vencido.
+- Una transferencia no pasa a `aprobado` con el aviso, solo con la confirmación del
+  panel, y la confirmación exige `verificadoEnBanco` exactamente `true`.
+- El operador no tiene `PAGOS_CONFIRMAR`.
+- Varios avisos simultáneos sobre el mismo pedido dejan un solo evento.

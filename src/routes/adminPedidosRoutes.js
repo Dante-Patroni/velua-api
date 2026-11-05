@@ -88,6 +88,15 @@ const validarCancelacion = [
     .withMessage("confirmaSinPago tiene que ser true o false"),
   manejarErroresValidacion,
 ];
+
+const validarConfirmacionPago = [
+  idRuta,
+  // Solo el booleano true: ni "true", ni 1. Es la dueña afirmando que miró el banco.
+  body("verificadoEnBanco")
+    .custom((valor) => valor === true)
+    .withMessage("Hay que confirmar que se verificó el ingreso en el banco"),
+  manejarErroresValidacion,
+];
 /**
  * @openapi
  * /admin/pedidos:
@@ -305,6 +314,108 @@ router.post(
   soloPermisos(PERMISOS.PEDIDOS_CANCELAR),
   validarCancelacion,
   controller.cancelar
+);
+
+/**
+ * @openapi
+ * /admin/pedidos/{id}/aviso:
+ *   post:
+ *     tags: [Admin - Pedidos]
+ *     summary: Registrar que la clienta avisó una transferencia
+ *     description: >
+ *       Solo el admin (PAGOS_CONFIRMAR). Para cuando la clienta manda el
+ *       comprobante por WhatsApp sin apretar "Ya transferí". Frena el vencimiento
+ *       mientras la dueña revisa el banco; no aprueba el pago. A diferencia del
+ *       aviso de la clienta, vale con la reserva vencida, mientras el pedido no
+ *       esté cancelado. Sin cuerpo. Repetirlo no cambia nada.
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/IdRuta'
+ *     responses:
+ *       200:
+ *         description: Aviso registrado, o sin cambios si ya estaba avisado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/AvisoRegistrado'
+ *       400:
+ *         $ref: '#/components/responses/DatosInvalidos'
+ *       401:
+ *         $ref: '#/components/responses/NoAutorizado'
+ *       403:
+ *         $ref: '#/components/responses/SinPermiso'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ *       409:
+ *         description: >
+ *           PEDIDO_NO_PAGABLE (no es por transferencia, o está cancelado o
+ *           devuelto) o PEDIDO_YA_PAGADO.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  "/admin/pedidos/:id/aviso",
+  authMiddleware,
+  soloPermisos(PERMISOS.PAGOS_CONFIRMAR),
+  validarId,
+  controller.registrarAviso
+);
+
+/**
+ * @openapi
+ * /admin/pedidos/{id}/pago-confirmado:
+ *   post:
+ *     tags: [Admin - Pedidos]
+ *     summary: Confirmar que el dinero de una transferencia entró
+ *     description: >
+ *       Solo el admin (PAGOS_CONFIRMAR). Es la única forma de aprobar una
+ *       transferencia: el aviso de la clienta no alcanza. No hace falta que haya
+ *       aviso. Solo pedidos por transferencia con el pago pendiente o rechazado y
+ *       sin cancelar, aunque la reserva haya vencido. Tiene los mismos efectos que
+ *       una aprobación de Mercado Pago: el pedido deja de vencer, queda en el
+ *       historial con el usuario y se encola el mail de pago confirmado.
+ *       Confirmar dos veces no es un error.
+ *     security:
+ *       - cookieAuth: []
+ *     parameters:
+ *       - $ref: '#/components/parameters/IdRuta'
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/ConfirmacionPagoEntrada'
+ *     responses:
+ *       200:
+ *         description: Pago confirmado, o sin cambios si ya estaba confirmado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ConfirmacionPagoResultado'
+ *       400:
+ *         $ref: '#/components/responses/DatosInvalidos'
+ *       401:
+ *         $ref: '#/components/responses/NoAutorizado'
+ *       403:
+ *         $ref: '#/components/responses/SinPermiso'
+ *       404:
+ *         $ref: '#/components/responses/NoEncontrado'
+ *       409:
+ *         description: PEDIDO_NO_PAGABLE (no es por transferencia, o está cancelado o devuelto).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  "/admin/pedidos/:id/pago-confirmado",
+  authMiddleware,
+  soloPermisos(PERMISOS.PAGOS_CONFIRMAR),
+  validarConfirmacionPago,
+  controller.confirmarPago
 );
 
 module.exports = router;
