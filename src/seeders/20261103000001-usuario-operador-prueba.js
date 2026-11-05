@@ -2,7 +2,7 @@
 
 const bcrypt = require("bcryptjs");
 const { COSTO_BCRYPT } = require("../services/AuthService");
-const { exigirEntornoDeDesarrollo } = require("../config/soloDesarrollo");
+const { exigirEntornoDeDesarrollo, exigirBaseLocal } = require("../config/soloDesarrollo");
 
 const LARGO_MINIMO = 12;
 
@@ -25,6 +25,7 @@ module.exports = {
    */
   async up(queryInterface) {
     exigirEntornoDeDesarrollo("Crear el operador de prueba");
+    exigirBaseLocal("Crear el operador de prueba");
     const email = mailDelOperador();
     const password = process.env.OPERADOR_PASSWORD;
 
@@ -63,6 +64,7 @@ module.exports = {
    */
   async down(queryInterface) {
     exigirEntornoDeDesarrollo("Borrar el operador de prueba");
+    exigirBaseLocal("Borrar el operador de prueba");
     const email = mailDelOperador();
     if (email) {
       await queryInterface.bulkDelete("usuarios", { email, rol: "operador" }, {});

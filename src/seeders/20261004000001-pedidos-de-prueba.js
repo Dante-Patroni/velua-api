@@ -1,6 +1,6 @@
 "use strict";
 
-const { exigirEntornoDeDesarrollo } = require("../config/soloDesarrollo");
+const { exigirEntornoDeDesarrollo, exigirBaseLocal } = require("../config/soloDesarrollo");
 const { aCentavos, aImporte } = require("../utils/dinero");
 
 /**
@@ -229,6 +229,7 @@ module.exports = {
   async up(queryInterface) {
     // Pedidos falsos en producción aparecerían como ventas reales en el panel.
     exigirEntornoDeDesarrollo("Cargar pedidos de prueba");
+    exigirBaseLocal("Cargar pedidos de prueba");
 
     const seq = queryInterface.sequelize;
     const SELECT = { type: seq.QueryTypes.SELECT };
@@ -376,6 +377,7 @@ module.exports = {
    */
   async down(queryInterface) {
     exigirEntornoDeDesarrollo("Borrar pedidos de prueba");
+    exigirBaseLocal("Borrar pedidos de prueba");
     const seq = queryInterface.sequelize;
 
     const ids = (

@@ -153,6 +153,49 @@ describe("seeders en producción", () => {
   });
 });
 
+// NODE_ENV solo protege por convención: con NODE_ENV=development y la base de
+// producción en el .env (por ejemplo, al copiar credenciales para depurar), la
+// primera guarda pasa. La segunda mira adónde se conecta de verdad.
+describe("seeders con una base que no es local", () => {
+  const antes = {};
+  const queryInterface = () => ({
+    bulkInsert: jest.fn(),
+    bulkDelete: jest.fn(),
+    sequelize: { query: jest.fn(async () => []), QueryTypes: { SELECT: "SELECT" } },
+  });
+
+  beforeEach(() => {
+    for (const clave of ["NODE_ENV", "DB_HOST"]) antes[clave] = process.env[clave];
+    process.env.NODE_ENV = "development";
+    process.env.DB_HOST = "mysql.railway.internal";
+  });
+  afterEach(() => {
+    for (const [clave, valor] of Object.entries(antes)) {
+      if (valor === undefined) delete process.env[clave];
+      else process.env[clave] = valor;
+    }
+  });
+
+  test.each([
+    ["el catálogo de ejemplo no se carga", () => catalogo, "up"],
+    ["el catálogo no se vacía", () => catalogo, "down"],
+    ["los pedidos de prueba no se cargan", () => pedidos, "up"],
+    ["los pedidos de prueba no se borran", () => pedidos, "down"],
+    ["el usuario inicial no se borra", () => usuario, "down"],
+    ["el operador de prueba no se crea", () => operador, "up"],
+    ["el operador de prueba no se borra", () => operador, "down"],
+  ])("%s", async (_nombre, seeder, metodo) => {
+    const qi = queryInterface();
+
+    await expect(seeder()[metodo](qi)).rejects.toThrow(
+      /solo contra una base local \(ahora: DB_HOST=mysql\.railway\.internal\)/
+    );
+    expect(qi.bulkInsert).not.toHaveBeenCalled();
+    expect(qi.bulkDelete).not.toHaveBeenCalled();
+    expect(qi.sequelize.query).not.toHaveBeenCalled();
+  });
+});
+
 describe("operador de prueba", () => {
   const VARIABLES = ["OPERADOR_EMAIL", "OPERADOR_PASSWORD"];
   let antes;
