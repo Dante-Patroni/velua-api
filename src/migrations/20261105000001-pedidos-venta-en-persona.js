@@ -27,18 +27,27 @@ module.exports = {
    * y valor por defecto, como los dejó su migración original): un MODIFY que omite
    * un atributo lo borra. Los índices no se tocan.
    *
+   * Se puede volver a correr si falla a mitad de camino: los DDL no van en una
+   * transacción, así que un error después de crear `canal` la deja creada sin que
+   * la migración quede registrada. Por eso la columna se agrega solo si falta, y los
+   * MODIFY ya dan el mismo resultado si se repiten. Sin esto, el reintento del
+   * pre-deploy chocaría con "columna duplicada" y frenaría todos los deploys.
+   *
    * @param {import("sequelize").QueryInterface} queryInterface - Interfaz de consultas.
    * @param {import("sequelize").Sequelize} Sequelize - Constructor con los tipos de dato.
    * @returns {Promise<void>}
    */
   async up(queryInterface, Sequelize) {
     // Los pedidos que ya existen entraron todos por la tienda.
-    await queryInterface.addColumn("pedidos", "canal", {
-      type: Sequelize.ENUM("tienda", "panel"),
-      allowNull: false,
-      defaultValue: "tienda",
-      after: "numero",
-    });
+    const columnas = await queryInterface.describeTable("pedidos");
+    if (!columnas.canal) {
+      await queryInterface.addColumn("pedidos", "canal", {
+        type: Sequelize.ENUM("tienda", "panel"),
+        allowNull: false,
+        defaultValue: "tienda",
+        after: "numero",
+      });
+    }
 
     const seq = queryInterface.sequelize;
     await seq.query(
