@@ -28,13 +28,21 @@ module.exports = (sequelize) => {
     {
       id: { type: DataTypes.INTEGER.UNSIGNED, autoIncrement: true, primaryKey: true },
       numero: { type: DataTypes.STRING(20), allowNull: false, unique: true },
+      // Por dónde entró: la tienda o el panel (venta en persona). Ver la migración
+      // 20261105000001: ampliar el esquema no habilita nada en la tienda.
+      canal: {
+        type: DataTypes.ENUM("tienda", "panel"),
+        allowNull: false,
+        defaultValue: "tienda",
+      },
 
       clienteNombre: { type: DataTypes.STRING(140), allowNull: false },
-      clienteEmail: { type: DataTypes.STRING(180), allowNull: false },
+      // Opcional solo para las ventas del panel; la tienda lo sigue exigiendo.
+      clienteEmail: { type: DataTypes.STRING(180), allowNull: true },
       clienteTelefono: { type: DataTypes.STRING(40), allowNull: false },
       clienteDocumento: { type: DataTypes.STRING(20), allowNull: true },
 
-      metodoEntrega: { type: DataTypes.ENUM("envio", "retiro"), allowNull: false },
+      metodoEntrega: { type: DataTypes.ENUM("envio", "retiro", "en_mano"), allowNull: false },
       zonaEnvioId: { type: DataTypes.INTEGER.UNSIGNED, allowNull: true },
       direccionCalle: { type: DataTypes.STRING(180), allowNull: true },
       direccionNumero: { type: DataTypes.STRING(20), allowNull: true },
@@ -59,7 +67,10 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: "nuevo",
       },
-      medioPago: { type: DataTypes.ENUM("mercadopago", "transferencia"), allowNull: false },
+      medioPago: {
+        type: DataTypes.ENUM("mercadopago", "transferencia", "efectivo"),
+        allowNull: false,
+      },
 
       mpPreferenceId: { type: DataTypes.STRING(80), allowNull: true },
       mpPaymentId: { type: DataTypes.STRING(80), allowNull: true },
