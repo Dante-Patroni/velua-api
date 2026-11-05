@@ -23,11 +23,11 @@
  */
 require("dotenv").config();
 
-const { exigirEntornoDeDesarrollo, exigirApiLocal } = require("../src/config/soloDesarrollo");
-
-const db = require("../src/models");
-const SequelizePedidoRepository = require("../src/repositories/sequelize/SequelizePedidoRepository");
-const { PedidoEstadoService } = require("../src/services/PedidoEstadoService");
+const {
+  exigirEntornoDeDesarrollo,
+  exigirApiLocal,
+  exigirBaseLocal,
+} = require("../src/config/soloDesarrollo");
 
 const BASE = process.env.VELUA_API_URL || `http://localhost:${process.env.PORT || 3000}/api/v1`;
 const NOMBRE = "Prueba de aviso contra vencimiento";
@@ -45,14 +45,19 @@ const fallar = (mensaje) => {
 };
 
 // Estas pruebas crean pedidos y cambian stock: nunca contra una base o una API
-// reales. NODE_ENV protege la base (el script se conecta por el .env) y la URL
-// protege la API.
+// reales. NODE_ENV y DB_HOST protegen la base (el script se conecta por el .env)
+// y la URL protege la API. Va antes de cargar los modelos, que abren la conexión.
 try {
   exigirEntornoDeDesarrollo(NOMBRE);
+  exigirBaseLocal(NOMBRE);
   exigirApiLocal(NOMBRE, BASE);
 } catch (error) {
   fallar(error.message);
 }
+
+const db = require("../src/models");
+const SequelizePedidoRepository = require("../src/repositories/sequelize/SequelizePedidoRepository");
+const { PedidoEstadoService } = require("../src/services/PedidoEstadoService");
 
 /**
  * @description Hace una petición JSON a la API.

@@ -2,6 +2,7 @@ const {
   ENTORNOS_DE_DESARROLLO,
   exigirEntornoDeDesarrollo,
   exigirApiLocal,
+  exigirBaseLocal,
 } = require("../../src/config/soloDesarrollo");
 const catalogo = require("../../src/seeders/20260918000001-catalogo-inicial");
 const pedidos = require("../../src/seeders/20261004000001-pedidos-de-prueba");
@@ -58,6 +59,29 @@ describe("exigirApiLocal", () => {
     "",
   ])("corta %s", (url) => {
     expect(() => exigirApiLocal("Prueba", url)).toThrow(/solo contra una API local/);
+  });
+});
+
+describe("exigirBaseLocal", () => {
+  test.each([undefined, "", "localhost", "127.0.0.1", "::1"])("permite DB_HOST=%s", (host) => {
+    expect(() => exigirBaseLocal("x", { DB_HOST: host })).not.toThrow();
+  });
+
+  test.each([
+    "containers-us-west-1.railway.app",
+    "mysql.railway.internal",
+    "127.0.0.1.nip.io",
+    "10.0.0.5",
+    "LOCALHOST.example.com",
+  ])("corta DB_HOST=%s", (host) => {
+    expect(() => exigirBaseLocal("Prueba", { DB_HOST: host })).toThrow(/solo contra una base local/);
+  });
+
+  test("corta aunque NODE_ENV diga desarrollo", () => {
+    const env = { NODE_ENV: "development", DB_HOST: "mysql.railway.internal" };
+
+    expect(() => exigirEntornoDeDesarrollo("x", env)).not.toThrow();
+    expect(() => exigirBaseLocal("x", env)).toThrow();
   });
 });
 
