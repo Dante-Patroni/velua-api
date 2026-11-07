@@ -2,6 +2,7 @@ const app = require("./app");
 const db = require("./models");
 const { crearVencimientoReservas } = require("./jobs/vencimientoReservas");
 const { avisarSiEstaDeshabilitada, configTransferencia } = require("./config/transferencia");
+const { avisarSiEstaDeshabilitado, configEfectivo } = require("./config/efectivo");
 
 const PORT = process.env.PORT || 3000;
 
@@ -15,6 +16,7 @@ const iniciar = async () => {
     await db.sequelize.authenticate();
     // Acá y no al cargar el módulo: los tests cargan la app y llenarían el log.
     avisarSiEstaDeshabilitada(configTransferencia);
+    avisarSiEstaDeshabilitado(configEfectivo);
     app.listen(PORT, () => {
       // eslint-disable-next-line no-console
       console.log(`Velua API escuchando en el puerto ${PORT}`);
