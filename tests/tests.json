@@ -3978,6 +3978,48 @@
               }
             }
           ]
+        },
+        {
+          "name": "POST /admin/productos sin sesion",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/productos",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos"]
+            },
+            "description": "Sin cookie de sesion. El cuerpo vacio es a proposito: si la proteccion fallara, la validacion tampoco dejaria crear nada (400), y el test igual falla.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Devuelve NO_AUTORIZADO', () => pm.expect(pm.response.json().error).to.eql('NO_AUTORIZADO'));"
+                ]
+              }
+            }
+          ]
         }
       ]
     },
@@ -6481,6 +6523,31 @@
                 "aviso"
               ]
             }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Devuelve SIN_PERMISO', () => pm.expect(pm.response.json().error).to.eql('SIN_PERMISO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /admin/productos como operador",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/999999",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "999999"]
+            },
+            "description": "El operador no tiene CATALOGO_BORRAR. Id inexistente a proposito: si el permiso fallara, daria 404 y no borraria nada, y el test igual falla."
           },
           "event": [
             {
