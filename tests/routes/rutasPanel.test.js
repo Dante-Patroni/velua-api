@@ -41,6 +41,9 @@ const PERMISO_POR_RUTA = {
 
 const RUTAS_ESPERADAS = 29;
 
+/** Rutas públicas definidas directo en la app (fuera de los routers). */
+const RUTAS_DE_LA_APP = ["/api/v1/salud"];
+
 // Cargar app.js entero (rutas, modelos, Sequelize) puede pasar los 5 s por defecto
 // en Windows con el disco frío: es lento por naturaleza, no se cuelga.
 jest.setTimeout(30000);
@@ -49,6 +52,7 @@ describe("rutas del panel", () => {
   let rutas;
   let authMiddleware;
   let permisoDe;
+  let fueraDelInventario;
 
   beforeAll(() => {
     const app = require("../../src/app");
@@ -58,9 +62,32 @@ describe("rutas del panel", () => {
     // Recorre el router real. app.router.stack no es API pública de Express: si
     // una versión nueva cambia su forma, el test de cantidad de abajo falla en
     // vez de recorrer una lista vacía y pasar en verde.
+    //
+    // El recorrido solo ve rutas de routers montados en /api/v1. Para que ninguna
+    // ruta de /admin se le escape por otro camino, cualquier forma distinta cuenta
+    // como un hallazgo: una ruta definida directo en la app, un router montado en
+    // otro prefijo, o un router o middleware anidado adentro de otro router.
     rutas = [];
-    for (const capa of app.router.stack) {
-      for (const sub of capa.handle?.stack ?? []) {
+    fueraDelInventario = [];
+    for (const [posicion, capa] of app.router.stack.entries()) {
+      if (capa.route) {
+        if (!RUTAS_DE_LA_APP.includes(capa.route.path)) {
+          fueraDelInventario.push(`ruta en la app: ${capa.route.path}`);
+        }
+        continue;
+      }
+      if (!capa.handle?.stack) continue; // middleware de la app (cors, json, ...)
+      const montaje = capa.matchers?.[0];
+      // Montado exactamente en /api/v1: atiende cualquier cosa debajo de /api/v1 (no
+      // solo /api/v1/admin, que sería un prefijo más largo) y nada fuera de ahí.
+      if (!montaje || !montaje("/api/v1/cualquier-ruta") || montaje("/cualquier-ruta")) {
+        fueraDelInventario.push(`router en la posición ${posicion} no montado en /api/v1`);
+      }
+      for (const sub of capa.handle.stack) {
+        if (!sub.route) {
+          fueraDelInventario.push(`capa sin ruta en el router de la posición ${posicion}`);
+          continue;
+        }
         const ruta = sub.route;
         if (!ruta || !String(ruta.path).startsWith("/admin")) continue;
         for (const metodo of Object.keys(ruta.methods)) {
@@ -71,6 +98,13 @@ describe("rutas del panel", () => {
         }
       }
     }
+  });
+
+  test("no hay rutas fuera del inventario (montadas en otro lado o anidadas)", () => {
+    // Si esto falla: la ruta nueva tiene que ir en un router montado en /api/v1,
+    // con router.get/post/... y proteger. Un router.use o un sub-router ocultaría
+    // rutas que este test no ve.
+    expect(fueraDelInventario).toEqual([]);
   });
 
   test(`hay exactamente ${RUTAS_ESPERADAS} rutas de /admin`, () => {

@@ -3,9 +3,11 @@ const { PERMISOS } = require("../config/permisos");
 
 /**
  * Middlewares de permiso que salieron de la fábrica, con el permiso que exigen.
- * No se exporta: nadie de afuera puede registrar una función como "protegida".
- * Es un WeakMap (y no una propiedad en la función) para que la marca no se pueda
- * leer ni copiar desde otro módulo; y no retiene memoria si el middleware se libera.
+ * No se exporta: solo crearProteger escribe acá, así que nadie de afuera puede
+ * registrar una función como "protegida". Desde afuera solo se consulta, con
+ * permisoDe. Es un WeakMap (y no una propiedad en la función) para que la marca no
+ * se pueda copiar a otra función; y no retiene memoria si el middleware se libera.
+ * Protege de errores, no de código que ya corre dentro del proceso.
  */
 const fabricados = new WeakMap();
 
