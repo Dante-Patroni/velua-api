@@ -60,7 +60,7 @@ npm run dev
 Verificar que responde:
 
 - API: http://localhost:3000/api/v1/salud
-- Documentación: http://localhost:3000/api-docs
+- Documentación: http://localhost:3000/api-docs (solo con `NODE_ENV` `development` o `test`; en producción no se publica)
 
 ---
 

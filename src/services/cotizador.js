@@ -11,6 +11,14 @@ const TOPE_ITEMS = 30;
 const MEDIOS_PAGO = Object.freeze(["mercadopago", "transferencia"]);
 
 /**
+ * @description Medios que existen solo en las ventas del panel. Nunca entran en
+ * MEDIOS_PAGO: la tienda no los ofrece aunque estén configurados. Para cotizarlos
+ * hace falta pedirlo explícitamente con `incluirEfectivo: true`, y eso lo hace
+ * solo la ruta del panel, que tiene su propio permiso.
+ */
+const MEDIOS_SOLO_PANEL = Object.freeze(["efectivo"]);
+
+/**
  * @description Motivos por los que un ítem se quita o se ajusta. El frontend
  * los traduce; acá nunca se arman textos para mostrar.
  */
@@ -114,7 +122,9 @@ class Cotizador {
    *   Null o ausente significa que no hay envío gratis.
    * @param {number} [config.descuentoTransferencia] - Porcentaje de descuento por
    *   pagar con transferencia.
-   * @param {{mercadopago?: boolean, transferencia?: boolean}} [config.mediosDisponibles] -
+   * @param {number} [config.descuentoEfectivo] - Porcentaje de descuento por pagar
+   *   en efectivo (solo ventas del panel).
+   * @param {{mercadopago?: boolean, transferencia?: boolean, efectivo?: boolean}} [config.mediosDisponibles] -
    *   Qué medios se pueden usar hoy. Solo cuenta un `true` explícito: lo que falte
    *   se informa como no disponible (falla cerrado).
    * @param {Function} [config.hoy] - Devuelve la fecha de hoy "AAAA-MM-DD" en la
@@ -124,9 +134,13 @@ class Cotizador {
     this.repositorio = cotizacionRepository;
     this.umbralEnvioGratis = config.umbralEnvioGratis ?? null;
     this.descuentoTransferencia = Number(config.descuentoTransferencia ?? 0);
+    this.descuentoEfectivo = Number(config.descuentoEfectivo ?? 0);
     this.mediosDisponibles = Object.freeze(
       Object.fromEntries(
-        MEDIOS_PAGO.map((medio) => [medio, config.mediosDisponibles?.[medio] === true])
+        [...MEDIOS_PAGO, ...MEDIOS_SOLO_PANEL].map((medio) => [
+          medio,
+          config.mediosDisponibles?.[medio] === true,
+        ])
       )
     );
     this.hoy = typeof config.hoy === "function" ? config.hoy : hoyEnArgentina;
@@ -144,14 +158,20 @@ class Cotizador {
    * @param {Object} pedido - Datos de la cotización.
    * @param {Array<{varianteId: number, cantidad: number}>} pedido.items - Carrito.
    * @param {number} [pedido.zonaEnvioId] - Zona elegida. Sin zona, se cotiza como retiro.
-   * @param {string} [pedido.medioPago] - "transferencia" o "mercadopago".
+   * @param {string} [pedido.medioPago] - "transferencia" o "mercadopago"; "efectivo"
+   *   solo con `incluirEfectivo`.
+   * @param {boolean} [pedido.incluirEfectivo=false] - Solo la ruta del panel lo pasa.
+   *   Sin un `true` explícito, el efectivo no aparece en `mediosPago` ni descuenta,
+   *   aunque esté configurado.
    * @returns {Promise<Object>} Ítems cotizados, avisos, totales del medio elegido y,
    *   en `mediosPago`, si cada medio está disponible y su total. El total de cada
    *   medio lo calcula acá, con su descuento y su envío: el envío gratis depende del
    *   monto ya descontado, así que la diferencia entre medios no es solo el descuento.
    * @throws {Error} DATOS_INVALIDOS, CARRITO_SIN_ITEMS_VALIDOS, ZONA_INVALIDA, DATOS_DE_VENTA_INCOMPLETOS
    */
-  async cotizar({ items, zonaEnvioId, medioPago }) {
+  async cotizar({ items, zonaEnvioId, medioPago, incluirEfectivo = false }) {
+    const medios = incluirEfectivo === true ? [...MEDIOS_PAGO, ...MEDIOS_SOLO_PANEL] : MEDIOS_PAGO;
+
     validarForma(items);
 
     const variantes = await this.repositorio.buscarVariantes(
@@ -174,7 +194,7 @@ class Cotizador {
     const descuentoCupon = 0;
     const base = subtotal - descuentoCupon;
 
-    const ajustePago = this.#ajustePorMedioDePago(base, medioPago);
+    const ajustePago = medios.includes(medioPago) ? this.#ajustePorMedioDePago(base, medioPago) : 0;
     const conDescuentos = base - ajustePago;
 
     const zona = await this.#buscarZona(zonaEnvioId);
@@ -184,7 +204,7 @@ class Cotizador {
 
     // El mismo cálculo para cada medio, con la zona ya buscada: una sola consulta.
     const mediosPago = Object.fromEntries(
-      MEDIOS_PAGO.map((medio) => {
+      medios.map((medio) => {
         if (!this.mediosDisponibles[medio]) return [medio, { disponible: false, total: null }];
         const conDescuentoDelMedio = base - this.#ajustePorMedioDePago(base, medio);
         const envioDelMedio = this.#calcularEnvio(zona, conDescuentoDelMedio);
@@ -333,10 +353,12 @@ class Cotizador {
    * @returns {number} El descuento en centavos. Cero si no corresponde.
    */
   #ajustePorMedioDePago(baseCentavos, medioPago) {
-    if (medioPago !== "transferencia" || this.descuentoTransferencia <= 0) {
-      return 0;
-    }
-    return porcentajeDe(baseCentavos, this.descuentoTransferencia);
+    const porcentaje = {
+      transferencia: this.descuentoTransferencia,
+      efectivo: this.descuentoEfectivo,
+    }[medioPago];
+    if (!(porcentaje > 0)) return 0;
+    return porcentajeDe(baseCentavos, porcentaje);
   }
 
   /**
@@ -393,4 +415,12 @@ class Cotizador {
   }
 }
 
-module.exports = { Cotizador, AVISOS, TOPE_POR_VARIANTE, TOPE_ITEMS, MEDIOS_PAGO, imagenPrincipal };
+module.exports = {
+  Cotizador,
+  AVISOS,
+  TOPE_POR_VARIANTE,
+  TOPE_ITEMS,
+  MEDIOS_PAGO,
+  MEDIOS_SOLO_PANEL,
+  imagenPrincipal,
+};
