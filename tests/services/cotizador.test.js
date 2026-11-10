@@ -356,6 +356,101 @@ describe("Cotizador", () => {
     });
   });
 
+  // Venta en persona (t27). El efectivo existe solo en el panel: la tienda no lo
+  // ve aunque esté configurado y habilitado. Lo único que lo suma es pedirlo con
+  // incluirEfectivo: true, y eso lo hace solo la ruta del panel.
+  describe("efectivo, solo para el panel", () => {
+    const TODO_HABILITADO = { mercadopago: true, transferencia: true, efectivo: true };
+    const configurado = (cambios = {}) =>
+      new Cotizador(repositorioCon([variante()], [zona()]), {
+        descuentoTransferencia: 10,
+        descuentoEfectivo: 15,
+        mediosDisponibles: TODO_HABILITADO,
+        ...cambios,
+      });
+
+    it("una cotización pública nunca lo incluye, aunque esté configurado y habilitado", async () => {
+      const r = await configurado().cotizar({ items: [{ varianteId: 1, cantidad: 1 }] });
+
+      expect(Object.keys(r.mediosPago)).toEqual(["mercadopago", "transferencia"]);
+    });
+
+    it("solo un true explícito lo incluye", async () => {
+      for (const incluirEfectivo of ["true", 1, {}, null, undefined, false]) {
+        const r = await configurado().cotizar({
+          items: [{ varianteId: 1, cantidad: 1 }],
+          incluirEfectivo,
+        });
+
+        expect(r.mediosPago).not.toHaveProperty("efectivo");
+      }
+    });
+
+    it("pedido desde el panel, suma el efectivo con su propio descuento", async () => {
+      const r = await configurado().cotizar({
+        items: [{ varianteId: 1, cantidad: 1 }],
+        incluirEfectivo: true,
+      });
+
+      expect(r.mediosPago).toEqual({
+        mercadopago: { disponible: true, total: "8500.00" },
+        transferencia: { disponible: true, total: "7650.00" },
+        efectivo: { disponible: true, total: "7225.00" },
+      });
+    });
+
+    it("elegido desde el panel, descuenta en los totales", async () => {
+      const r = await configurado().cotizar({
+        items: [{ varianteId: 1, cantidad: 1 }],
+        medioPago: "efectivo",
+        incluirEfectivo: true,
+      });
+
+      expect(r.totales.ajusteMedioPago).toBe("1275.00");
+      expect(r.totales.total).toBe("7225.00");
+      expect(r.mediosPago.efectivo.total).toBe(r.totales.total);
+    });
+
+    it("elegido sin el pedido del panel, no descuenta", async () => {
+      const r = await configurado().cotizar({
+        items: [{ varianteId: 1, cantidad: 1 }],
+        medioPago: "efectivo",
+      });
+
+      expect(r.totales.ajusteMedioPago).toBe("0.00");
+      expect(r.totales.total).toBe("8500.00");
+    });
+
+    it("deshabilitado, aparece como no disponible y sin total", async () => {
+      const r = await configurado({
+        mediosDisponibles: { mercadopago: true, transferencia: true },
+      }).cotizar({ items: [{ varianteId: 1, cantidad: 1 }], incluirEfectivo: true });
+
+      expect(r.mediosPago.efectivo).toEqual({ disponible: false, total: null });
+    });
+
+    it("lleva su propio envío: el descuento puede dejarlo sin envío gratis", async () => {
+      const r = await configurado({ umbralEnvioGratis: "8000.00" }).cotizar({
+        items: [{ varianteId: 1, cantidad: 1 }],
+        zonaEnvioId: 1,
+        incluirEfectivo: true,
+      });
+
+      // 8500 llega al umbral; con 15 % baja a 7225 y paga los 6500 de envío.
+      expect(r.mediosPago.mercadopago.total).toBe("8500.00");
+      expect(r.mediosPago.efectivo.total).toBe("13725.00");
+    });
+
+    it("sin descuento configurado, el efectivo cuesta lo mismo que la lista", async () => {
+      const r = await configurado({ descuentoEfectivo: undefined }).cotizar({
+        items: [{ varianteId: 1, cantidad: 1 }],
+        incluirEfectivo: true,
+      });
+
+      expect(r.mediosPago.efectivo.total).toBe("8500.00");
+    });
+  });
+
   describe("envío", () => {
     it("sin zona, cotiza como retiro y no cobra envío", async () => {
       const servicio = new Cotizador(repositorioCon([variante()], [zona()]));
