@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const { CheckoutService, generarNumero, ALFABETO } = require("../../src/services/CheckoutService");
 
 const AHORA = new Date("2026-10-06T15:00:00.000Z");
@@ -443,10 +444,31 @@ describe("CheckoutService", () => {
       }
     });
 
-    it("genera números distintos", () => {
-      const numeros = new Set(Array.from({ length: 2000 }, generarNumero));
+    // Antes: "genera 2000 números distintos". Con 31^6 combinaciones, dos iguales
+    // salían ~1 de cada 450 corridas aunque el código estuviera bien. Que no se
+    // repitan depende del azar de crypto, que no es código nuestro; lo nuestro es
+    // usarlo bien y qué pasa cuando igual choca. Eso se prueba siempre igual.
+    it("arma cada carácter con crypto.randomInt sobre el alfabeto", () => {
+      const azar = jest.spyOn(crypto, "randomInt");
+      for (const indice of [0, 1, 2, 28, 29, 30]) azar.mockReturnValueOnce(indice);
 
-      expect(numeros.size).toBe(2000);
+      try {
+        expect(generarNumero()).toBe("VEL-234XYZ");
+        expect(azar).toHaveBeenCalledTimes(6);
+        for (const [maximo] of azar.mock.calls) expect(maximo).toBe(ALFABETO.length);
+      } finally {
+        azar.mockRestore();
+      }
+    });
+
+    it("si cinco números seguidos ya existen, falla en vez de repetir uno", async () => {
+      const repo = crearRepositorio();
+      repo.tx.existeNumero.mockResolvedValue(true);
+
+      await expect(servicioCon(repo).crearPedido(entrada())).rejects.toThrow(
+        "No se pudo generar un número de pedido libre"
+      );
+      expect(repo.tx.existeNumero).toHaveBeenCalledTimes(5);
     });
   });
 
