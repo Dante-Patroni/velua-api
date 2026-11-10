@@ -11,8 +11,7 @@ const {
   sinPuntosFinales,
 } = require("../services/PedidoEstadoService");
 const PedidoAdminController = require("../controllers/PedidoAdminController");
-const { authMiddleware } = require("../middlewares/authMiddleware");
-const { soloPermisos } = require("../middlewares/roleMiddleware");
+const { proteger } = require("../middlewares/proteger");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { PERMISOS } = require("../config/permisos");
 const { TRANSICIONES_PAGO, TRANSICIONES_PREPARACION } = require("../services/transicionesPedido");
@@ -144,8 +143,7 @@ const validarConfirmacionPago = [
  */
 router.get(
   "/admin/pedidos",
-  authMiddleware,
-  soloPermisos(PERMISOS.PEDIDOS_VER),
+  proteger(PERMISOS.PEDIDOS_VER),
   validarListado,
   controller.listar
 );
@@ -181,8 +179,7 @@ router.get(
  */
 router.get(
   "/admin/pedidos/:id",
-  authMiddleware,
-  soloPermisos(PERMISOS.PEDIDOS_VER),
+  proteger(PERMISOS.PEDIDOS_VER),
   validarId,
   controller.detalle
 );
@@ -234,8 +231,7 @@ router.get(
  */
 router.patch(
   "/admin/pedidos/:id/preparacion",
-  authMiddleware,
-  soloPermisos(PERMISOS.PEDIDOS_GESTIONAR),
+  proteger(PERMISOS.PEDIDOS_GESTIONAR),
   validarPreparacion,
   controller.cambiarPreparacion
 );
@@ -310,8 +306,7 @@ router.patch(
  */
 router.post(
   "/admin/pedidos/:id/cancelacion",
-  authMiddleware,
-  soloPermisos(PERMISOS.PEDIDOS_CANCELAR),
+  proteger(PERMISOS.PEDIDOS_CANCELAR),
   validarCancelacion,
   controller.cancelar
 );
@@ -358,8 +353,7 @@ router.post(
  */
 router.post(
   "/admin/pedidos/:id/aviso",
-  authMiddleware,
-  soloPermisos(PERMISOS.PAGOS_CONFIRMAR),
+  proteger(PERMISOS.PAGOS_CONFIRMAR),
   validarId,
   controller.registrarAviso
 );
@@ -412,8 +406,7 @@ router.post(
  */
 router.post(
   "/admin/pedidos/:id/pago-confirmado",
-  authMiddleware,
-  soloPermisos(PERMISOS.PAGOS_CONFIRMAR),
+  proteger(PERMISOS.PAGOS_CONFIRMAR),
   validarConfirmacionPago,
   controller.confirmarPago
 );

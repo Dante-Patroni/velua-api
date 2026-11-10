@@ -6,8 +6,7 @@ const SequelizeImagenRepository = require("../repositories/sequelize/SequelizeIm
 const CloudinaryStorage = require("../almacenamiento/CloudinaryStorage");
 const { ImagenAdminService } = require("../services/ImagenAdminService");
 const ImagenAdminController = require("../controllers/ImagenAdminController");
-const { authMiddleware } = require("../middlewares/authMiddleware");
-const { soloPermisos } = require("../middlewares/roleMiddleware");
+const { proteger } = require("../middlewares/proteger");
 const { recibirImagen } = require("../middlewares/subidaImagen");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { PERMISOS } = require("../config/permisos");
@@ -17,13 +16,6 @@ const router = express.Router();
 const controller = new ImagenAdminController(
   new ImagenAdminService(new SequelizeImagenRepository(db), new CloudinaryStorage())
 );
-
-/**
- * @description Cadena de protección: sesión válida más el permiso indicado.
- * @param {string} permiso - Permiso requerido.
- * @returns {Array<Function>} Middlewares de autenticación y autorización.
- */
-const proteger = (permiso) => [authMiddleware, soloPermisos(permiso)];
 
 /**
  * @description Regla del id del producto en la ruta.
