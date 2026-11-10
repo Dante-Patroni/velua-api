@@ -5,8 +5,7 @@ const db = require("../models");
 const SequelizeProductoRepository = require("../repositories/sequelize/SequelizeProductoRepository");
 const ProductoAdminService = require("../services/ProductoAdminService");
 const ProductoAdminController = require("../controllers/ProductoAdminController");
-const { authMiddleware } = require("../middlewares/authMiddleware");
-const { soloPermisos } = require("../middlewares/roleMiddleware");
+const { proteger } = require("../middlewares/proteger");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { PERMISOS } = require("../config/permisos");
 
@@ -22,13 +21,6 @@ const controller = new ProductoAdminController(
     new ImagenAdminService(new SequelizeImagenRepository(db), new CloudinaryStorage())
   )
 );
-
-/**
- * @description Cadena de protección: sesión válida más el permiso indicado.
- * @param {string} permiso - Permiso requerido.
- * @returns {Array<Function>} Middlewares de autenticación y autorización.
- */
-const proteger = (permiso) => [authMiddleware, soloPermisos(permiso)];
 
 /**
  * @description Regla del id del producto en la ruta.

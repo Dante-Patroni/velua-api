@@ -5,8 +5,7 @@ const db = require("../models");
 const SequelizeArrepentimientoRepository = require("../repositories/sequelize/SequelizeArrepentimientoRepository");
 const { ArrepentimientoService } = require("../services/ArrepentimientoService");
 const ArrepentimientoController = require("../controllers/ArrepentimientoController");
-const { authMiddleware } = require("../middlewares/authMiddleware");
-const { soloPermisos } = require("../middlewares/roleMiddleware");
+const { proteger } = require("../middlewares/proteger");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { PERMISOS } = require("../config/permisos");
 
@@ -113,8 +112,7 @@ const validarListado = [
  */
 router.get(
   "/admin/arrepentimientos",
-  authMiddleware,
-  soloPermisos(PERMISOS.PEDIDOS_VER),
+  proteger(PERMISOS.PEDIDOS_VER),
   validarListado,
   controller.listar
 );

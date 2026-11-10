@@ -5,8 +5,7 @@ const db = require("../models");
 const SequelizeCategoriaRepository = require("../repositories/sequelize/SequelizeCategoriaRepository");
 const CategoriaAdminService = require("../services/CategoriaAdminService");
 const CategoriaAdminController = require("../controllers/CategoriaAdminController");
-const { authMiddleware } = require("../middlewares/authMiddleware");
-const { soloPermisos } = require("../middlewares/roleMiddleware");
+const { proteger } = require("../middlewares/proteger");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 const { PERMISOS } = require("../config/permisos");
 const CloudinaryStorage = require("../almacenamiento/CloudinaryStorage");
@@ -17,13 +16,6 @@ const router = express.Router();
 const controller = new CategoriaAdminController(
   new CategoriaAdminService(new SequelizeCategoriaRepository(db), new CloudinaryStorage())
 );
-
-/**
- * @description Cadena de protección: sesión válida más el permiso indicado.
- * @param {string} permiso - Permiso requerido.
- * @returns {Array<Function>} Middlewares de autenticación y autorización.
- */
-const proteger = (permiso) => [authMiddleware, soloPermisos(permiso)];
 
 /**
  * @description Regla del id en la ruta. Función por el mismo motivo que reglasCampos.
