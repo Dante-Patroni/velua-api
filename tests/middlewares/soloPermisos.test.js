@@ -42,6 +42,10 @@ describe("soloPermisos", () => {
     ["sin permisos", { id: 3, rol: "cliente", permisos: [] }],
     ["sin la lista de permisos", { id: 4, rol: "cliente" }],
     ["sin usuario en la request", undefined],
+    // Un texto acertaría por coincidencia parcial con includes; un objeto, por su
+    // propio includes. Solo una lista cuenta como permisos.
+    ["con permisos como texto", { id: 5, rol: "?", permisos: "CATALOGO_BORRAR,CATALOGO_VER" }],
+    ["con permisos como objeto", { id: 6, rol: "?", permisos: { includes: () => true } }],
   ])("%s, responde 403 SIN_PERMISO y no deja pasar", (_caso, usuario) => {
     const { res, next } = correr(usuario);
 
