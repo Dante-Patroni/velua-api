@@ -246,118 +246,17 @@ class CheckoutService {
       throw new Error("MEDIO_PAGO_NO_DISPONIBLE");
     }
 
-    const { items, cliente, entrega, medioPago, totalEsperado, notas } = entrada;
-    const envio = entrega.metodo === "envio";
+    const { cliente, medioPago } = entrada;
 
     // Se espera la transacción y no se devuelve a secas: crearPedido tiene que
     // seguir siendo async para que los errores de validarCoherencia lleguen como
     // promesa rechazada.
-    const resultado = await this.repositorio.transaccion(async (tx) => {
-      const fuente = new FuenteQueRecuerda(tx);
-      const cotizador = new Cotizador(fuente, this.config);
-      const cotizacion = await cotizador.cotizar({
-        items,
-        zonaEnvioId: envio ? entrega.zonaEnvioId : null,
-        medioPago,
-      });
-
-      if (cotizacion.avisos.length > 0) {
-        throw new Error("CARRITO_DESACTUALIZADO");
-      }
-      if (aCentavos(cotizacion.totales.total) !== aCentavos(totalEsperado)) {
-        throw new Error("TOTAL_CAMBIO");
-      }
-
-      const lineas = [...cotizacion.items].sort((a, b) => a.varianteId - b.varianteId);
-      for (const linea of lineas) {
-        await tx.descontarStock(linea.varianteId, linea.cantidad);
-      }
-
-      const numero = await this.#numeroLibre(tx);
-      const expiraEn = new Date(
-        this.ahora().getTime() + VENCIMIENTO_HORAS[medioPago] * 60 * 60 * 1000
-      );
-      const t = cotizacion.totales;
-      const d = envio ? entrega.direccion : {};
-
-      const pedido = await tx.crearPedido({
-        numero,
-        clienteNombre: cliente.nombre.trim(),
-        clienteEmail: cliente.email.trim().toLowerCase(),
-        clienteTelefono: cliente.telefono.trim(),
-        clienteDocumento: cliente.documento?.trim() || null,
-        metodoEntrega: entrega.metodo,
-        zonaEnvioId: envio ? entrega.zonaEnvioId : null,
-        direccionCalle: d.calle?.trim() ?? null,
-        direccionNumero: d.numero?.trim() ?? null,
-        direccionExtra: d.extra?.trim() || null,
-        direccionCiudad: d.ciudad?.trim() ?? null,
-        direccionProvincia: d.provincia?.trim() ?? null,
-        direccionCp: d.cp?.trim() ?? null,
-        subtotal: t.subtotal,
-        descuentoCupon: t.descuentoCupon,
-        ajustePago: t.ajusteMedioPago,
-        costoEnvio: t.costoEnvio,
-        total: t.total,
-        medioPago,
-        expiraEn,
-        notasCliente: notas?.trim() || null,
-      });
-
-      await tx.crearItems(
-        cotizacion.items.map((i) => ({
-          pedidoId: pedido.id,
-          varianteId: i.varianteId,
-          nombreProducto: i.productoNombre,
-          nombreVariante: i.varianteNombre,
-          sku: fuente.leidas.get(i.varianteId)?.sku ?? null,
-          precioUnitario: i.precioUnitario,
-          cantidad: i.cantidad,
-          subtotal: i.subtotal,
-        }))
-      );
-
-      await tx.registrarEvento({
-        pedidoId: pedido.id,
-        campo: "pago",
-        estadoAnterior: null,
-        estadoNuevo: "pendiente",
-        origen: "checkout",
-      });
-
-      // Se encola acá y lo envía el job de H5. Si el encolado falla, falla todo:
-      // un pedido sin su mail de confirmación es un pedido que la clienta no sabe
-      // si se hizo.
-      await tx.encolarEmail({
-        pedidoId: pedido.id,
-        tipo: "pedido_recibido",
-        destinatario: cliente.email.trim().toLowerCase(),
-        datos: {
-          numero,
-          nombre: cliente.nombre.trim(),
-          medioPago,
-          expiraEn: expiraEn.toISOString(),
-          metodoEntrega: entrega.metodo,
-          envio: cotizacion.envio,
-          items: cotizacion.items.map((i) => ({
-            producto: i.productoNombre,
-            variante: i.varianteNombre,
-            cantidad: i.cantidad,
-            subtotal: i.subtotal,
-          })),
-          totales: t,
-        },
-      });
-
-      return {
-        pedidoId: pedido.id,
-        numero,
-        estadoPago: "pendiente",
-        medioPago,
-        total: t.total,
-        expiraEn,
-      };
-    });
+    const resultado = await this.repositorio.transaccion((tx) =>
+      this.#crearEnTransaccion(tx, entrada, {
+        horasDeReserva: VENCIMIENTO_HORAS[medioPago],
+        eventoInicial: { estadoNuevo: "pendiente", origen: "checkout" },
+      })
+    );
 
     // El id es interno: la respuesta pública identifica el pedido por su número
     const { pedidoId, ...publico } = resultado;
@@ -383,6 +282,136 @@ class CheckoutService {
       );
       return { ...publico, urlPago: null };
     }
+  }
+
+  /**
+   * @description El núcleo de la creación de un pedido, el mismo para cualquier
+   * canal: cotiza sobre las variantes bloqueadas, verifica que nada haya cambiado
+   * desde lo que se mostró, descuenta el stock (siempre en el mismo orden, para no
+   * trabarse con otra compra), genera el número y guarda el pedido, sus ítems, el
+   * evento inicial y el mail. Se llama adentro de una transacción: si algo falla,
+   * no queda nada a medias.
+   *
+   * Las reglas propias de cada canal (qué medios acepta, qué se valida antes) las
+   * pone quien lo llama; acá llegan solo como opciones con nombre.
+   *
+   * @param {Object} tx - Repositorio transaccional.
+   * @param {Object} entrada - Carrito, clienta, entrega, medio de pago y total visto,
+   *   ya validados por el canal.
+   * @param {Object} opciones - Lo que cambia según el canal.
+   * @param {number} opciones.horasDeReserva - Cuántas horas queda apartado el stock
+   *   antes de vencer.
+   * @param {{estadoNuevo: string, origen: string}} opciones.eventoInicial - Evento
+   *   de pago con el que nace el pedido.
+   * @returns {Promise<Object>} Id, número, estado de pago, medio, total y vencimiento.
+   * @throws {Error} CARRITO_DESACTUALIZADO, TOTAL_CAMBIO, CARRITO_SIN_ITEMS_VALIDOS,
+   *   ZONA_INVALIDA, STOCK_INSUFICIENTE
+   */
+  async #crearEnTransaccion(tx, entrada, { horasDeReserva, eventoInicial }) {
+    const { items, cliente, entrega, medioPago, totalEsperado, notas } = entrada;
+    const envio = entrega.metodo === "envio";
+    const fuente = new FuenteQueRecuerda(tx);
+    const cotizador = new Cotizador(fuente, this.config);
+    const cotizacion = await cotizador.cotizar({
+      items,
+      zonaEnvioId: envio ? entrega.zonaEnvioId : null,
+      medioPago,
+    });
+
+    if (cotizacion.avisos.length > 0) {
+      throw new Error("CARRITO_DESACTUALIZADO");
+    }
+    if (aCentavos(cotizacion.totales.total) !== aCentavos(totalEsperado)) {
+      throw new Error("TOTAL_CAMBIO");
+    }
+
+    const lineas = [...cotizacion.items].sort((a, b) => a.varianteId - b.varianteId);
+    for (const linea of lineas) {
+      await tx.descontarStock(linea.varianteId, linea.cantidad);
+    }
+
+    const numero = await this.#numeroLibre(tx);
+    const expiraEn = new Date(this.ahora().getTime() + horasDeReserva * 60 * 60 * 1000);
+    const t = cotizacion.totales;
+    const d = envio ? entrega.direccion : {};
+
+    const pedido = await tx.crearPedido({
+      numero,
+      clienteNombre: cliente.nombre.trim(),
+      clienteEmail: cliente.email.trim().toLowerCase(),
+      clienteTelefono: cliente.telefono.trim(),
+      clienteDocumento: cliente.documento?.trim() || null,
+      metodoEntrega: entrega.metodo,
+      zonaEnvioId: envio ? entrega.zonaEnvioId : null,
+      direccionCalle: d.calle?.trim() ?? null,
+      direccionNumero: d.numero?.trim() ?? null,
+      direccionExtra: d.extra?.trim() || null,
+      direccionCiudad: d.ciudad?.trim() ?? null,
+      direccionProvincia: d.provincia?.trim() ?? null,
+      direccionCp: d.cp?.trim() ?? null,
+      subtotal: t.subtotal,
+      descuentoCupon: t.descuentoCupon,
+      ajustePago: t.ajusteMedioPago,
+      costoEnvio: t.costoEnvio,
+      total: t.total,
+      medioPago,
+      expiraEn,
+      notasCliente: notas?.trim() || null,
+    });
+
+    await tx.crearItems(
+      cotizacion.items.map((i) => ({
+        pedidoId: pedido.id,
+        varianteId: i.varianteId,
+        nombreProducto: i.productoNombre,
+        nombreVariante: i.varianteNombre,
+        sku: fuente.leidas.get(i.varianteId)?.sku ?? null,
+        precioUnitario: i.precioUnitario,
+        cantidad: i.cantidad,
+        subtotal: i.subtotal,
+      }))
+    );
+
+    await tx.registrarEvento({
+      pedidoId: pedido.id,
+      campo: "pago",
+      estadoAnterior: null,
+      estadoNuevo: eventoInicial.estadoNuevo,
+      origen: eventoInicial.origen,
+    });
+
+    // Se encola acá y lo envía el job de H5. Si el encolado falla, falla todo:
+    // un pedido sin su mail de confirmación es un pedido que la clienta no sabe
+    // si se hizo.
+    await tx.encolarEmail({
+      pedidoId: pedido.id,
+      tipo: "pedido_recibido",
+      destinatario: cliente.email.trim().toLowerCase(),
+      datos: {
+        numero,
+        nombre: cliente.nombre.trim(),
+        medioPago,
+        expiraEn: expiraEn.toISOString(),
+        metodoEntrega: entrega.metodo,
+        envio: cotizacion.envio,
+        items: cotizacion.items.map((i) => ({
+          producto: i.productoNombre,
+          variante: i.varianteNombre,
+          cantidad: i.cantidad,
+          subtotal: i.subtotal,
+        })),
+        totales: t,
+      },
+    });
+
+    return {
+      pedidoId: pedido.id,
+      numero,
+      estadoPago: eventoInicial.estadoNuevo,
+      medioPago,
+      total: t.total,
+      expiraEn,
+    };
   }
 
   /**
