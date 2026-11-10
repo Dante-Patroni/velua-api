@@ -21,6 +21,11 @@ describe("documentacionHabilitada", () => {
 describe("/api-docs en la app", () => {
   const original = process.env.NODE_ENV;
 
+  // Cargar app.js entero (rutas, modelos, Sequelize) puede pasar los 5 s por defecto
+  // en Windows, con el disco frío o con otro test cargando la app en paralelo. Es
+  // lento por naturaleza, no se cuelga: el límite propio vale solo para estos dos.
+  const CARGA_DE_LA_APP = 30000;
+
   afterEach(() => {
     process.env.NODE_ENV = original;
   });
@@ -47,11 +52,19 @@ describe("/api-docs en la app", () => {
     }
   };
 
-  test("en producción, /api-docs no existe", async () => {
-    expect(await pedirDocumentacion("production")).toBe(404);
-  });
+  test(
+    "en producción, /api-docs no existe",
+    async () => {
+      expect(await pedirDocumentacion("production")).toBe(404);
+    },
+    CARGA_DE_LA_APP
+  );
 
-  test("en desarrollo, /api-docs responde", async () => {
-    expect(await pedirDocumentacion("development")).toBe(200);
-  });
+  test(
+    "en desarrollo, /api-docs responde",
+    async () => {
+      expect(await pedirDocumentacion("development")).toBe(200);
+    },
+    CARGA_DE_LA_APP
+  );
 });
