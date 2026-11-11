@@ -140,4 +140,20 @@ describe("registrarResultadoPago", () => {
       servicio.registrarResultadoPago(7, { estado: "pending", pagoId: "1" })
     ).rejects.toThrow("Resultado de pago desconocido");
   });
+
+  it.each([
+    ["aprobado", APROBADO],
+    ["rechazado", RECHAZADO],
+  ])("sin email, registra el pago %s igual y no encola ningún mail", async (estado, resultado) => {
+    const { servicio, tx } = armar(pedido({ clienteEmail: null }));
+
+    const r = await servicio.registrarResultadoPago(7, resultado);
+
+    expect(r).toEqual({ cambiado: true, numero: "VEL-ABC234" });
+    expect(tx.actualizarEstados).toHaveBeenCalledWith(7, { estadoPago: estado });
+    expect(tx.registrarEvento).toHaveBeenCalledWith(
+      expect.objectContaining({ estadoAnterior: "pendiente", estadoNuevo: estado })
+    );
+    expect(tx.encolarEmail).not.toHaveBeenCalled();
+  });
 });

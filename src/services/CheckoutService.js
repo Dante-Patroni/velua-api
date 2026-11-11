@@ -4,6 +4,7 @@ const { Cotizador } = require("./cotizador");
 const { aCentavos } = require("../utils/dinero");
 const { decidirReintentoMP } = require("./decidirReintentoMP");
 const { estaVencido } = require("./PedidoEstadoService");
+const { encolarParaClienta } = require("./mailsClienta");
 
 /** Una preferencia se reusa si le quedan al menos estos minutos de vida. */
 const MARGEN_PREFERENCIA_MS = 5 * 60 * 1000;
@@ -383,7 +384,7 @@ class CheckoutService {
     // Se encola acá y lo envía el job de H5. Si el encolado falla, falla todo:
     // un pedido sin su mail de confirmación es un pedido que la clienta no sabe
     // si se hizo.
-    await tx.encolarEmail({
+    await encolarParaClienta(tx, {
       pedidoId: pedido.id,
       tipo: "pedido_recibido",
       destinatario: cliente.email.trim().toLowerCase(),

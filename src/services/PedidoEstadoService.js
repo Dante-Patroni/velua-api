@@ -3,6 +3,7 @@ const {
   esTransicionValida,
   validarTransicion,
 } = require("./transicionesPedido");
+const { encolarParaClienta } = require("./mailsClienta");
 
 /** Resultados del procesador que mueven el estado de pago. */
 const RESULTADOS_PAGO = Object.freeze(["aprobado", "rechazado"]);
@@ -147,7 +148,7 @@ class PedidoEstadoService {
 
       // Si el encolado falla, falla todo: la cancelación se reintenta en la próxima
       // vuelta del job, con su mail.
-      await tx.encolarEmail({
+      await encolarParaClienta(tx, {
         pedidoId: pedido.id,
         tipo: "pedido_cancelado",
         destinatario: pedido.clienteEmail,
@@ -263,7 +264,7 @@ class PedidoEstadoService {
         origen,
         detalle,
       });
-      await tx.encolarEmail({
+      await encolarParaClienta(tx, {
         pedidoId: pedido.id,
         tipo: "pago_rechazado",
         destinatario: pedido.clienteEmail,
@@ -350,7 +351,7 @@ class PedidoEstadoService {
       ...(usuarioId === undefined ? {} : { usuarioId }),
       detalle,
     });
-    await tx.encolarEmail({
+    await encolarParaClienta(tx, {
       pedidoId: pedido.id,
       tipo: "pago_confirmado",
       destinatario: pedido.clienteEmail,
@@ -586,7 +587,7 @@ class PedidoEstadoService {
       });
 
       if (hacia === "enviado") {
-        await tx.encolarEmail({
+        await encolarParaClienta(tx, {
           pedidoId: pedido.id,
           tipo: "pedido_enviado",
           destinatario: pedido.clienteEmail,
@@ -687,7 +688,7 @@ class PedidoEstadoService {
         origen: "panel",
         usuarioId,
       });
-      await tx.encolarEmail({
+      await encolarParaClienta(tx, {
         pedidoId: pedido.id,
         tipo: "pedido_cancelado",
         destinatario: pedido.clienteEmail,
