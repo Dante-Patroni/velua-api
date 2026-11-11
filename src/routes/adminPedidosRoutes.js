@@ -411,4 +411,13 @@ router.post(
   controller.confirmarPago
 );
 
+/**
+ * Esqueleto del resumen de ventas pendientes de cobro (t27, PR 6). Queda montada
+ * para que la pantalla del panel (t28) pueda empezar a llamarla; la cuenta real
+ * llega con el PR 6.
+ */
+router.get("/admin/ventas/resumen", (req, res) => {
+  res.json({ ok: true });
+});
+
 module.exports = router;
