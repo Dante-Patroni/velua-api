@@ -993,7 +993,7 @@ describe("registrarVentaDelPanel", () => {
 
       await expect(registrar(repo)).rejects.toThrow("CARRITO_SIN_ITEMS_VALIDOS");
       expect(repo.estado.pedidos).toEqual([]);
-    });    
+    });
   });
 
   describe("lo que se guarda es lo que entra en la huella", () => {

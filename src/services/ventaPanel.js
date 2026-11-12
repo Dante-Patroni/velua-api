@@ -59,7 +59,7 @@ const textoONull = (valor) => {
 const normalizarVenta = (datos) => {
   if (datos === null || typeof datos !== "object") {
     throw datosInvalidos({ venta: "Faltan los datos de la venta" });
-  }  
+  }
   const envio = datos.entrega?.metodo === "envio";
   const direccion = datos.entrega?.direccion;
   if (!envio && direccion !== undefined && direccion !== null) {
@@ -68,7 +68,7 @@ const normalizarVenta = (datos) => {
   const zona = datos.entrega?.zonaEnvioId;
   if (!envio && zona !== undefined && zona !== null) {
     throw datosInvalidos({ "entrega.zonaEnvioId": "La zona va solo con envío" });
-  }  
+  }
 
   return {
     items: (datos.items ?? [])
@@ -119,7 +119,7 @@ const validarVentaPanel = (venta) => {
       throw datosInvalidos({ items: "Hay una variante repetida" });
     }
     vistas.add(varianteId);
-  }  
+  }
   if (!venta.cliente.nombre || !venta.cliente.telefono) {
     throw datosInvalidos({ cliente: "Faltan el nombre o el teléfono" });
   }

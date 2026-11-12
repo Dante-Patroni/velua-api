@@ -93,7 +93,7 @@ describe("normalizarVenta", () => {
 
   test.each([undefined, null, "venta"])("sin datos (%p): DATOS_INVALIDOS", (valor) => {
     expect(() => normalizarVenta(valor)).toThrow("DATOS_INVALIDOS");
-  });  
+  });
 
   test("el total queda con dos decimales", () => {
     expect(normalizarVenta(datos({ totalEsperado: "21800" })).totalEsperado).toBe("21800.00");
@@ -140,7 +140,7 @@ describe("validarVentaPanel", () => {
           { varianteId: 3, cantidad: 2 },
         ],
       },
-    ],    
+    ],
   ])("%s: DATOS_INVALIDOS", (_caso, cambios) => {
     expect(valida(cambios)).toThrow("DATOS_INVALIDOS");
   });
