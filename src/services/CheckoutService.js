@@ -372,12 +372,14 @@ class CheckoutService {
         })
       );
     } catch (error) {
-      // Otro reintento con la misma clave ganó la carrera: esta transacción ya volvió
-      // atrás entera (stock, eventos, mail). Se responde como reintento.
-      if (error.message === "CLAVE_VENTA_DUPLICADA") {
-        const ganadora = await this.#ventaPrevia(clave, huella);
-        if (ganadora) return { creada: false, venta: ganadora };
-      }
+      // Si otro reintento con la misma clave ganó la carrera, esta transacción ya
+      // volvió atrás entera (stock, eventos, mail) y se responde como reintento. No
+      // solo ante el choque con el índice (CLAVE_VENTA_DUPLICADA): si la otra se llevó
+      // la última unidad, esta encuentra el stock en 0 al pasar el bloqueo y falla
+      // antes del INSERT (por ejemplo, CARRITO_SIN_ITEMS_VALIDOS). Por eso, ante
+      // cualquier error, se vuelve a mirar la clave; si no hay venta, sigue el error.
+      const ganadora = await this.#ventaPrevia(clave, huella);
+      if (ganadora) return { creada: false, venta: ganadora };
       throw error;
     }
 
@@ -488,6 +490,11 @@ class CheckoutService {
     const t = cotizacion.totales;
     const d = envio ? entrega.direccion : {};
 
+    // El núcleo limpia los textos porque la tienda le pasa los datos tal como
+    // llegan. La venta del panel ya viene normalizada (normalizarVenta), y limpiarla
+    // de nuevo no la cambia. Si cambia una de las dos normalizaciones (por ejemplo,
+    // la del email), hay que cambiar la otra igual: la huella guardada describe lo
+    // que normalizó normalizarVenta.
     const pedido = await tx.crearPedido({
       numero,
       canal: perfil.canal,

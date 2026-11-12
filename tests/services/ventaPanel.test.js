@@ -85,6 +85,16 @@ describe("normalizarVenta", () => {
     }
   );
 
+  test.each(["retiro", "en_mano"])("con %s, una zona es un error", (metodo) => {
+    expect(() => normalizarVenta(datos({ entrega: { metodo, zonaEnvioId: 5 } }))).toThrow(
+      "DATOS_INVALIDOS"
+    );
+  });
+
+  test.each([undefined, null, "venta"])("sin datos (%p): DATOS_INVALIDOS", (valor) => {
+    expect(() => normalizarVenta(valor)).toThrow("DATOS_INVALIDOS");
+  });  
+
   test("el total queda con dos decimales", () => {
     expect(normalizarVenta(datos({ totalEsperado: "21800" })).totalEsperado).toBe("21800.00");
     expect(normalizarVenta(datos({ totalEsperado: "21800.5" })).totalEsperado).toBe("21800.50");
@@ -118,6 +128,19 @@ describe("validarVentaPanel", () => {
     ],
     ["sin nombre", { cliente: { nombre: "  ", telefono: "358" } }],
     ["sin teléfono", { cliente: { nombre: "Ana" } }],
+    ["sin ítems", { items: [] }],
+    ["una variante que no es un número", { items: [{ varianteId: "abc", cantidad: 1 }] }],
+    ["cantidad 0", { items: [{ varianteId: 3, cantidad: 0 }] }],
+    ["cantidad con decimales", { items: [{ varianteId: 3, cantidad: 1.5 }] }],
+    [
+      "una variante repetida",
+      {
+        items: [
+          { varianteId: 3, cantidad: 1 },
+          { varianteId: 3, cantidad: 2 },
+        ],
+      },
+    ],    
   ])("%s: DATOS_INVALIDOS", (_caso, cambios) => {
     expect(valida(cambios)).toThrow("DATOS_INVALIDOS");
   });

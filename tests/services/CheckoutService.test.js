@@ -960,6 +960,17 @@ describe("registrarVentaDelPanel", () => {
         expect(repo.estado.emails).toEqual([]);
       });
 
+      it("la última unidad: el que esperaba el bloqueo encuentra el stock en 0 y responde como reintento", async () => {
+        const repo = yaGuardadaPorOtro(venta());
+        repo.estado.variantes[0].stock = 0;
+
+        const r = await registrar(repo);
+
+        expect(r).toEqual({ creada: false, venta: expect.objectContaining({ id: 41 }) });
+        expect(repo.estado.variantes[0].stock).toBe(0);
+        expect(repo.estado.eventos).toEqual([]);
+      });
+
       it("otra venta: CLAVE_REUTILIZADA", async () => {
         const repo = yaGuardadaPorOtro(venta({ notas: "Otra venta" }));
 
@@ -968,13 +979,21 @@ describe("registrarVentaDelPanel", () => {
       });
     });
 
-    it("otro error de la base no se confunde con un reintento", async () => {
+    it("otro error, sin venta con esa clave, sigue tal cual", async () => {
       const repo = crearRepositorio();
       repo.tx.crearPedido.mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
 
       await expect(registrar(repo)).rejects.toThrow("ER_LOCK_DEADLOCK");
-      expect(repo.buscarPorClaveVenta).toHaveBeenCalledTimes(1);
+      // Una vez antes de crear y otra después del error: no había venta.
+      expect(repo.buscarPorClaveVenta).toHaveBeenCalledTimes(2);
     });
+
+    it("sin stock y sin venta con esa clave, sigue siendo un carrito sin ítems válidos", async () => {
+      const repo = crearRepositorio({ variantes: [variante({ stock: 0 })] });
+
+      await expect(registrar(repo)).rejects.toThrow("CARRITO_SIN_ITEMS_VALIDOS");
+      expect(repo.estado.pedidos).toEqual([]);
+    });    
   });
 
   describe("lo que se guarda es lo que entra en la huella", () => {

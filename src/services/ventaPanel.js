@@ -47,21 +47,28 @@ const textoONull = (valor) => {
  * - Textos sin espacios de los bordes; lo vacío o ausente, null.
  * - Email en minúsculas.
  * - Ítems ordenados por variante: el orden en que se cargaron no cambia la venta.
- * - Dirección solo con envío. Con retiro o en mano, si viene, es un error y no se
- *   descarta en silencio: no se guarda un domicilio que no hace falta.
+ * - Dirección y zona solo con envío. Con retiro o en mano, si vienen, es un error y
+ *   no se descartan en silencio: no se guarda un domicilio que no hace falta.
  * - Total esperado con dos decimales, a partir de sus centavos.
  *
  * @param {Object} datos - Datos validados (matchedData) de la venta.
  * @returns {Object} La venta normalizada.
- * @throws {Error} DATOS_INVALIDOS si el total no tiene forma de importe o si viene
- *   una dirección sin envío.
+ * @throws {Error} DATOS_INVALIDOS si no hay datos, si el total no tiene forma de
+ *   importe o si vienen una dirección o una zona sin envío.
  */
 const normalizarVenta = (datos) => {
+  if (datos === null || typeof datos !== "object") {
+    throw datosInvalidos({ venta: "Faltan los datos de la venta" });
+  }  
   const envio = datos.entrega?.metodo === "envio";
   const direccion = datos.entrega?.direccion;
   if (!envio && direccion !== undefined && direccion !== null) {
     throw datosInvalidos({ "entrega.direccion": "La dirección va solo con envío" });
   }
+  const zona = datos.entrega?.zonaEnvioId;
+  if (!envio && zona !== undefined && zona !== null) {
+    throw datosInvalidos({ "entrega.zonaEnvioId": "La zona va solo con envío" });
+  }  
 
   return {
     items: (datos.items ?? [])
@@ -97,6 +104,22 @@ const normalizarVenta = (datos) => {
  * @throws {Error} DATOS_INVALIDOS con el campo.
  */
 const validarVentaPanel = (venta) => {
+  if (venta.items.length === 0) {
+    throw datosInvalidos({ items: "Agregá al menos un producto" });
+  }
+  const vistas = new Set();
+  for (const { varianteId, cantidad } of venta.items) {
+    if (!Number.isInteger(varianteId) || varianteId < 1) {
+      throw datosInvalidos({ items: "Hay una variante inválida" });
+    }
+    if (!Number.isInteger(cantidad) || cantidad < 1) {
+      throw datosInvalidos({ items: "Las cantidades son enteros desde 1" });
+    }
+    if (vistas.has(varianteId)) {
+      throw datosInvalidos({ items: "Hay una variante repetida" });
+    }
+    vistas.add(varianteId);
+  }  
   if (!venta.cliente.nombre || !venta.cliente.telefono) {
     throw datosInvalidos({ cliente: "Faltan el nombre o el teléfono" });
   }
