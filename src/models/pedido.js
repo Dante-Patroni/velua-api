@@ -35,6 +35,11 @@ module.exports = (sequelize) => {
         allowNull: false,
         defaultValue: "tienda",
       },
+      // Idempotencia de las ventas del panel (migración 20261111000001): la clave que
+      // manda el panel y el SHA-256 del contenido validado. Van juntas o ninguna (CHECK
+      // en la base); los pedidos de la tienda no tienen.
+      claveVenta: { type: DataTypes.CHAR(36), allowNull: true, unique: true },
+      huellaVenta: { type: DataTypes.CHAR(64), allowNull: true },
 
       clienteNombre: { type: DataTypes.STRING(140), allowNull: false },
       // Opcional solo para las ventas del panel; la tienda lo sigue exigiendo.
