@@ -28,6 +28,16 @@ class PedidoRepository {
   }
 
   /**
+   * @description Busca la venta del panel registrada con una clave de idempotencia.
+   * @param {string} _clave - Clave (un UUID en minúsculas).
+   * @returns {Promise<Object|null>} id, numero, total, estadoPago, medioPago y
+   *   huellaVenta, o null si la clave no se usó.
+   */
+  async buscarPorClaveVenta(_clave) {
+    throw new Error("Metodo buscarPorClaveVenta no implementado");
+  }
+
+  /**
    * @description Lista los ids de los pedidos cuya reserva venció: pago pendiente o
    * rechazado, plazo pasado y sin comprobante informado. No bloquea nada: es solo la
    * lista de candidatos, y cada uno se vuelve a verificar con candado al cancelarlo.

@@ -3,6 +3,21 @@ const { Op } = require("sequelize");
 const { PedidoRepository, PedidoTransaccion } = require("../PedidoRepository");
 const { ESTADOS_PAGO_VENCIBLES } = require("../../services/transicionesPedido");
 
+/** Índice único de la clave de idempotencia (migración 20261111000001). */
+const INDICE_CLAVE_VENTA = "ux_pedidos_clave_venta";
+
+/**
+ * @description Si el error es el choque con el índice único de la clave de venta.
+ * Se decide por el errno 1062 (igual en MySQL y MariaDB) y por el nombre del índice
+ * en el mensaje; nunca por el nombre del código, que el driver etiqueta con la tabla
+ * de MySQL (en MariaDB, otros errores llegan con nombres que no son los suyos).
+ * @param {Error} error - Error de Sequelize.
+ * @returns {boolean} true si es una clave de venta repetida.
+ */
+const esClaveVentaRepetida = (error) =>
+  error?.parent?.errno === 1062 &&
+  String(error.parent.sqlMessage ?? error.parent.message ?? "").includes(INDICE_CLAVE_VENTA);
+
 /**
  * @description Repositorio atado a una transacción de Sequelize. Todas sus
  * operaciones corren dentro de ella.
@@ -137,8 +152,17 @@ class SequelizePedidoTransaccion extends PedidoTransaccion {
    * @returns {Promise<Object>} Pedido creado, con su id.
    */
   async crearPedido(datos) {
-    const pedido = await this.models.Pedido.create(datos, { transaction: this.t });
-    return pedido.toJSON();
+    try {
+      const pedido = await this.models.Pedido.create(datos, { transaction: this.t });
+      return pedido.toJSON();
+    } catch (error) {
+      // Otra venta con la misma clave se guardó primero: el servicio lo trata como
+      // un reintento. Cualquier otro error sigue tal cual.
+      if (esClaveVentaRepetida(error)) {
+        throw new Error("CLAVE_VENTA_DUPLICADA", { cause: error });
+      }
+      throw error;
+    }
   }
 
   /**
@@ -304,6 +328,22 @@ class SequelizePedidoRepository extends PedidoRepository {
       where: { numero },
       include: [{ model: this.models.PedidoItem, as: "items" }],
       order: [[{ model: this.models.PedidoItem, as: "items" }, "id", "ASC"]],
+    });
+    return pedido ? pedido.toJSON() : null;
+  }
+
+  /**
+   * @description Busca la venta del panel registrada con una clave de idempotencia.
+   * Sin transacción: se llama antes de crear y después de un choque con el índice,
+   * cuando la otra venta ya está confirmada.
+   * @param {string} clave - Clave (un UUID en minúsculas).
+   * @returns {Promise<Object|null>} id, numero, total, estadoPago, medioPago y
+   *   huellaVenta, o null.
+   */
+  async buscarPorClaveVenta(clave) {
+    const pedido = await this.models.Pedido.findOne({
+      where: { claveVenta: clave },
+      attributes: ["id", "numero", "total", "estadoPago", "medioPago", "huellaVenta"],
     });
     return pedido ? pedido.toJSON() : null;
   }

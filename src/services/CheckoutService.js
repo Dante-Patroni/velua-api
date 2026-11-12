@@ -5,6 +5,12 @@ const { aCentavos } = require("../utils/dinero");
 const { decidirReintentoMP } = require("./decidirReintentoMP");
 const { estaVencido } = require("./PedidoEstadoService");
 const { encolarParaClienta } = require("./mailsClienta");
+const {
+  normalizarVenta,
+  validarVentaPanel,
+  normalizarClave,
+  huellaDeVenta,
+} = require("./ventaPanel");
 
 /** Una preferencia se reusa si le quedan al menos estos minutos de vida. */
 const MARGEN_PREFERENCIA_MS = 5 * 60 * 1000;
@@ -29,6 +35,30 @@ const LARGO_NUMERO = 6;
 const VENCIMIENTO_HORAS = Object.freeze({ mercadopago: 1, transferencia: 24 });
 
 const MEDIOS = Object.keys(VENCIMIENTO_HORAS);
+
+/**
+ * @description Lo que distingue a cada canal en la creación de un pedido. Son
+ * fijos y privados de este módulo: desde afuera solo se elige el método
+ * (crearPedido o registrarVentaDelPanel), nunca se arma un canal a medida.
+ *
+ * - canal, que se guarda en el pedido.
+ * - incluirEfectivo, si el cotizador ofrece el efectivo (solo el panel).
+ * - vence, si el stock apartado vence solo. Las ventas del panel no: la dueña las
+ *   cancela a mano si no le pagan.
+ * - origenEvento, el origen del evento con el que nace el pedido.
+ */
+const PERFIL_TIENDA = Object.freeze({
+  canal: "tienda",
+  incluirEfectivo: false,
+  vence: true,
+  origenEvento: "checkout",
+});
+const PERFIL_PANEL = Object.freeze({
+  canal: "panel",
+  incluirEfectivo: true,
+  vence: false,
+  origenEvento: "panel",
+});
 
 /** Estados de pago desde los que todavía se puede pagar con Mercado Pago. */
 const ESTADOS_PAGABLES = Object.freeze(["pendiente", "rechazado"]);
@@ -253,10 +283,7 @@ class CheckoutService {
     // seguir siendo async para que los errores de validarCoherencia lleguen como
     // promesa rechazada.
     const resultado = await this.repositorio.transaccion((tx) =>
-      this.#crearEnTransaccion(tx, entrada, {
-        horasDeReserva: VENCIMIENTO_HORAS[medioPago],
-        eventoInicial: { estadoNuevo: "pendiente", origen: "checkout" },
-      })
+      this.#crearEnTransaccion(tx, entrada, PERFIL_TIENDA)
     );
 
     // El id es interno: la respuesta pública identifica el pedido por su número
@@ -286,6 +313,112 @@ class CheckoutService {
   }
 
   /**
+   * @description Registra una venta hecha fuera de la tienda (WhatsApp, teléfono,
+   * en persona), desde el panel. Es un pedido con canal "panel", el mismo stock y el
+   * mismo historial, creado por el mismo núcleo que la tienda.
+   *
+   * Idempotente: el panel manda una clave por venta. Si la clave ya se usó con el
+   * mismo contenido (un reintento), devuelve la venta original sin tocar nada más:
+   * ni stock, ni eventos, ni mails. Con otro contenido, CLAVE_REUTILIZADA. Si dos
+   * reintentos llegan a la vez, el índice único de la base frena al segundo, que
+   * vuelve atrás entero y responde como reintento.
+   *
+   * Efectivo cobrado: el pago nace aprobado, con un solo evento. Efectivo sin cobrar
+   * y transferencia: pendiente, sin vencimiento (la dueña la cancela a mano, y la
+   * transferencia se aprueba con "Confirmar pago recibido").
+   *
+   * @param {Object} datos - Datos validados de la venta (ver normalizarVenta).
+   * @param {Object} contexto - Lo que no viene del cuerpo.
+   * @param {number} contexto.usuarioId - Quién registra la venta: sale de la sesión.
+   * @param {string} contexto.claveVenta - El encabezado Idempotency-Key (un UUID).
+   * @returns {Promise<{creada: boolean, venta: Object}>} creada: false si fue un
+   *   reintento. venta: id, número, total, estado de pago y medio.
+   * @throws {Error} DATOS_INVALIDOS, MEDIO_PAGO_NO_DISPONIBLE, CLAVE_REUTILIZADA,
+   *   CARRITO_DESACTUALIZADO, TOTAL_CAMBIO, CARRITO_SIN_ITEMS_VALIDOS, ZONA_INVALIDA,
+   *   STOCK_INSUFICIENTE
+   */
+  async registrarVentaDelPanel(datos, { usuarioId, claveVenta } = {}) {
+    if (!Number.isInteger(usuarioId) || usuarioId < 1) {
+      throw new Error("DATOS_INVALIDOS");
+    }
+    const clave = normalizarClave(claveVenta);
+    const venta = normalizarVenta(datos);
+    validarVentaPanel(venta);
+
+    // Antes de la transacción, como la tienda: un medio deshabilitado por su
+    // configuración no se usa. El cotizador calcula el descuento aunque el medio no
+    // esté disponible; sin esta puerta, un DESCUENTO_EFECTIVO inválido (descuento 0)
+    // cobraría sin descuento y sin aviso.
+    if (this.config.mediosDisponibles?.[venta.medioPago] !== true) {
+      throw new Error("MEDIO_PAGO_NO_DISPONIBLE");
+    }
+
+    const huella = huellaDeVenta(venta);
+    const previa = await this.#ventaPrevia(clave, huella);
+    if (previa) return { creada: false, venta: previa };
+
+    const cobrada = venta.cobradoEnEfectivo === true;
+    let resultado;
+    try {
+      resultado = await this.repositorio.transaccion((tx) =>
+        this.#crearEnTransaccion(tx, venta, PERFIL_PANEL, {
+          estadoPago: cobrada ? "aprobado" : "pendiente",
+          usuarioId,
+          detalle: cobrada
+            ? "Cobrado en efectivo al registrar la venta"
+            : "Venta registrada desde el panel",
+          claveVenta: clave,
+          huellaVenta: huella,
+        })
+      );
+    } catch (error) {
+      // Si otro reintento con la misma clave ganó la carrera, esta transacción ya
+      // volvió atrás entera (stock, eventos, mail) y se responde como reintento. No
+      // solo ante el choque con el índice (CLAVE_VENTA_DUPLICADA): si la otra se llevó
+      // la última unidad, esta encuentra el stock en 0 al pasar el bloqueo y falla
+      // antes del INSERT (por ejemplo, CARRITO_SIN_ITEMS_VALIDOS). Por eso, ante
+      // cualquier error, se vuelve a mirar la clave; si no hay venta, sigue el error.
+      const ganadora = await this.#ventaPrevia(clave, huella);
+      if (ganadora) return { creada: false, venta: ganadora };
+      throw error;
+    }
+
+    return {
+      creada: true,
+      venta: {
+        id: resultado.pedidoId,
+        numero: resultado.numero,
+        total: resultado.total,
+        estadoPago: resultado.estadoPago,
+        medioPago: resultado.medioPago,
+      },
+    };
+  }
+
+  /**
+   * @description Busca una venta ya registrada con esa clave.
+   * @param {string} clave - Clave de idempotencia, normalizada.
+   * @param {string} huella - Huella de la venta que se quiere registrar.
+   * @returns {Promise<Object|null>} La venta (id, número, total, estado de pago y
+   *   medio, con el estado actual), o null si la clave no se usó.
+   * @throws {Error} CLAVE_REUTILIZADA si la clave se usó con otro contenido.
+   */
+  async #ventaPrevia(clave, huella) {
+    const pedido = await this.repositorio.buscarPorClaveVenta(clave);
+    if (!pedido) return null;
+    if (pedido.huellaVenta !== huella) {
+      throw new Error("CLAVE_REUTILIZADA");
+    }
+    return {
+      id: pedido.id,
+      numero: pedido.numero,
+      total: pedido.total,
+      estadoPago: pedido.estadoPago,
+      medioPago: pedido.medioPago,
+    };
+  }
+
+  /**
    * @description El núcleo de la creación de un pedido, el mismo para cualquier
    * canal: cotiza sobre las variantes bloqueadas, verifica que nada haya cambiado
    * desde lo que se mostró, descuenta el stock (siempre en el mismo orden, para no
@@ -294,21 +427,37 @@ class CheckoutService {
    * no queda nada a medias.
    *
    * Las reglas propias de cada canal (qué medios acepta, qué se valida antes) las
-   * pone quien lo llama; acá llegan solo como opciones con nombre.
+   * pone quien lo llama. Lo que cambia la creación llega en dos partes: el perfil
+   * del canal (fijo, PERFIL_TIENDA o PERFIL_PANEL) y los datos de este pedido,
+   * ya validados por el método que lo llama.
    *
    * @param {Object} tx - Repositorio transaccional.
    * @param {Object} entrada - Carrito, clienta, entrega, medio de pago y total visto,
    *   ya validados por el canal.
-   * @param {Object} opciones - Lo que cambia según el canal.
-   * @param {number} opciones.horasDeReserva - Cuántas horas queda apartado el stock
-   *   antes de vencer.
-   * @param {{estadoNuevo: string, origen: string}} opciones.eventoInicial - Evento
-   *   de pago con el que nace el pedido.
+   * @param {Readonly<Object>} perfil - PERFIL_TIENDA o PERFIL_PANEL.
+   * @param {Object} [delPedido] - Lo propio de este pedido (solo el panel lo usa).
+   * @param {"pendiente"|"aprobado"} [delPedido.estadoPago="pendiente"] - Estado con
+   *   el que nace el pago.
+   * @param {number|null} [delPedido.usuarioId=null] - Quién lo registró (sesión).
+   * @param {string|null} [delPedido.detalle=null] - Detalle del evento inicial.
+   * @param {string|null} [delPedido.claveVenta=null] - Clave de idempotencia.
+   * @param {string|null} [delPedido.huellaVenta=null] - Huella del contenido.
    * @returns {Promise<Object>} Id, número, estado de pago, medio, total y vencimiento.
    * @throws {Error} CARRITO_DESACTUALIZADO, TOTAL_CAMBIO, CARRITO_SIN_ITEMS_VALIDOS,
-   *   ZONA_INVALIDA, STOCK_INSUFICIENTE
+   *   ZONA_INVALIDA, STOCK_INSUFICIENTE, CLAVE_VENTA_DUPLICADA
    */
-  async #crearEnTransaccion(tx, entrada, { horasDeReserva, eventoInicial }) {
+  async #crearEnTransaccion(
+    tx,
+    entrada,
+    perfil,
+    {
+      estadoPago = "pendiente",
+      usuarioId = null,
+      detalle = null,
+      claveVenta = null,
+      huellaVenta = null,
+    } = {}
+  ) {
     const { items, cliente, entrega, medioPago, totalEsperado, notas } = entrada;
     const envio = entrega.metodo === "envio";
     const fuente = new FuenteQueRecuerda(tx);
@@ -317,6 +466,7 @@ class CheckoutService {
       items,
       zonaEnvioId: envio ? entrega.zonaEnvioId : null,
       medioPago,
+      incluirEfectivo: perfil.incluirEfectivo,
     });
 
     if (cotizacion.avisos.length > 0) {
@@ -332,14 +482,24 @@ class CheckoutService {
     }
 
     const numero = await this.#numeroLibre(tx);
-    const expiraEn = new Date(this.ahora().getTime() + horasDeReserva * 60 * 60 * 1000);
+    const expiraEn = perfil.vence
+      ? new Date(this.ahora().getTime() + VENCIMIENTO_HORAS[medioPago] * 60 * 60 * 1000)
+      : null;
+    // La tienda siempre trae email (lo exige su ruta); una venta del panel puede no tenerlo.
+    const email = cliente.email ? cliente.email.trim().toLowerCase() : null;
     const t = cotizacion.totales;
     const d = envio ? entrega.direccion : {};
 
+    // El núcleo limpia los textos porque la tienda le pasa los datos tal como
+    // llegan. La venta del panel ya viene normalizada (normalizarVenta), y limpiarla
+    // de nuevo no la cambia. Si cambia una de las dos normalizaciones (por ejemplo,
+    // la del email), hay que cambiar la otra igual: la huella guardada describe lo
+    // que normalizó normalizarVenta.
     const pedido = await tx.crearPedido({
       numero,
+      canal: perfil.canal,
       clienteNombre: cliente.nombre.trim(),
-      clienteEmail: cliente.email.trim().toLowerCase(),
+      clienteEmail: email,
       clienteTelefono: cliente.telefono.trim(),
       clienteDocumento: cliente.documento?.trim() || null,
       metodoEntrega: entrega.metodo,
@@ -356,8 +516,11 @@ class CheckoutService {
       costoEnvio: t.costoEnvio,
       total: t.total,
       medioPago,
+      estadoPago,
       expiraEn,
       notasCliente: notas?.trim() || null,
+      claveVenta,
+      huellaVenta,
     });
 
     await tx.crearItems(
@@ -377,8 +540,10 @@ class CheckoutService {
       pedidoId: pedido.id,
       campo: "pago",
       estadoAnterior: null,
-      estadoNuevo: eventoInicial.estadoNuevo,
-      origen: eventoInicial.origen,
+      estadoNuevo: estadoPago,
+      origen: perfil.origenEvento,
+      usuarioId,
+      detalle,
     });
 
     // Se encola acá y lo envía el job de H5. Si el encolado falla, falla todo:
@@ -387,12 +552,13 @@ class CheckoutService {
     await encolarParaClienta(tx, {
       pedidoId: pedido.id,
       tipo: "pedido_recibido",
-      destinatario: cliente.email.trim().toLowerCase(),
+      destinatario: email,
       datos: {
         numero,
         nombre: cliente.nombre.trim(),
         medioPago,
-        expiraEn: expiraEn.toISOString(),
+        estadoPago,
+        expiraEn: expiraEn ? expiraEn.toISOString() : null,
         metodoEntrega: entrega.metodo,
         envio: cotizacion.envio,
         items: cotizacion.items.map((i) => ({
@@ -408,7 +574,7 @@ class CheckoutService {
     return {
       pedidoId: pedido.id,
       numero,
-      estadoPago: eventoInicial.estadoNuevo,
+      estadoPago,
       medioPago,
       total: t.total,
       expiraEn,
