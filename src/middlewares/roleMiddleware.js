@@ -9,7 +9,10 @@ const { manejarErrorHttp } = require("./errorMapper");
  */
 const soloPermisos = (...permisosRequeridos) => {
   return (req, res, next) => {
-    const permisosUsuario = req.usuario?.permisos ?? [];
+    // Solo una lista cuenta: con un texto, includes acierta por coincidencia parcial
+    // ("CATALOGO_BORRAR".includes("CATALOGO")) y la decisión fallaría abierta.
+    // Cualquier otro tipo se trata como "sin permisos".
+    const permisosUsuario = Array.isArray(req.usuario?.permisos) ? req.usuario.permisos : [];
     const tienePermiso = permisosRequeridos.some((p) => permisosUsuario.includes(p));
 
     if (!tienePermiso) {
