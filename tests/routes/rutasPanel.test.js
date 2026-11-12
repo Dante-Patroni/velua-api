@@ -61,7 +61,7 @@ const PUBLICAS = {
   "GET /productos": "Catálogo de la tienda",
   "GET /productos/:slug": "Ficha de producto",
   "GET /zonas-envio": "Zonas para elegir el envío en el checkout",
-    "POST /cotizar": "Total del carrito, calculado por la API; solo el limitador global",
+  "POST /cotizar": "Total del carrito, calculado por la API; solo el limitador global",
   "POST /pedidos": "Checkout de la tienda, con limitador",
   "GET /pedidos/:numero": "Seguimiento por número, con limitador",
   "POST /pedidos/:numero/pago": "Reintentar el pago con Mercado Pago, con limitador",
