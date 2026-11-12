@@ -145,6 +145,25 @@ describe("cambiarEstadoPreparacion", () => {
     ]);
   });
 
+  test("sin email, despacha igual y no encola ningún mail", async () => {
+    const repo = crearRepositorio({
+      pedidos: [pedido({ estadoPedido: "en_preparacion", clienteEmail: null })],
+    });
+
+    await servicio(repo).cambiarEstadoPreparacion(1, {
+      hacia: "enviado",
+      seguimiento: "AB123456789AR",
+      usuarioId: ADMIN,
+    });
+
+    expect(repo.estado.pedidos[0]).toMatchObject({
+      estadoPedido: "enviado",
+      seguimiento: "AB123456789AR",
+    });
+    expect(repo.estado.eventos).toHaveLength(1);
+    expect(repo.estado.emails).toEqual([]);
+  });
+
   test("no despacha un envío sin seguimiento", async () => {
     const repo = crearRepositorio({ pedidos: [pedido({ estadoPedido: "en_preparacion" })] });
 
@@ -282,6 +301,17 @@ describe("cancelarManual", () => {
       datos: expect.objectContaining({ motivo: "tienda" }),
     });
     expect(JSON.stringify(repo.estado.emails[0])).not.toContain(MOTIVO);
+  });
+
+  test("sin email, cancela igual, repone el stock y no encola ningún mail", async () => {
+    const repo = sinPagar({ clienteEmail: null });
+
+    const r = await servicio(repo).cancelarManual(1, { motivo: MOTIVO, usuarioId: ADMIN });
+
+    expect(r).toEqual({ cancelado: true, numero: "VEL-AAAAAA" });
+    expect(repo.estado.stock).toEqual({ 3: 6, 7: 2 });
+    expect(repo.estado.eventos).toHaveLength(2);
+    expect(repo.estado.emails).toEqual([]);
   });
 
   test("también cancela un pedido con el pago rechazado", async () => {
@@ -561,6 +591,17 @@ describe("confirmarPagoTransferencia", () => {
       verificadoEnBanco: true,
       ...datos,
     });
+
+  test("sin email, aprueba igual, deja de vencer y no encola ningún mail", async () => {
+    const repo = crearRepositorio({ pedidos: [avisado({ clienteEmail: null })] });
+
+    const r = await confirmar(repo);
+
+    expect(r).toEqual({ confirmado: true, numero: "VEL-AAAAAA" });
+    expect(repo.estado.pedidos[0]).toMatchObject({ estadoPago: "aprobado", expiraEn: null });
+    expect(repo.estado.eventos).toHaveLength(1);
+    expect(repo.estado.emails).toEqual([]);
+  });
 
   test("con el pago pendiente, lo aprueba, deja de vencer y encola el mail", async () => {
     const repo = crearRepositorio({ pedidos: [avisado()] });

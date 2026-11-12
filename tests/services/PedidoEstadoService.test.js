@@ -257,4 +257,16 @@ describe("cancelarVencido", () => {
     await expect(servicio(repo).cancelarVencido(1)).rejects.toThrow("TRANSICION_INVALIDA");
     expect(repo.estado.stock).toEqual({ 3: 0, 7: 5 });
   });
+
+  it("sin email, cancela igual y no encola ningún mail", async () => {
+    const repo = crearRepositorio({ pedidos: [pedido({ clienteEmail: null })] });
+
+    const r = await servicio(repo).cancelarVencido(1);
+
+    expect(r).toEqual({ cancelado: true, numero: "VEL-AAAAAA" });
+    expect(repo.estado.pedidos[0].estadoPago).toBe("cancelado");
+    expect(repo.estado.stock).toEqual({ 3: 1, 7: 7 });
+    expect(repo.estado.eventos.length).toBeGreaterThan(0);
+    expect(repo.tx.encolarEmail).not.toHaveBeenCalled();
+  });
 });
