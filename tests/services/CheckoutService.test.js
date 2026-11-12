@@ -1,5 +1,6 @@
 const crypto = require("crypto");
 const { CheckoutService, generarNumero, ALFABETO } = require("../../src/services/CheckoutService");
+const { normalizarVenta, huellaDeVenta } = require("../../src/services/ventaPanel");
 
 const AHORA = new Date("2026-10-06T15:00:00.000Z");
 const HORA = 60 * 60 * 1000;
@@ -54,6 +55,10 @@ const crearRepositorio = ({ variantes = [variante()], zonas = [ZONA] } = {}) => 
     }),
     existeNumero: jest.fn(async (numero) => estado.pedidos.some((p) => p.numero === numero)),
     crearPedido: jest.fn(async (datos) => {
+      // Como el índice único de la base: otra venta con la misma clave ya guardada.
+      if (datos.claveVenta && estado.pedidos.some((p) => p.claveVenta === datos.claveVenta)) {
+        throw new Error("CLAVE_VENTA_DUPLICADA");
+      }
       const pedido = { id: estado.pedidos.length + 1, ...datos };
       estado.pedidos.push(pedido);
       return pedido;
@@ -76,6 +81,9 @@ const crearRepositorio = ({ variantes = [variante()], zonas = [ZONA] } = {}) => 
       }
     }),
     buscarPorNumero: jest.fn(),
+    buscarPorClaveVenta: jest.fn(
+      async (clave) => estado.pedidos.find((p) => p.claveVenta === clave) ?? null
+    ),
   };
 };
 
@@ -666,5 +674,385 @@ describe("CheckoutService", () => {
 
       await expect(servicio.informarComprobante("VEL-4K7Q2X")).rejects.toThrow("PEDIDO_VENCIDO");
     });
+  });
+});
+
+describe("registrarVentaDelPanel", () => {
+  const ADMIN = 1;
+  const CLAVE = "3f1c2a9e-5b7d-4e8a-9c21-7d4e5f6a8b90";
+
+  /** Venta en mano, cobrada en efectivo: 2 × 8500 con 10 % de descuento. */
+  const venta = (cambios = {}) => ({
+    items: [{ varianteId: 1, cantidad: 2 }],
+    cliente: { nombre: " Ana Gómez ", telefono: " 358 400-1122 " },
+    entrega: { metodo: "en_mano" },
+    medioPago: "efectivo",
+    cobradoEnEfectivo: true,
+    totalEsperado: "15300.00",
+    ...cambios,
+  });
+
+  /** Servicio del panel: efectivo y transferencia habilitados, 10 % cada uno. */
+  const panelCon = (repo, config = {}) =>
+    new CheckoutService(
+      repo,
+      {
+        descuentoEfectivo: 10,
+        descuentoTransferencia: 10,
+        mediosDisponibles: { efectivo: true, transferencia: true },
+        ...config,
+      },
+      () => AHORA
+    );
+
+  const registrar = (repo, datos = venta(), contexto = {}, config = {}) =>
+    panelCon(repo, config).registrarVentaDelPanel(datos, {
+      usuarioId: ADMIN,
+      claveVenta: CLAVE,
+      ...contexto,
+    });
+
+  describe("efectivo cobrado al registrar", () => {
+    it("crea el pedido del panel con el pago aprobado y sin vencimiento", async () => {
+      const repo = crearRepositorio();
+
+      const r = await registrar(repo);
+
+      expect(r.creada).toBe(true);
+      expect(r.venta).toEqual({
+        id: 1,
+        numero: expect.stringMatching(/^VEL-[A-Z0-9]{6}$/),
+        total: "15300.00",
+        estadoPago: "aprobado",
+        medioPago: "efectivo",
+      });
+      expect(repo.estado.pedidos[0]).toMatchObject({
+        canal: "panel",
+        estadoPago: "aprobado",
+        expiraEn: null,
+        clienteNombre: "Ana Gómez",
+        clienteTelefono: "358 400-1122",
+        clienteEmail: null,
+        metodoEntrega: "en_mano",
+        zonaEnvioId: null,
+        direccionCalle: null,
+        claveVenta: CLAVE,
+        huellaVenta: expect.stringMatching(/^[0-9a-f]{64}$/),
+      });
+    });
+
+    it("un solo evento, — → aprobado, con el usuario de la sesión", async () => {
+      const repo = crearRepositorio();
+
+      await registrar(repo);
+
+      expect(repo.estado.eventos).toEqual([
+        {
+          pedidoId: 1,
+          campo: "pago",
+          estadoAnterior: null,
+          estadoNuevo: "aprobado",
+          origen: "panel",
+          usuarioId: ADMIN,
+          detalle: "Cobrado en efectivo al registrar la venta",
+        },
+      ]);
+    });
+
+    it("descuenta el stock una vez", async () => {
+      const repo = crearRepositorio();
+
+      await registrar(repo);
+
+      expect(repo.estado.variantes[0].stock).toBe(8);
+    });
+  });
+
+  describe("pendientes", () => {
+    it.each([
+      ["efectivo sin cobrar", { cobradoEnEfectivo: false }],
+      ["efectivo sin decir si se cobró", { cobradoEnEfectivo: undefined }],
+      ["transferencia", { medioPago: "transferencia", cobradoEnEfectivo: undefined }],
+    ])("%s: pago pendiente, sin vencimiento", async (_caso, cambios) => {
+      const repo = crearRepositorio();
+
+      const r = await registrar(repo, venta(cambios));
+
+      expect(r.venta.estadoPago).toBe("pendiente");
+      expect(repo.estado.pedidos[0]).toMatchObject({ estadoPago: "pendiente", expiraEn: null });
+      expect(repo.estado.eventos).toEqual([
+        expect.objectContaining({
+          estadoAnterior: null,
+          estadoNuevo: "pendiente",
+          origen: "panel",
+          usuarioId: ADMIN,
+          detalle: "Venta registrada desde el panel",
+        }),
+      ]);
+    });
+  });
+
+  describe("mails", () => {
+    it("sin email, se crea igual y no se encola nada", async () => {
+      const repo = crearRepositorio();
+
+      await registrar(repo);
+
+      expect(repo.estado.pedidos).toHaveLength(1);
+      expect(repo.estado.emails).toEqual([]);
+    });
+
+    it("con email, un solo pedido_recibido, sin vencimiento y con el pago aprobado", async () => {
+      const repo = crearRepositorio();
+      const conEmail = venta({ cliente: { ...venta().cliente, email: " Ana@Ejemplo.TEST " } });
+
+      await registrar(repo, conEmail);
+
+      expect(repo.estado.emails).toHaveLength(1);
+      expect(repo.estado.emails[0]).toMatchObject({
+        tipo: "pedido_recibido",
+        destinatario: "ana@ejemplo.test",
+        datos: { estadoPago: "aprobado", expiraEn: null, medioPago: "efectivo" },
+      });
+    });
+  });
+
+  describe("envío", () => {
+    it("guarda la dirección y cobra el envío de la zona", async () => {
+      const repo = crearRepositorio();
+      const conEnvio = venta({
+        entrega: {
+          metodo: "envio",
+          zonaEnvioId: 5,
+          direccion: {
+            calle: "Sobremonte",
+            numero: "1200",
+            ciudad: "Río Cuarto",
+            provincia: "Córdoba",
+            cp: "5800",
+          },
+        },
+        totalEsperado: "21800.00",
+      });
+
+      const r = await registrar(repo, conEnvio);
+
+      expect(r.venta.total).toBe("21800.00");
+      expect(repo.estado.pedidos[0]).toMatchObject({
+        metodoEntrega: "envio",
+        zonaEnvioId: 5,
+        direccionCalle: "Sobremonte",
+        costoEnvio: "6500.00",
+      });
+    });
+  });
+
+  describe("medio deshabilitado por su configuración", () => {
+    // Un DESCUENTO_EFECTIVO inválido deja { habilitado: false, descuento: 0 }: sin la
+    // puerta, la venta se cobraría sin descuento y sin aviso (revisión del #73).
+    it.each([
+      [
+        "efectivo",
+        venta(),
+        { descuentoEfectivo: 0, mediosDisponibles: { efectivo: false, transferencia: true } },
+      ],
+      [
+        "transferencia",
+        venta({ medioPago: "transferencia", cobradoEnEfectivo: undefined }),
+        { mediosDisponibles: { efectivo: true, transferencia: false } },
+      ],
+      ["sin mediosDisponibles", venta(), { mediosDisponibles: undefined }],
+    ])("%s: MEDIO_PAGO_NO_DISPONIBLE, sin cotizar ni crear nada", async (_caso, datos, config) => {
+      const repo = crearRepositorio();
+
+      await expect(registrar(repo, datos, {}, config)).rejects.toThrow("MEDIO_PAGO_NO_DISPONIBLE");
+      expect(repo.transaccion).not.toHaveBeenCalled();
+      expect(repo.estado.pedidos).toEqual([]);
+      expect(repo.estado.variantes[0].stock).toBe(10);
+    });
+  });
+
+  describe("idempotencia", () => {
+    it("un reintento con la misma clave y la misma venta devuelve la original, sin tocar nada", async () => {
+      const repo = crearRepositorio();
+      const primera = await registrar(repo);
+
+      // La misma venta, escrita distinto: espacios, y la clave en mayúsculas
+      const reintento = await registrar(
+        repo,
+        venta({
+          cliente: { nombre: "Ana Gómez", telefono: "358 400-1122" },
+          totalEsperado: "15300",
+        }),
+        { claveVenta: CLAVE.toUpperCase() }
+      );
+
+      expect(reintento).toEqual({ creada: false, venta: primera.venta });
+      expect(repo.transaccion).toHaveBeenCalledTimes(1);
+      expect(repo.estado.pedidos).toHaveLength(1);
+      expect(repo.estado.eventos).toHaveLength(1);
+      expect(repo.estado.variantes[0].stock).toBe(8);
+    });
+
+    it("el reintento devuelve el estado actual del pedido", async () => {
+      const repo = crearRepositorio();
+      await registrar(repo, venta({ cobradoEnEfectivo: false }));
+      repo.estado.pedidos[0].estadoPago = "cancelado";
+
+      const r = await registrar(repo, venta({ cobradoEnEfectivo: false }));
+
+      expect(r.venta.estadoPago).toBe("cancelado");
+    });
+
+    it("la misma clave con otra venta: CLAVE_REUTILIZADA, sin crear nada", async () => {
+      const repo = crearRepositorio();
+      await registrar(repo);
+
+      await expect(
+        registrar(
+          repo,
+          venta({ items: [{ varianteId: 1, cantidad: 1 }], totalEsperado: "7650.00" })
+        )
+      ).rejects.toThrow("CLAVE_REUTILIZADA");
+      expect(repo.estado.pedidos).toHaveLength(1);
+      expect(repo.estado.variantes[0].stock).toBe(8);
+    });
+
+    describe("carrera: otro reintento guardó primero", () => {
+      /**
+       * Simula dos pedidos simultáneos: cuando este busca la clave, todavía no hay
+       * nada; cuando intenta guardar, la otra venta ya está (el índice lo frena).
+       */
+      const yaGuardadaPorOtro = (datos) => {
+        const repo = crearRepositorio();
+        repo.estado.pedidos.push({
+          id: 41,
+          numero: "VEL-OTRA23",
+          total: "15300.00",
+          estadoPago: "aprobado",
+          medioPago: "efectivo",
+          claveVenta: CLAVE,
+          huellaVenta: huellaDeVenta(normalizarVenta(datos)),
+        });
+        repo.buscarPorClaveVenta.mockResolvedValueOnce(null);
+        return repo;
+      };
+
+      it("misma venta: vuelve atrás entera y responde como reintento", async () => {
+        const repo = yaGuardadaPorOtro(venta());
+
+        const r = await registrar(repo);
+
+        expect(r).toEqual({
+          creada: false,
+          venta: {
+            id: 41,
+            numero: "VEL-OTRA23",
+            total: "15300.00",
+            estadoPago: "aprobado",
+            medioPago: "efectivo",
+          },
+        });
+        // Lo que esta transacción había hecho volvió atrás
+        expect(repo.estado.variantes[0].stock).toBe(10);
+        expect(repo.estado.pedidos).toHaveLength(1);
+        expect(repo.estado.eventos).toEqual([]);
+        expect(repo.estado.emails).toEqual([]);
+      });
+
+      it("otra venta: CLAVE_REUTILIZADA", async () => {
+        const repo = yaGuardadaPorOtro(venta({ notas: "Otra venta" }));
+
+        await expect(registrar(repo)).rejects.toThrow("CLAVE_REUTILIZADA");
+        expect(repo.estado.variantes[0].stock).toBe(10);
+      });
+    });
+
+    it("otro error de la base no se confunde con un reintento", async () => {
+      const repo = crearRepositorio();
+      repo.tx.crearPedido.mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+
+      await expect(registrar(repo)).rejects.toThrow("ER_LOCK_DEADLOCK");
+      expect(repo.buscarPorClaveVenta).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("lo que se guarda es lo que entra en la huella", () => {
+    it("la huella guardada es la de la venta normalizada, y sus datos son los guardados", async () => {
+      const repo = crearRepositorio();
+      const datos = venta({
+        notas: "  Pasa a la tarde ",
+        cliente: { ...venta().cliente, documento: " 30111222 " },
+      });
+
+      await registrar(repo, datos);
+
+      const normalizada = normalizarVenta(datos);
+      const guardado = repo.estado.pedidos[0];
+      expect(guardado.huellaVenta).toBe(huellaDeVenta(normalizada));
+      expect(guardado).toMatchObject({
+        clienteNombre: normalizada.cliente.nombre,
+        clienteTelefono: normalizada.cliente.telefono,
+        clienteEmail: normalizada.cliente.email,
+        clienteDocumento: normalizada.cliente.documento,
+        metodoEntrega: normalizada.entrega.metodo,
+        medioPago: normalizada.medioPago,
+        notasCliente: normalizada.notas,
+      });
+    });
+  });
+
+  describe("datos inválidos: no toca la base", () => {
+    it.each([
+      ["sin usuario", venta(), { usuarioId: undefined }],
+      ["usuario que no es entero", venta(), { usuarioId: "1" }],
+      ["sin clave", venta(), { claveVenta: undefined }],
+      ["clave que no es UUID", venta(), { claveVenta: "venta-1" }],
+      ["Mercado Pago", venta({ medioPago: "mercadopago", cobradoEnEfectivo: undefined }), {}],
+      ["cobrado con transferencia", venta({ medioPago: "transferencia" }), {}],
+      [
+        "dirección con entrega en mano",
+        venta({ entrega: { metodo: "en_mano", direccion: { calle: "X" } } }),
+        {},
+      ],
+    ])("%s: DATOS_INVALIDOS", async (_caso, datos, contexto) => {
+      const repo = crearRepositorio();
+
+      await expect(registrar(repo, datos, contexto)).rejects.toThrow("DATOS_INVALIDOS");
+      expect(repo.buscarPorClaveVenta).not.toHaveBeenCalled();
+      expect(repo.transaccion).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("la tienda no cambia con el núcleo compartido", () => {
+  it("crea con canal tienda, sin clave y con el evento sin usuario", async () => {
+    const repo = crearRepositorio();
+
+    await servicioCon(repo).crearPedido(entrada());
+
+    expect(repo.estado.pedidos[0]).toMatchObject({
+      canal: "tienda",
+      estadoPago: "pendiente",
+      claveVenta: null,
+      huellaVenta: null,
+      expiraEn: new Date(AHORA.getTime() + HORA),
+    });
+    expect(repo.estado.eventos[0]).toMatchObject({
+      origen: "checkout",
+      usuarioId: null,
+      detalle: null,
+    });
+  });
+
+  it("la tienda sigue rechazando el efectivo", async () => {
+    const repo = crearRepositorio();
+
+    await expect(
+      servicioCon(repo, { mediosDisponibles: { efectivo: true } }).crearPedido(
+        entrada({ medioPago: "efectivo" })
+      )
+    ).rejects.toThrow("DATOS_INVALIDOS");
+    expect(repo.transaccion).not.toHaveBeenCalled();
   });
 });
