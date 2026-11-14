@@ -51,6 +51,10 @@
     {
       "name": "Admin - Pedidos",
       "description": "Consulta y gestión de pedidos desde el panel"
+    },
+    {
+      "name": "Admin - Ventas",
+      "description": "Ventas en persona registradas desde el panel"
     }
   ],
   "components": {
@@ -2247,6 +2251,184 @@
           }
         }
       },
+      "VentaPanelEntrada": {
+        "type": "object",
+        "required": [
+          "items",
+          "cliente",
+          "entrega",
+          "medioPago",
+          "totalEsperado"
+        ],
+        "description": "No lleva precio ni usuario: el total lo calcula la API y el usuario sale de la sesión.",
+        "properties": {
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 30,
+            "description": "Sin variantes repetidas: una línea por variante.",
+            "items": {
+              "type": "object",
+              "required": [
+                "varianteId",
+                "cantidad"
+              ],
+              "properties": {
+                "varianteId": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "cantidad": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "cliente": {
+            "type": "object",
+            "required": [
+              "nombre",
+              "telefono"
+            ],
+            "properties": {
+              "nombre": {
+                "type": "string",
+                "minLength": 2,
+                "maxLength": 140,
+                "example": "Lucía Fernández"
+              },
+              "telefono": {
+                "type": "string",
+                "minLength": 6,
+                "maxLength": 40,
+                "example": "358 412-3344"
+              },
+              "email": {
+                "type": "string",
+                "format": "email",
+                "nullable": true,
+                "maxLength": 180,
+                "description": "Opcional. Sin email no se manda ningún mail."
+              },
+              "documento": {
+                "type": "string",
+                "nullable": true,
+                "maxLength": 20
+              }
+            }
+          },
+          "entrega": {
+            "type": "object",
+            "required": [
+              "metodo"
+            ],
+            "description": "Con envio, zonaEnvioId y la direccion completa son obligatorios. Con retiro o en_mano, mandar una zona o una direccion es un error.",
+            "properties": {
+              "metodo": {
+                "type": "string",
+                "enum": [
+                  "envio",
+                  "retiro",
+                  "en_mano"
+                ]
+              },
+              "zonaEnvioId": {
+                "type": "integer",
+                "nullable": true
+              },
+              "direccion": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                  "calle": {
+                    "type": "string",
+                    "maxLength": 180
+                  },
+                  "numero": {
+                    "type": "string",
+                    "maxLength": 20
+                  },
+                  "extra": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 120
+                  },
+                  "ciudad": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "provincia": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "cp": {
+                    "type": "string",
+                    "maxLength": 20
+                  }
+                }
+              }
+            }
+          },
+          "medioPago": {
+            "type": "string",
+            "enum": [
+              "efectivo",
+              "transferencia"
+            ]
+          },
+          "cobradoEnEfectivo": {
+            "type": "boolean",
+            "description": "Solo los booleanos true o false. Con true (solo con efectivo), el pago nace aprobado. Sin el campo o con false, queda pendiente."
+          },
+          "totalEsperado": {
+            "type": "string",
+            "description": "El total que mostró la cotización. Si no coincide con el real, se rechaza con TOTAL_CAMBIO.",
+            "example": "15300.00"
+          },
+          "notas": {
+            "type": "string",
+            "nullable": true,
+            "maxLength": 500
+          }
+        }
+      },
+      "VentaPanelResultado": {
+        "type": "object",
+        "required": [
+          "id",
+          "numero",
+          "total",
+          "estadoPago",
+          "medioPago"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 42
+          },
+          "numero": {
+            "type": "string",
+            "example": "VEL-4K7Q2X"
+          },
+          "total": {
+            "type": "string",
+            "example": "15300.00"
+          },
+          "estadoPago": {
+            "type": "string",
+            "description": "En un reintento, el estado actual del pedido.",
+            "example": "aprobado"
+          },
+          "medioPago": {
+            "type": "string",
+            "enum": [
+              "efectivo",
+              "transferencia"
+            ]
+          }
+        }
+      },
       "CancelacionResultado": {
         "type": "object",
         "required": [
@@ -3213,6 +3395,104 @@
                 },
                 "example": {
                   "error": "LIMITE_SUPERADO"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/ventas": {
+      "post": {
+        "tags": [
+          "Admin - Ventas"
+        ],
+        "summary": "Registrar una venta hecha fuera de la tienda",
+        "description": "Solo el admin (VENTAS_REGISTRAR). Crea un pedido con canal panel, con el mismo stock y el mismo historial que la tienda. El total lo calcula la API. En efectivo con cobradoEnEfectivo true, el pago nace aprobado; si no, queda pendiente, sin vencimiento. La transferencia se aprueba después con pago-confirmado.\n\nEs idempotente: cada venta lleva un UUID en Idempotency-Key. Repetir la misma venta con la misma clave devuelve la original (200), sin descontar stock de nuevo. La misma clave con otra venta es CLAVE_REUTILIZADA.\n",
+        "security": [
+          {
+            "cookieAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "description": "Un UUID por venta. El panel lo genera una vez y lo repite en cada reintento.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VentaPanelEntrada"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reintento. Devuelve la venta original, con su estado actual",
+            "headers": {
+              "Idempotent-Replayed": {
+                "description": "Siempre true en un reintento.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "true"
+                  ]
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaPanelResultado"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Venta registrada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VentaPanelResultado"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/DatosInvalidos"
+          },
+          "401": {
+            "$ref": "#/components/responses/NoAutorizado"
+          },
+          "403": {
+            "$ref": "#/components/responses/SinPermiso"
+          },
+          "409": {
+            "description": "CLAVE_REUTILIZADA (la clave ya se usó con otra venta), TOTAL_CAMBIO, CARRITO_DESACTUALIZADO o STOCK_INSUFICIENTE.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "MEDIO_PAGO_NO_DISPONIBLE (el medio está deshabilitado por su configuración).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
