@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -147,13 +150,19 @@ jobs:
         run: npm ci --omit=dev
 
       - name: Las herramientas de desarrollo no están instaladas
+        # Compara contra las devDependencies del package.json: una nueva entra sola
+        # al control. Falla si alguna quedó instalada, también como transitiva.
         run: |
-          for paquete in jest eslint newman nodemon prettier swagger-jsdoc swagger-ui-express wait-on; do
-            if [ -d "node_modules/$paquete" ]; then
-              echo "::error::$paquete no tendría que estar en la instalación de producción"
-              exit 1
-            fi
-          done
+          node -e '
+            const fs = require("fs");
+            const dev = Object.keys(require("./package.json").devDependencies);
+            const presentes = dev.filter((p) => fs.existsSync(`node_modules/${p}`));
+            if (presentes.length > 0) {
+              console.log(`::error::En la instalación de producción: ${presentes.join(", ")}`);
+              process.exit(1);
+            }
+            console.log(`${dev.length} herramientas de desarrollo, ninguna instalada`);
+          '
 
       - name: Auditoría de las dependencias de producción
         run: npm audit --omit=dev --audit-level=high
