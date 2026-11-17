@@ -1,5 +1,5 @@
 const { validationResult, matchedData } = require("express-validator");
-const { reglas } = require("../../src/validators/ventaPanel");
+const { reglas, reglasCarrito, reglasCotizacion } = require("../../src/validators/ventaPanel");
 
 const CLAVE = "3f1c2a9e-5b7d-4e8a-9c21-7d4e5f6a8b90";
 
@@ -123,5 +123,77 @@ describe("validarVentaPanel", () => {
     expect(datos).not.toHaveProperty("usuarioId");
     expect(datos).not.toHaveProperty("canal");
     expect(datos.items).toEqual([{ varianteId: 1, cantidad: 2 }]);
+  });
+});
+
+describe("validarCotizacionPanel", () => {
+  /** Carrito válido para cotizar, en mano y sin medio de pago. */
+  const carrito = (cambios = {}) => ({
+    items: [{ varianteId: 1, cantidad: 2 }],
+    entrega: { metodo: "en_mano" },
+    ...cambios,
+  });
+
+  /**
+   * @description Corre las reglas de la cotización sobre una request falsa.
+   * @param {Object} body - Cuerpo.
+   * @returns {Promise<{errores: Object, datos: Object}>} Errores por campo y lo validado.
+   */
+  const validarCotizacion = async (body) => {
+    const req = { body, headers: {} };
+    for (const regla of reglasCotizacion) await regla.run(req);
+    const errores = {};
+    for (const e of validationResult(req).array()) errores[e.path] ??= e.msg;
+    return { errores, datos: matchedData(req, { locations: ["body"] }) };
+  };
+
+  // No alcanza con reglas parecidas: tienen que ser las mismas. Si la cotización
+  // tuviera una copia, podría aceptar un carrito que la venta rechaza.
+  test("las reglas del carrito son los mismos objetos en la venta y en la cotización", () => {
+    expect(reglasCarrito.length).toBeGreaterThan(0);
+    for (const regla of reglasCarrito) {
+      expect(reglas).toContain(regla);
+      expect(reglasCotizacion).toContain(regla);
+    }
+  });
+
+  test("sin medio de pago pasa, y no pide clave de idempotencia", async () => {
+    expect((await validarCotizacion(carrito())).errores).toEqual({});
+  });
+
+  test.each(["efectivo", "transferencia"])("con %s pasa", async (medioPago) => {
+    expect((await validarCotizacion(carrito({ medioPago }))).errores).toEqual({});
+  });
+
+  test.each([
+    ["Mercado Pago", { medioPago: "mercadopago" }, "medioPago"],
+    ["sin ítems", { items: [] }, "items"],
+    ["una cantidad 0", { items: [{ varianteId: 1, cantidad: 0 }] }, "items[0].cantidad"],
+    ["otra entrega", { entrega: { metodo: "correo" } }, "entrega.metodo"],
+    [
+      "una zona que no es un id",
+      { entrega: { metodo: "envio", zonaEnvioId: "x" } },
+      "entrega.zonaEnvioId",
+    ],
+  ])("%s: error en %s", async (_caso, cambios, campo) => {
+    const { errores } = await validarCotizacion(carrito(cambios));
+
+    expect(Object.keys(errores)).toContain(campo);
+  });
+
+  test("solo el carrito llega al controlador: lo demás del cuerpo no pasa", async () => {
+    const { datos } = await validarCotizacion({
+      ...carrito({ medioPago: "efectivo" }),
+      incluirEfectivo: false,
+      cobradoEnEfectivo: true,
+      totalEsperado: "1.00",
+      cliente: { nombre: "Ana", telefono: "358 400-1122" },
+    });
+
+    expect(datos).toEqual({
+      items: [{ varianteId: 1, cantidad: 2 }],
+      entrega: { metodo: "en_mano" },
+      medioPago: "efectivo",
+    });
   });
 });
