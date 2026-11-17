@@ -1338,6 +1338,68 @@ module.exports = {
           notas: { type: "string", nullable: true, maxLength: 500 },
         },
       },
+VentaCotizacionEntrada: {
+        type: "object",
+        required: ["items", "entrega"],
+        description:
+          "El carrito de la venta, con la misma forma que en POST /admin/ventas. No lleva precio: lo calcula la API.",
+        properties: {
+          items: {
+            type: "array",
+            minItems: 1,
+            maxItems: 30,
+            description: "Sin variantes repetidas: una línea por variante.",
+            items: {
+              type: "object",
+              required: ["varianteId", "cantidad"],
+              properties: {
+                varianteId: { type: "integer", minimum: 1 },
+                cantidad: { type: "integer", minimum: 1 },
+              },
+            },
+          },
+          entrega: {
+            type: "object",
+            required: ["metodo"],
+            description:
+              "Con envio, zonaEnvioId es obligatorio. Con retiro o en_mano, mandar una zona es un error.",
+            properties: {
+              metodo: { type: "string", enum: ["envio", "retiro", "en_mano"] },
+              zonaEnvioId: { type: "integer", nullable: true },
+            },
+          },
+          medioPago: {
+            type: "string",
+            enum: ["efectivo", "transferencia"],
+            nullable: true,
+            description: "Opcional. Sin él, mediosPago trae el total de cada medio.",
+          },
+        },
+      },
+      VentaCotizacion: {
+        type: "object",
+        required: ["items", "avisos", "totales", "envio", "mediosPago"],
+        properties: {
+          items: { type: "array", items: { $ref: "#/components/schemas/ItemCotizado" } },
+          avisos: {
+            type: "array",
+            description: "Vacío si el carrito quedó tal como lo mandaron.",
+            items: { $ref: "#/components/schemas/AvisoCotizacion" },
+          },
+          totales: { $ref: "#/components/schemas/TotalesCotizacion" },
+          envio: { $ref: "#/components/schemas/DetalleEnvio" },
+          mediosPago: {
+            type: "object",
+            description:
+              "El total de cada medio del panel, calculado acá con su descuento y su envío. El panel manda como totalEsperado el del medio elegido.",
+            required: ["efectivo", "transferencia"],
+            properties: {
+              efectivo: { $ref: "#/components/schemas/MedioPagoCotizado" },
+              transferencia: { $ref: "#/components/schemas/MedioPagoCotizado" },
+            },
+          },
+        },
+      },
       VentaPanelResultado: {
         type: "object",
         required: ["id", "numero", "total", "estadoPago", "medioPago"],

@@ -33,7 +33,8 @@ class CotizacionPanelService {
    * @param {Object} datos - Datos validados (matchedData): items, entrega y,
    *   opcional, medioPago.
    * @returns {Promise<Object>} La cotización (items, avisos, totales, envio,
-   *   mediosPago).
+   *   mediosPago). En mediosPago van solo los medios del panel: efectivo y
+   *   transferencia.
    * @throws {Error} DATOS_INVALIDOS, MEDIO_PAGO_NO_DISPONIBLE,
    *   CARRITO_SIN_ITEMS_VALIDOS, ZONA_INVALIDA
    */
@@ -59,7 +60,13 @@ class CotizacionPanelService {
       medioPago,
       incluirEfectivo: true,
     });
-    return cotizacion;
+    // El cotizador informa todos los medios que conoce. El panel no vende con
+    // Mercado Pago: se devuelven solo los suyos, para que la pantalla no tenga que
+    // filtrar.
+    return {
+      ...cotizacion,
+      mediosPago: Object.fromEntries(MEDIOS_PANEL.map((m) => [m, cotizacion.mediosPago[m]])),
+    };
   }
 }
 

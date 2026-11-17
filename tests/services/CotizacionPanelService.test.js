@@ -21,7 +21,16 @@ const datos = (cambios = {}) => ({
 });
 
 /** Cotizador falso: registra con qué se lo llamó. */
-const cotizadorFalso = () => ({ cotizar: jest.fn(async () => ({ cotizacion: true })) });
+const cotizadorFalso = () => ({
+  cotizar: jest.fn(async () => ({
+    totales: { total: "1.00" },
+    mediosPago: {
+      efectivo: { disponible: true, total: "1.00" },
+      transferencia: { disponible: true, total: "1.00" },
+      mercadopago: { disponible: false, total: null },
+    },
+  })),
+});
 
 describe("CotizacionPanelService", () => {
   test("pide el efectivo y pasa el carrito normalizado", async () => {
@@ -29,7 +38,11 @@ describe("CotizacionPanelService", () => {
     const servicio = new CotizacionPanelService(cotizador, config());
 
     await expect(servicio.cotizar(datos({ medioPago: "efectivo" }))).resolves.toEqual({
-      cotizacion: true,
+      totales: { total: "1.00" },
+      mediosPago: {
+        efectivo: { disponible: true, total: "1.00" },
+        transferencia: { disponible: true, total: "1.00" },
+      },
     });
     expect(cotizador.cotizar).toHaveBeenCalledWith({
       items: [
@@ -163,9 +176,9 @@ describe("CotizacionPanelService con el cotizador real", () => {
     expect(mediosPago.efectivo.disponible).toBe(true);
   });
 
-  test("no ofrece Mercado Pago como medio del panel", async () => {
+  test("mediosPago trae solo los medios del panel", async () => {
     const { mediosPago } = await servicioCon(config()).cotizar(datos());
 
-    expect(mediosPago.mercadopago?.disponible ?? false).toBe(false);
+    expect(Object.keys(mediosPago).sort()).toEqual(["efectivo", "transferencia"]);
   });
 });
