@@ -44,9 +44,10 @@ const PERMISO_POR_RUTA = {
   "POST /admin/pedidos/:id/aviso": "PAGOS_CONFIRMAR",
   "POST /admin/pedidos/:id/pago-confirmado": "PAGOS_CONFIRMAR",
   "POST /admin/ventas": "VENTAS_REGISTRAR",
+  "POST /admin/ventas/cotizacion": "VENTAS_REGISTRAR",
 };
 
-const RUTAS_ESPERADAS = 30;
+const RUTAS_ESPERADAS = 31;
 
 /** Piden sesión, pero ningún permiso: cada usuario sobre su propia cuenta. */
 const SOLO_SESION = ["GET /auth/yo", "PUT /auth/contrasena"];

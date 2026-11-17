@@ -4,14 +4,16 @@ const path = require("path");
 const SRC = path.join(__dirname, "..", "..", "src");
 
 /**
- * Archivos que pueden pedir el efectivo al cotizador: el cotizador mismo y
- * CheckoutService, que lo pide solo con el perfil del panel (lo verifica el test de
- * abajo). La ruta del panel (POST /admin/ventas, con su permiso) se agrega acá en
- * su PR, y esa línea nueva es la que tiene que mirar la revisión.
+ * Archivos que pueden pedir el efectivo al cotizador: el cotizador mismo,
+ * CheckoutService, que lo pide solo con el perfil del panel, y
+ * CotizacionPanelService, la cotización del panel (POST /admin/ventas/cotizacion,
+ * con VENTAS_REGISTRAR). Los dos últimos los verifican los tests de abajo. Una línea
+ * nueva en esta lista es lo primero que tiene que mirar la revisión.
  */
 const PERMITIDOS = [
   path.join("services", "cotizador.js"),
   path.join("services", "CheckoutService.js"),
+  path.join("services", "CotizacionPanelService.js"),
 ];
 
 /**
@@ -57,5 +59,16 @@ describe("efectivo solo en el panel", () => {
     const delPanel = llamadas.find((m) => m[1] === "PERFIL_PANEL").index;
     expect(delPanel).toBeGreaterThan(fuente.indexOf("async registrarVentaDelPanel("));
     expect(delPanel).toBeLessThan(fuente.indexOf("async #ventaPrevia("));
+  });
+
+  test("CotizacionPanelService pide el efectivo una sola vez, fijo y nunca de los datos", () => {
+    const fuente = fs.readFileSync(path.join(SRC, "services", "CotizacionPanelService.js"), "utf8");
+
+    const valores = [...fuente.matchAll(/incluirEfectivo:\s*([^,\n}]+)/g)].map((m) => m[1].trim());
+    expect(valores).toEqual(["true"]);
+    // Una sola mención en todo el archivo: así la regex de arriba no se saltea un
+    // { incluirEfectivo } abreviado ni un objeto armado de otra forma.
+    expect(fuente.match(/\bincluirEfectivo\b/g)).toHaveLength(1);
+    expect(fuente).not.toMatch(/datos\.incluirEfectivo|\.\.\.datos/);
   });
 });

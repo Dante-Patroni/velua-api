@@ -1,5 +1,5 @@
 const VentaPanelController = require("../../src/controllers/VentaPanelController");
-const { reglas } = require("../../src/validators/ventaPanel");
+const { reglas, reglasCotizacion } = require("../../src/validators/ventaPanel");
 
 const CLAVE = "3f1c2a9e-5b7d-4e8a-9c21-7d4e5f6a8b90";
 const VENTA = {
@@ -133,5 +133,61 @@ describe("VentaPanelController.registrar", () => {
     } finally {
       consola.mockRestore();
     }
+  });
+});
+
+describe("VentaPanelController.cotizar", () => {
+  const COTIZACION = { totales: { total: "15300.00" }, mediosPago: {} };
+
+  /**
+   * @description Corre cotizar con el cuerpo dado, después de las reglas de la ruta.
+   * @param {Object} body - Cuerpo.
+   * @param {Object|Error} [resultado] - Lo que devuelve el servicio, o el error.
+   * @returns {Promise<{servicio: Object, res: Object}>} El servicio y la response.
+   */
+  const cotizar = async (body, resultado = COTIZACION) => {
+    const req = { body, headers: {} };
+    for (const regla of reglasCotizacion) await regla.run(req);
+    const servicio = {
+      cotizar:
+        resultado instanceof Error
+          ? jest.fn().mockRejectedValue(resultado)
+          : jest.fn().mockResolvedValue(resultado),
+    };
+    const res = crearRes();
+    await new VentaPanelController(null, servicio).cotizar(req, res);
+    return { servicio, res };
+  };
+
+  const carrito = { items: [{ varianteId: 1, cantidad: 2 }], entrega: { metodo: "en_mano" } };
+
+  test("200 con la cotización", async () => {
+    const { res } = await cotizar({ ...carrito, medioPago: "efectivo" });
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    expect(res.json).toHaveBeenCalledWith(COTIZACION);
+  });
+
+  test("al servicio llega solo lo validado: incluirEfectivo y lo demás se descartan", async () => {
+    const { servicio } = await cotizar({
+      ...carrito,
+      incluirEfectivo: false,
+      totalEsperado: "1.00",
+      usuarioId: 99,
+    });
+
+    expect(servicio.cotizar).toHaveBeenCalledWith(carrito);
+  });
+
+  test.each([
+    ["MEDIO_PAGO_NO_DISPONIBLE", 503],
+    ["CARRITO_SIN_ITEMS_VALIDOS", 400],
+    ["ZONA_INVALIDA", 400],
+    ["DATOS_INVALIDOS", 400],
+  ])("%s responde %i", async (codigo, status) => {
+    const { res } = await cotizar(carrito, new Error(codigo));
+
+    expect(res.status).toHaveBeenCalledWith(status);
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ error: codigo }));
   });
 });

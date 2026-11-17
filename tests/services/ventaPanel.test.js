@@ -1,4 +1,6 @@
 const {
+  normalizarCarrito,
+  validarCarrito,
   normalizarVenta,
   validarVentaPanel,
   normalizarClave,
@@ -220,5 +222,48 @@ describe("huellaDeVenta", () => {
     ["las notas", { notas: "Pasa a la tarde" }],
   ])("cambia si cambia %s", (_campo, cambios) => {
     expect(huella(cambios)).not.toBe(huella({}));
+  });
+});
+
+describe("el carrito, compartido con la cotización", () => {
+  // La cotización y la venta tienen que leer el carrito igual: si no, la pantalla
+  // podría cotizar un carrito y la venta guardar otro.
+  test("normalizarCarrito da los mismos ítems y la misma entrega que la venta", () => {
+    const venta = normalizarVenta(datos());
+
+    expect(normalizarCarrito(datos())).toEqual({ items: venta.items, entrega: venta.entrega });
+  });
+
+  test("con retiro, una zona es un error también al cotizar", () => {
+    expect(() =>
+      normalizarCarrito({ items: [], entrega: { metodo: "retiro", zonaEnvioId: 5 } })
+    ).toThrow("DATOS_INVALIDOS");
+  });
+
+  test("un carrito sin cliente ni medio de pago pasa: no son parte del carrito", () => {
+    const carrito = normalizarCarrito({
+      items: [{ varianteId: 3, cantidad: 2 }],
+      entrega: { metodo: "en_mano" },
+    });
+
+    expect(() => validarCarrito(carrito)).not.toThrow();
+  });
+
+  test.each([
+    ["sin ítems", { items: [], entrega: { metodo: "en_mano" } }],
+    [
+      "una variante repetida",
+      {
+        items: [
+          { varianteId: 3, cantidad: 1 },
+          { varianteId: 3, cantidad: 2 },
+        ],
+        entrega: { metodo: "en_mano" },
+      },
+    ],
+    ["envío sin zona", { items: [{ varianteId: 3, cantidad: 1 }], entrega: { metodo: "envio" } }],
+    ["otra entrega", { items: [{ varianteId: 3, cantidad: 1 }], entrega: { metodo: "correo" } }],
+  ])("%s: DATOS_INVALIDOS", (_caso, carrito) => {
+    expect(() => validarCarrito(normalizarCarrito(carrito))).toThrow("DATOS_INVALIDOS");
   });
 });

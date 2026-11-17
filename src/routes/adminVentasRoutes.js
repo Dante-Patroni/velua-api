@@ -2,28 +2,88 @@ const express = require("express");
 
 const db = require("../models");
 const SequelizePedidoRepository = require("../repositories/sequelize/SequelizePedidoRepository");
+const SequelizeCotizacionRepository = require("../repositories/sequelize/SequelizeCotizacionRepository");
 const { CheckoutService } = require("../services/CheckoutService");
+const { CotizacionPanelService } = require("../services/CotizacionPanelService");
+const { Cotizador } = require("../services/cotizador");
 const VentaPanelController = require("../controllers/VentaPanelController");
 const { proteger } = require("../middlewares/proteger");
-const { validarVentaPanel } = require("../validators/ventaPanel");
+const { validarVentaPanel, validarCotizacionPanel } = require("../validators/ventaPanel");
 const { PERMISOS } = require("../config/permisos");
-const { configEfectivo } = require("../config/efectivo");
-const { configTransferenciaEnPanel } = require("../config/transferencia");
+const { configVentaPanel } = require("../config/ventaPanel");
 
 const router = express.Router();
 
-// El servicio del panel, con su propia configuración. Cada medio se habilita por la
-// suya: un descuento inválido deshabilita el medio (503), no se cobra sin descuento.
+// La venta y su cotización, con la misma configuración (config/ventaPanel.js): si
+// fueran dos, la pantalla podría mostrar un total y la venta rechazarlo. Cada medio
+// se habilita por la suya: un descuento inválido deshabilita el medio (503), no se
+// cobra sin descuento.
 const controller = new VentaPanelController(
-  new CheckoutService(new SequelizePedidoRepository(db), {
-    umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
-    descuentoEfectivo: configEfectivo.descuento,
-    descuentoTransferencia: configTransferenciaEnPanel.descuento,
-    mediosDisponibles: {
-      efectivo: configEfectivo.habilitado,
-      transferencia: configTransferenciaEnPanel.habilitada,
-    },
-  })
+  new CheckoutService(new SequelizePedidoRepository(db), configVentaPanel),
+  new CotizacionPanelService(
+    new Cotizador(new SequelizeCotizacionRepository(db), configVentaPanel),
+    configVentaPanel
+  )
+);
+
+/**
+ * @openapi
+ * /admin/ventas/cotizacion:
+ *   post:
+ *     tags: [Admin - Ventas]
+ *     summary: Cotizar una venta del panel
+ *     description: >
+ *       Solo el admin (VENTAS_REGISTRAR). Calcula el total de una venta del panel
+ *       con efectivo y transferencia, con el descuento y el envío de cada medio.
+ *       **No crea ni reserva nada**: el stock se verifica al registrar la venta.
+ *
+ *
+ *       El total que el panel manda después como totalEsperado es
+ *       mediosPago[medioElegido].total. totales.total sin medio de pago no lleva
+ *       descuento: no es el total de ningún medio.
+ *
+ *
+ *       Sin medioPago, cada medio informa si está disponible. Con un medioPago
+ *       deshabilitado por su configuración, 503.
+ *     security:
+ *       - cookieAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/VentaCotizacionEntrada'
+ *     responses:
+ *       200:
+ *         description: Venta cotizada
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/VentaCotizacion'
+ *       400:
+ *         description: >
+ *           DATOS_INVALIDOS (con el campo), CARRITO_SIN_ITEMS_VALIDOS o
+ *           ZONA_INVALIDA.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         $ref: '#/components/responses/NoAutorizado'
+ *       403:
+ *         $ref: '#/components/responses/SinPermiso'
+ *       503:
+ *         description: MEDIO_PAGO_NO_DISPONIBLE (el medio pedido está deshabilitado por su configuración).
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+  "/admin/ventas/cotizacion",
+  proteger(PERMISOS.VENTAS_REGISTRAR),
+  validarCotizacionPanel,
+  controller.cotizar
 );
 
 /**

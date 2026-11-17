@@ -1,5 +1,6 @@
 const { body, header } = require("express-validator");
 const { TOPE_ITEMS } = require("../services/cotizador");
+const { MEDIOS_PANEL, ENTREGAS_PANEL } = require("../services/ventaPanel");
 const { manejarErroresValidacion } = require("../middlewares/validacion");
 
 /**
@@ -17,6 +18,37 @@ const textoOpcional = (campo, maximo) =>
     .withMessage(`Hasta ${maximo} caracteres`);
 
 /**
+ * Reglas de los ítems y de la entrega: los mismos objetos para la venta y para su
+ * cotización. Si cada ruta tuviera las suyas, la cotización podría aceptar un
+ * carrito que la venta después rechaza.
+ *
+ * La dirección va acá aunque la cotización no la use: así llega al servicio, que
+ * rechaza una dirección sin envío igual en las dos. Si la cotización la descartara
+ * en la validación, aceptaría un carrito con retiro y dirección que la venta
+ * rechaza.
+ */
+const reglasCarrito = [
+  body("items")
+    .isArray({ min: 1, max: TOPE_ITEMS })
+    .withMessage(`La venta admite entre 1 y ${TOPE_ITEMS} productos`),
+  body("items.*.varianteId").isInt({ min: 1 }).withMessage("Variante inválida").toInt(),
+  body("items.*.cantidad").isInt({ min: 1 }).withMessage("Cantidad inválida").toInt(),
+
+  body("entrega.metodo").isIn(ENTREGAS_PANEL).withMessage("Elegí envío, retiro o en mano"),
+  body("entrega.zonaEnvioId")
+    .optional({ values: "null" })
+    .isInt({ min: 1 })
+    .withMessage("Zona de envío inválida")
+    .toInt(),
+  textoOpcional("entrega.direccion.calle", 180),
+  textoOpcional("entrega.direccion.numero", 20),
+  textoOpcional("entrega.direccion.extra", 120),
+  textoOpcional("entrega.direccion.ciudad", 120),
+  textoOpcional("entrega.direccion.provincia", 80),
+  textoOpcional("entrega.direccion.cp", 20),
+];
+
+/**
  * Reglas de forma de POST /admin/ventas. Solo lo que está acá llega al servicio
  * (el controlador lee con matchedData): un campo de más en el cuerpo, como un
  * precio o un usuario, no se usa nunca.
@@ -30,11 +62,7 @@ const reglas = [
     .isUUID()
     .withMessage("Falta el encabezado Idempotency-Key, con un UUID por venta"),
 
-  body("items")
-    .isArray({ min: 1, max: TOPE_ITEMS })
-    .withMessage(`La venta admite entre 1 y ${TOPE_ITEMS} productos`),
-  body("items.*.varianteId").isInt({ min: 1 }).withMessage("Variante inválida").toInt(),
-  body("items.*.cantidad").isInt({ min: 1 }).withMessage("Cantidad inválida").toInt(),
+  ...reglasCarrito,
 
   body("cliente.nombre")
     .isString()
@@ -56,22 +84,7 @@ const reglas = [
     .isLength({ max: 180 }),
   textoOpcional("cliente.documento", 20),
 
-  body("entrega.metodo")
-    .isIn(["envio", "retiro", "en_mano"])
-    .withMessage("Elegí envío, retiro o en mano"),
-  body("entrega.zonaEnvioId")
-    .optional({ values: "null" })
-    .isInt({ min: 1 })
-    .withMessage("Zona de envío inválida")
-    .toInt(),
-  textoOpcional("entrega.direccion.calle", 180),
-  textoOpcional("entrega.direccion.numero", 20),
-  textoOpcional("entrega.direccion.extra", 120),
-  textoOpcional("entrega.direccion.ciudad", 120),
-  textoOpcional("entrega.direccion.provincia", 80),
-  textoOpcional("entrega.direccion.cp", 20),
-
-  body("medioPago").isIn(["efectivo", "transferencia"]).withMessage("Efectivo o transferencia"),
+  body("medioPago").isIn(MEDIOS_PANEL).withMessage("Efectivo o transferencia"),
   // Solo los booleanos: ni "true", ni 1, ni "1". Es la dueña diciendo que ya cobró.
   body("cobradoEnEfectivo")
     .optional()
@@ -86,7 +99,28 @@ const reglas = [
   textoOpcional("notas", 500),
 ];
 
+/**
+ * Reglas de forma de POST /admin/ventas/cotizacion: las del carrito, y el medio de
+ * pago opcional (sin él, la cotización trae el total de cada medio).
+ */
+const reglasCotizacion = [
+  ...reglasCarrito,
+  body("medioPago")
+    .optional({ values: "null" })
+    .isIn(MEDIOS_PANEL)
+    .withMessage("Efectivo o transferencia"),
+];
+
 /** Las reglas y, al final, la respuesta 400 si alguna falla. */
 const validarVentaPanel = [...reglas, manejarErroresValidacion];
 
-module.exports = { validarVentaPanel, reglas };
+/** Lo mismo para la cotización. */
+const validarCotizacionPanel = [...reglasCotizacion, manejarErroresValidacion];
+
+module.exports = {
+  validarVentaPanel,
+  validarCotizacionPanel,
+  reglas,
+  reglasCarrito,
+  reglasCotizacion,
+};
