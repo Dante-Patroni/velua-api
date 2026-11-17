@@ -7,23 +7,15 @@ const VentaPanelController = require("../controllers/VentaPanelController");
 const { proteger } = require("../middlewares/proteger");
 const { validarVentaPanel } = require("../validators/ventaPanel");
 const { PERMISOS } = require("../config/permisos");
-const { configEfectivo } = require("../config/efectivo");
-const { configTransferenciaEnPanel } = require("../config/transferencia");
+const { configVentaPanel } = require("../config/ventaPanel");
 
 const router = express.Router();
 
-// El servicio del panel, con su propia configuración. Cada medio se habilita por la
-// suya: un descuento inválido deshabilita el medio (503), no se cobra sin descuento.
+// El servicio del panel, con la configuración que comparte con la cotización
+// (config/ventaPanel.js). Cada medio se habilita por la suya: un descuento inválido
+// deshabilita el medio (503), no se cobra sin descuento.
 const controller = new VentaPanelController(
-  new CheckoutService(new SequelizePedidoRepository(db), {
-    umbralEnvioGratis: process.env.ENVIO_GRATIS_DESDE || null,
-    descuentoEfectivo: configEfectivo.descuento,
-    descuentoTransferencia: configTransferenciaEnPanel.descuento,
-    mediosDisponibles: {
-      efectivo: configEfectivo.habilitado,
-      transferencia: configTransferenciaEnPanel.habilitada,
-    },
-  })
+  new CheckoutService(new SequelizePedidoRepository(db), configVentaPanel)
 );
 
 /**
