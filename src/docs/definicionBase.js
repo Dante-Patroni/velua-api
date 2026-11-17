@@ -1338,7 +1338,7 @@ module.exports = {
           notas: { type: "string", nullable: true, maxLength: 500 },
         },
       },
-VentaCotizacionEntrada: {
+      VentaCotizacionEntrada: {
         type: "object",
         required: ["items", "entrega"],
         description:
