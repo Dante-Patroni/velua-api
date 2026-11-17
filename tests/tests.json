@@ -7460,6 +7460,471 @@
           ]
         },
         {
+          "name": "POST /admin/ventas/cotizacion sin sesion",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas/cotizacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas", "cotizacion"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"entrega\": { \"metodo\": \"en_mano\" }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('Responde 401', () => pm.response.to.have.status(401));"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas/cotizacion (sin medio de pago)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas/cotizacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas", "cotizacion"]
+            },
+            "description": "Sin medio elegido: el total de cada medio, con su descuento. La CI configura un descuento en efectivo distinto del de transferencia, para que un medio cambiado por el otro se note.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"entrega\": { \"metodo\": \"en_mano\" }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test('mediosPago trae solo los medios del panel', () => pm.expect(Object.keys(c.mediosPago).sort()).to.eql(['efectivo', 'transferencia']));",
+                  "pm.test('Los dos medios estan disponibles', () => { pm.expect(c.mediosPago.efectivo.disponible).to.eql(true); pm.expect(c.mediosPago.transferencia.disponible).to.eql(true); });",
+                  "pm.test('Los totales de los medios son distintos (si no, esta prueba no detecta un medio cambiado)', () => pm.expect(c.mediosPago.efectivo.total).to.not.eql(c.mediosPago.transferencia.total));",
+                  "pm.collectionVariables.set('cot_total_efectivo', c.mediosPago.efectivo.total);",
+                  "pm.collectionVariables.set('cot_total_transferencia', c.mediosPago.transferencia.total);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas/cotizacion (efectivo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas/cotizacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas", "cotizacion"]
+            },
+            "description": "Con el medio elegido, totales.total es el de ese medio: es el número que la venta compara con totalEsperado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"entrega\": { \"metodo\": \"en_mano\" },\n  \"medioPago\": \"efectivo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('totales.total es el total del efectivo', () => pm.expect(pm.response.json().totales.total).to.eql(pm.collectionVariables.get('cot_total_efectivo')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas/cotizacion con Mercado Pago",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas/cotizacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas", "cotizacion"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"entrega\": { \"metodo\": \"en_mano\" },\n  \"medioPago\": \"mercadopago\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas/cotizacion con una zona y retiro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas/cotizacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas", "cotizacion"]
+            },
+            "description": "La misma regla que la venta: con retiro, una zona es un error, no se descarta en silencio.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"entrega\": { \"metodo\": \"retiro\", \"zonaEnvioId\": 1 }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Marca la zona', () => pm.expect(pm.response.json().details).to.have.property('entrega.zonaEnvioId'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock despues de cotizar",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{ped_producto_id}}"]
+            },
+            "description": "Cotizar no reserva ni descuenta nada."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "const original = Number(pm.collectionVariables.get('ped_stock_original'));",
+                  "pm.test('Cotizar no toco el stock', () => pm.expect(v.stock).to.eql(original));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas en efectivo con el total de transferencia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas"]
+            },
+            "description": "El error que esta prueba quiere atrapar: mandar el total del otro medio.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Cotizacion\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"en_mano\" },\n  \"medioPago\": \"efectivo\",\n  \"totalEsperado\": \"{{cot_total_transferencia}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Devuelve TOTAL_CAMBIO', () => pm.expect(pm.response.json().error).to.eql('TOTAL_CAMBIO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas (efectivo, con el total cotizado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas"]
+            },
+            "description": "Sin cobradoEnEfectivo: queda pendiente y se puede cancelar al final, para que correr Newman muchas veces no cambie el catalogo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Cotizacion\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"en_mano\" },\n  \"medioPago\": \"efectivo\",\n  \"totalEsperado\": \"{{cot_total_efectivo}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const v = pm.response.json();",
+                  "pm.test('El total registrado es el cotizado', () => pm.expect(v.total).to.eql(pm.collectionVariables.get('cot_total_efectivo')));",
+                  "pm.test('En efectivo, pendiente', () => { pm.expect(v.medioPago).to.eql('efectivo'); pm.expect(v.estadoPago).to.eql('pendiente'); });",
+                  "pm.collectionVariables.set('venta_efectivo_id', v.id);",
+                  "pm.collectionVariables.set('venta_efectivo_numero', v.numero);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas (transferencia, con el total cotizado)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Cotizacion\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"en_mano\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{cot_total_transferencia}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const v = pm.response.json();",
+                  "pm.test('El total registrado es el cotizado', () => pm.expect(v.total).to.eql(pm.collectionVariables.get('cot_total_transferencia')));",
+                  "pm.test('Por transferencia, pendiente', () => { pm.expect(v.medioPago).to.eql('transferencia'); pm.expect(v.estadoPago).to.eql('pendiente'); });",
+                  "pm.collectionVariables.set('venta_transferencia_id', v.id);",
+                  "pm.collectionVariables.set('venta_transferencia_numero', v.numero);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion de la venta cotizada (efectivo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{venta_efectivo_id}}/cancelacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "pedidos", "{{venta_efectivo_id}}", "cancelacion"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"Prueba Newman de la cotizacion del panel\", \"confirmaSinPago\": true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cancela la venta', () => pm.expect(pm.response.json()).to.eql({ cancelado: true, numero: pm.collectionVariables.get('venta_efectivo_numero') }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion de la venta cotizada (transferencia)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{venta_transferencia_id}}/cancelacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "pedidos", "{{venta_transferencia_id}}", "cancelacion"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"Prueba Newman de la cotizacion del panel\", \"confirmaSinPago\": true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cancela la venta', () => pm.expect(pm.response.json()).to.eql({ cancelado: true, numero: pm.collectionVariables.get('venta_transferencia_numero') }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock despues de cancelar las ventas cotizadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos", "{{ped_producto_id}}"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "const original = Number(pm.collectionVariables.get('ped_stock_original'));",
+                  "pm.test('El stock vuelve al original', () => pm.expect(v.stock).to.eql(original));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "POST /auth/logout (ventas del panel)",
           "request": {
             "method": "POST",
@@ -7558,6 +8023,45 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Devuelve SIN_PERMISO', () => pm.expect(pm.response.json().error).to.eql('SIN_PERMISO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas/cotizacion como operador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas/cotizacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas", "cotizacion"]
+            },
+            "description": "Directo a la API con la sesión del operador: cotizar tambien es solo del admin.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"entrega\": { \"metodo\": \"en_mano\" }\n}",
               "options": {
                 "raw": {
                   "language": "json"

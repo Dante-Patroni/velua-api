@@ -33,6 +33,9 @@ jobs:
       TRANSFERENCIA_ALIAS: velua.prueba.ci
       TRANSFERENCIA_CBU: "0000000000000000000000"
       TRANSFERENCIA_TITULAR: Tienda de Prueba
+      # Distinto del de transferencia (0): así efectivo y transferencia dan totales
+      # distintos y Newman detecta si la venta usa el total del otro medio.
+      DESCUENTO_EFECTIVO: "10"
 
     services:
       mysql:
