@@ -163,13 +163,27 @@ class Cotizador {
    * @param {boolean} [pedido.incluirEfectivo=false] - Solo la ruta del panel lo pasa.
    *   Sin un `true` explícito, el efectivo no aparece en `mediosPago` ni descuenta,
    *   aunque esté configurado.
+   * @param {boolean} [pedido.detalleInterno=false] - Qué dicen los avisos de lo que no
+   *   se puede vender. `false` (por defecto): respuesta apta para cualquiera, sin
+   *   sesión. Una variante inexistente, una inactiva y una de un producto
+   *   despublicado dan el mismo aviso, `VARIANTE_INACTIVA` sin nombre: no se puede
+   *   saber qué ids existen ni cómo se llama un producto no publicado. `true`:
+   *   información operativa interna (el motivo real y el nombre); solo la piden
+   *   servicios del panel, fijo en el código y nunca desde la request
+   *   (detalleInternoSoloPanel.test.js).
    * @returns {Promise<Object>} Ítems cotizados, avisos, totales del medio elegido y,
    *   en `mediosPago`, si cada medio está disponible y su total. El total de cada
    *   medio lo calcula acá, con su descuento y su envío: el envío gratis depende del
    *   monto ya descontado, así que la diferencia entre medios no es solo el descuento.
    * @throws {Error} DATOS_INVALIDOS, CARRITO_SIN_ITEMS_VALIDOS, ZONA_INVALIDA, DATOS_DE_VENTA_INCOMPLETOS
    */
-  async cotizar({ items, zonaEnvioId, medioPago, incluirEfectivo = false }) {
+  async cotizar({
+    items,
+    zonaEnvioId,
+    medioPago,
+    incluirEfectivo = false,
+    detalleInterno = false,
+  }) {
     const medios = incluirEfectivo === true ? [...MEDIOS_PAGO, ...MEDIOS_SOLO_PANEL] : MEDIOS_PAGO;
 
     validarForma(items);
@@ -182,7 +196,7 @@ class Cotizador {
     // Una sola fecha para todo el carrito: si la cotización cruza la medianoche,
     // todos los ítems se evalúan contra el mismo día.
     const hoy = this.hoy();
-    const { lineas, avisos } = this.#resolverLineas(items, porId, hoy);
+    const { lineas, avisos } = this.#resolverLineas(items, porId, hoy, detalleInterno === true);
 
     if (lineas.length === 0) {
       throw new Error("CARRITO_SIN_ITEMS_VALIDOS");
@@ -262,11 +276,25 @@ class Cotizador {
    * @param {Array<Object>} items - Ítems recibidos.
    * @param {Map<number, Object>} porId - Variantes encontradas, por id.
    * @param {string} hoy - Fecha de hoy "AAAA-MM-DD" en la zona del negocio.
+   * @param {boolean} detalleInterno - Ver cotizar: sin él, lo que no existe y lo que
+   *   no está publicado dan el mismo aviso, sin nombre.
    * @returns {{lineas: Array<Object>, avisos: Array<Object>}} Líneas válidas y avisos.
    */
-  #resolverLineas(items, porId, hoy) {
+  #resolverLineas(items, porId, hoy, detalleInterno) {
     const lineas = [];
     const avisos = [];
+    /**
+     * @description Aviso de algo que no se puede vender. Sin detalle interno, el
+     * mismo para todos los casos y sin nombre.
+     * @param {number} varianteId - Variante pedida.
+     * @param {string} motivo - Motivo real (AVISOS).
+     * @param {string} [producto] - Nombre del producto, si existe.
+     * @returns {Object} El aviso.
+     */
+    const noDisponible = (varianteId, motivo, producto) =>
+      detalleInterno
+        ? { varianteId, motivo, ...(producto === undefined ? {} : { producto }) }
+        : { varianteId, motivo: AVISOS.VARIANTE_INACTIVA };
 
     for (const item of items) {
       const varianteId = Number(item.varianteId);
@@ -274,18 +302,18 @@ class Cotizador {
       const variante = porId.get(varianteId);
 
       if (!variante) {
-        avisos.push({ varianteId, motivo: AVISOS.VARIANTE_INEXISTENTE });
+        avisos.push(noDisponible(varianteId, AVISOS.VARIANTE_INEXISTENTE));
         continue;
       }
 
       const nombre = `${variante.producto?.nombre ?? ""}`.trim();
 
       if (!variante.activa) {
-        avisos.push({ varianteId, motivo: AVISOS.VARIANTE_INACTIVA, producto: nombre });
+        avisos.push(noDisponible(varianteId, AVISOS.VARIANTE_INACTIVA, nombre));
         continue;
       }
       if (!variante.producto?.activo) {
-        avisos.push({ varianteId, motivo: AVISOS.PRODUCTO_INACTIVO, producto: nombre });
+        avisos.push(noDisponible(varianteId, AVISOS.PRODUCTO_INACTIVO, nombre));
         continue;
       }
       // Falla segura: undefined no es "sin fecha" (eso es null), es un dato que

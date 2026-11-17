@@ -529,7 +529,7 @@ describe("Cotizador", () => {
   });
 
   describe("disponibilidad", () => {
-    it("avisa y saca una variante que no existe", async () => {
+    it("con detalle interno, avisa y saca una variante que no existe", async () => {
       const servicio = new Cotizador(repositorioCon([variante({ id: 1 })]));
 
       const r = await servicio.cotizar({
@@ -537,13 +537,14 @@ describe("Cotizador", () => {
           { varianteId: 1, cantidad: 1 },
           { varianteId: 99, cantidad: 1 },
         ],
+        detalleInterno: true,
       });
 
       expect(r.items).toHaveLength(1);
-      expect(r.avisos[0].motivo).toBe(AVISOS.VARIANTE_INEXISTENTE);
+      expect(r.avisos).toEqual([{ varianteId: 99, motivo: AVISOS.VARIANTE_INEXISTENTE }]);
     });
 
-    it("avisa y saca una variante desactivada", async () => {
+    it("con detalle interno, avisa y saca una variante desactivada, con su nombre", async () => {
       const servicio = new Cotizador(
         repositorioCon([variante({ id: 1 }), variante({ id: 2, activa: false })])
       );
@@ -553,13 +554,16 @@ describe("Cotizador", () => {
           { varianteId: 1, cantidad: 1 },
           { varianteId: 2, cantidad: 1 },
         ],
+        detalleInterno: true,
       });
 
       expect(r.items).toHaveLength(1);
-      expect(r.avisos[0].motivo).toBe(AVISOS.VARIANTE_INACTIVA);
+      expect(r.avisos).toEqual([
+        { varianteId: 2, motivo: AVISOS.VARIANTE_INACTIVA, producto: "Éclat Noir" },
+      ]);
     });
 
-    it("avisa y saca una variante de un producto despublicado", async () => {
+    it("con detalle interno, avisa y saca una variante de un producto despublicado", async () => {
       const servicio = new Cotizador(
         repositorioCon([
           variante({ id: 1 }),
@@ -575,10 +579,13 @@ describe("Cotizador", () => {
           { varianteId: 1, cantidad: 1 },
           { varianteId: 2, cantidad: 1 },
         ],
+        detalleInterno: true,
       });
 
       expect(r.items).toHaveLength(1);
-      expect(r.avisos[0].motivo).toBe(AVISOS.PRODUCTO_INACTIVO);
+      expect(r.avisos).toEqual([
+        { varianteId: 2, motivo: AVISOS.PRODUCTO_INACTIVO, producto: "Velours" },
+      ]);
     });
 
     it("avisa y saca una variante sin stock", async () => {
@@ -779,4 +786,88 @@ describe("Cotizador", () => {
     expect(producto.imagenes[0].orden).toBe(1);
   });
 });
+});
+
+describe("Cotizador: avisos públicos (sin detalle interno)", () => {
+  const SECRETO = "Lanzamiento de Invierno";
+  const productoSecreto = (cambios) => ({
+    id: 2,
+    nombre: SECRETO,
+    slug: "secreto",
+    activo: true,
+    disponibleDesde: null,
+    ...cambios,
+  });
+
+  // Un mismo carrito (una variante vendible y otra que no), en los tres casos que
+  // la tienda no tiene que poder distinguir.
+  const escenarios = {
+    "no existe": [variante({ id: 1 })],
+    "variante inactiva": [
+      variante({ id: 1 }),
+      variante({ id: 2, activa: false, producto: productoSecreto() }),
+    ],
+    "producto despublicado": [
+      variante({ id: 1 }),
+      variante({ id: 2, producto: productoSecreto({ activo: false }) }),
+    ],
+  };
+  const carrito = [
+    { varianteId: 1, cantidad: 1 },
+    { varianteId: 2, cantidad: 1 },
+  ];
+
+  /**
+   * @description Cotiza el carrito con las variantes del escenario.
+   * @param {Object[]} variantes - Lo que devuelve el repositorio.
+   * @param {Object} [opciones] - Opciones extra para cotizar.
+   * @returns {Promise<Object>} La cotización.
+   */
+  const cotizar = (variantes, opciones = {}) =>
+    new Cotizador(repositorioCon(variantes)).cotizar({ items: carrito, ...opciones });
+
+  test.each(Object.keys(escenarios))(
+    "%s: un solo aviso, VARIANTE_INACTIVA sin nombre",
+    async (caso) => {
+      const r = await cotizar(escenarios[caso]);
+
+      expect(r.avisos).toEqual([{ varianteId: 2, motivo: AVISOS.VARIANTE_INACTIVA }]);
+    }
+  );
+
+  // Si cualquier otra parte de la respuesta cambiara, seguiría habiendo un oráculo
+  // aunque los avisos fueran iguales: se compara la respuesta entera.
+  test("la respuesta completa es idéntica en los tres casos", async () => {
+    const [noExiste, inactiva, despublicado] = await Promise.all(
+      Object.values(escenarios).map((v) => cotizar(v))
+    );
+
+    expect(inactiva).toEqual(noExiste);
+    expect(despublicado).toEqual(noExiste);
+  });
+
+  test("el nombre del producto no aparece en ningún campo", async () => {
+    for (const variantes of Object.values(escenarios)) {
+      expect(JSON.stringify(await cotizar(variantes))).not.toContain(SECRETO);
+    }
+  });
+
+  test.each(["true", 1, "si"])("detalleInterno %p no es true: avisos públicos", async (valor) => {
+    const r = await cotizar(escenarios["variante inactiva"], { detalleInterno: valor });
+
+    expect(r.avisos).toEqual([{ varianteId: 2, motivo: AVISOS.VARIANTE_INACTIVA }]);
+  });
+
+  test("con detalle interno, cada caso conserva su motivo y su nombre", async () => {
+    const avisos = [];
+    for (const variantes of Object.values(escenarios)) {
+      avisos.push((await cotizar(variantes, { detalleInterno: true })).avisos[0]);
+    }
+
+    expect(avisos).toEqual([
+      { varianteId: 2, motivo: AVISOS.VARIANTE_INEXISTENTE },
+      { varianteId: 2, motivo: AVISOS.VARIANTE_INACTIVA, producto: SECRETO },
+      { varianteId: 2, motivo: AVISOS.PRODUCTO_INACTIVO, producto: SECRETO },
+    ]);
+  });
 });

@@ -52,6 +52,7 @@ describe("CotizacionPanelService", () => {
       zonaEnvioId: null,
       medioPago: "efectivo",
       incluirEfectivo: true,
+      detalleInterno: true,
     });
   });
 

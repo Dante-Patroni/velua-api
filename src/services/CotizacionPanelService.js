@@ -59,6 +59,8 @@ class CotizacionPanelService {
       zonaEnvioId: entrega.zonaEnvioId,
       medioPago,
       incluirEfectivo: true,
+      // El panel ve por qué no se puede vender algo y cómo se llama.
+      detalleInterno: true,
     });
     // El cotizador informa todos los medios que conoce. El panel no vende con
     // Mercado Pago: se devuelven solo los suyos, para que la pantalla no tenga que
