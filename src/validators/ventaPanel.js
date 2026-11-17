@@ -21,6 +21,11 @@ const textoOpcional = (campo, maximo) =>
  * Reglas de los ítems y de la entrega: los mismos objetos para la venta y para su
  * cotización. Si cada ruta tuviera las suyas, la cotización podría aceptar un
  * carrito que la venta después rechaza.
+ *
+ * La dirección va acá aunque la cotización no la use: así llega al servicio, que
+ * rechaza una dirección sin envío igual en las dos. Si la cotización la descartara
+ * en la validación, aceptaría un carrito con retiro y dirección que la venta
+ * rechaza.
  */
 const reglasCarrito = [
   body("items")
@@ -35,6 +40,12 @@ const reglasCarrito = [
     .isInt({ min: 1 })
     .withMessage("Zona de envío inválida")
     .toInt(),
+  textoOpcional("entrega.direccion.calle", 180),
+  textoOpcional("entrega.direccion.numero", 20),
+  textoOpcional("entrega.direccion.extra", 120),
+  textoOpcional("entrega.direccion.ciudad", 120),
+  textoOpcional("entrega.direccion.provincia", 80),
+  textoOpcional("entrega.direccion.cp", 20),
 ];
 
 /**
@@ -72,13 +83,6 @@ const reglas = [
     .withMessage("Revisá el mail")
     .isLength({ max: 180 }),
   textoOpcional("cliente.documento", 20),
-
-  textoOpcional("entrega.direccion.calle", 180),
-  textoOpcional("entrega.direccion.numero", 20),
-  textoOpcional("entrega.direccion.extra", 120),
-  textoOpcional("entrega.direccion.ciudad", 120),
-  textoOpcional("entrega.direccion.provincia", 80),
-  textoOpcional("entrega.direccion.cp", 20),
 
   body("medioPago").isIn(MEDIOS_PANEL).withMessage("Efectivo o transferencia"),
   // Solo los booleanos: ni "true", ni 1, ni "1". Es la dueña diciendo que ya cobró.

@@ -1,5 +1,6 @@
 const { validationResult, matchedData } = require("express-validator");
 const { reglas, reglasCarrito, reglasCotizacion } = require("../../src/validators/ventaPanel");
+const { normalizarCarrito, validarCarrito } = require("../../src/services/ventaPanel");
 
 const CLAVE = "3f1c2a9e-5b7d-4e8a-9c21-7d4e5f6a8b90";
 
@@ -195,5 +196,46 @@ describe("validarCotizacionPanel", () => {
       entrega: { metodo: "en_mano" },
       medioPago: "efectivo",
     });
+  });
+});
+
+describe("la venta y la cotización deciden igual sobre el mismo carrito", () => {
+  /**
+   * @description Pasa un cuerpo por las reglas de una ruta y por el carrito del
+   * servicio, y devuelve qué decide: "ok", o el error y su campo.
+   * @param {Object[]} reglasDeLaRuta - Reglas de la venta o de la cotización.
+   * @param {Object} body - Cuerpo.
+   * @returns {Promise<string>} "ok", "400 <campo>" (validación) o "<código> <campo>".
+   */
+  const decidir = async (reglasDeLaRuta, body) => {
+    const req = { body: structuredClone(body), headers: {} };
+    for (const regla of reglasDeLaRuta) await regla.run(req);
+    const errores = validationResult(req)
+      .array()
+      .map((e) => e.path)
+      .filter((p) => p.startsWith("items") || p.startsWith("entrega"));
+    if (errores.length > 0) return `400 ${errores[0]}`;
+    try {
+      validarCarrito(normalizarCarrito(matchedData(req, { locations: ["body"] })));
+      return "ok";
+    } catch (error) {
+      return `${error.message} ${Object.keys(error.details ?? {})[0]}`;
+    }
+  };
+
+  const items = [{ varianteId: 1, cantidad: 2 }];
+
+  // Lo que no es del carrito (cliente, medio, total) no entra en la comparación:
+  // la cotización no lo pide.
+  test.each([
+    ["en mano", { items, entrega: { metodo: "en_mano" } }],
+    ["envío con zona", { items, entrega: { metodo: "envio", zonaEnvioId: 3 } }],
+    ["envío sin zona", { items, entrega: { metodo: "envio" } }],
+    ["retiro con zona", { items, entrega: { metodo: "retiro", zonaEnvioId: 3 } }],
+    ["retiro con dirección", { items, entrega: { metodo: "retiro", direccion: { calle: "X" } } }],
+    ["en mano con dirección", { items, entrega: { metodo: "en_mano", direccion: { cp: "5800" } } }],
+    ["una cantidad 0", { items: [{ varianteId: 1, cantidad: 0 }], entrega: { metodo: "en_mano" } }],
+  ])("%s", async (_caso, body) => {
+    expect(await decidir(reglasCotizacion, body)).toBe(await decidir(reglas, body));
   });
 });

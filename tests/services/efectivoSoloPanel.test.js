@@ -66,6 +66,9 @@ describe("efectivo solo en el panel", () => {
 
     const valores = [...fuente.matchAll(/incluirEfectivo:\s*([^,\n}]+)/g)].map((m) => m[1].trim());
     expect(valores).toEqual(["true"]);
+    // Una sola mención en todo el archivo: así la regex de arriba no se saltea un
+    // { incluirEfectivo } abreviado ni un objeto armado de otra forma.
+    expect(fuente.match(/\bincluirEfectivo\b/g)).toHaveLength(1);
     expect(fuente).not.toMatch(/datos\.incluirEfectivo|\.\.\.datos/);
   });
 });
