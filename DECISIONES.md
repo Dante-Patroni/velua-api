@@ -324,3 +324,16 @@ antes de tocar código. Cada línea lleva fecha.
 - TLS con `rejectUnauthorized: false`: cifra, pero no verifica el certificado. Bajo, porque la conexión va por la red privada y la base no tiene acceso público.
 
 **Pendientes:** borrar `ADMIN_PASSWORD`, `ADMIN_EMAIL` y `ADMIN_NOMBRE` de Railway y cambiar la contraseña del panel; fijar la versión de Node (Railway 20, local 22); validar las variables obligatorias al arrancar; _Watch Paths_ para la API.
+
+## 2026-11-16 — Venta del panel: la clave de idempotencia no tiene dueño
+
+**Decisión:** en `POST /admin/ventas` la clave es global, no por usuario. La huella no incluye `usuarioId` y `buscarPorClaveVenta` no filtra por quién registró la venta.
+
+**Por qué:** hoy hay un solo usuario con `VENTAS_REGISTRAR`. La clave es un UUID que el panel genera una vez por venta: para chocar, otro usuario tendría que mandar el mismo UUID con la misma venta.
+
+**Riesgos aceptados:**
+
+- Con dos usuarios, el reintento de uno con la clave y la venta del otro recibe esa venta: id, número, total, estado de pago y medio. Sin datos del cliente.
+- La idempotencia evita duplicados, no limita: el tope lo pone `limitadorGlobal` (100 req/min por IP).
+
+**Revisar si** se suma un segundo usuario con `VENTAS_REGISTRAR`: incluir `usuarioId` en la huella, subiendo `VERSION_HUELLA` para que las ventas viejas sigan comparándose con la suya.
