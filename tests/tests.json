@@ -1291,7 +1291,48 @@
                   "pm.test('Cotiza solo el producto valido', () => pm.expect(c.items).to.have.lengthOf(1));",
                   "pm.test('Avisa por el que no existe', () => {",
                   "    pm.expect(c.avisos[0].varianteId).to.eql(999999);",
-                  "    pm.expect(c.avisos[0].motivo).to.eql('VARIANTE_INEXISTENTE');",
+                  "    pm.expect(c.avisos[0]).to.eql({ varianteId: 999999, motivo: 'VARIANTE_INACTIVA' });",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con detalleInterno en el cuerpo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "La tienda no puede pedir el detalle interno de los avisos: responde igual que sin el campo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"varianteId\": {{variante_con_stock}}, \"cantidad\": 1 },\n    { \"varianteId\": 999999, \"cantidad\": 1 }\n  ],\n  \"detalleInterno\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('El aviso sigue siendo el publico', () => {",
+                  "    pm.expect(pm.response.json().avisos).to.eql([{ varianteId: 999999, motivo: 'VARIANTE_INACTIVA' }]);",
                   "});"
                 ]
               }
@@ -3705,6 +3746,52 @@
           ]
         },
         {
+          "name": "POST /cotizar con una variante desactivada (aviso publico)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "description": "La tienda es publica: una variante desactivada da el mismo aviso que un id que no existe, sin el nombre del producto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"varianteId\": {{variante_con_stock}}, \"cantidad\": 1 },\n    { \"varianteId\": {{variante_b}}, \"cantidad\": 1 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test('Cotiza solo el producto valido', () => pm.expect(c.items).to.have.lengthOf(1));",
+                  "pm.test('El mismo aviso que para un id que no existe, sin nombre', () => {",
+                  "    pm.expect(c.avisos).to.eql([{ varianteId: Number(pm.collectionVariables.get('variante_b')), motivo: 'VARIANTE_INACTIVA' }]);",
+                  "});",
+                  "pm.test('El nombre del producto no aparece en la respuesta', () => {",
+                  "    pm.expect(pm.response.text()).to.not.include('Producto Newman editado');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "PATCH desactivar la ultima variante activa",
           "request": {
             "method": "PATCH",
@@ -3827,6 +3914,96 @@
                 "exec": [
                   "pm.test('Responde 200', () => pm.response.to.have.status(200));",
                   "pm.test('Quedo despublicado', () => pm.expect(pm.response.json().activo).to.be.false);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /cotizar con un producto despublicado (aviso publico)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/cotizar",
+              "host": ["{{base_url}}"],
+              "path": ["cotizar"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"varianteId\": {{variante_con_stock}}, \"cantidad\": 1 },\n    { \"varianteId\": {{variante_a}}, \"cantidad\": 1 }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const c = pm.response.json();",
+                  "pm.test('Cotiza solo el producto valido', () => pm.expect(c.items).to.have.lengthOf(1));",
+                  "pm.test('El mismo aviso que para un id que no existe, sin nombre', () => {",
+                  "    pm.expect(c.avisos).to.eql([{ varianteId: Number(pm.collectionVariables.get('variante_a')), motivo: 'VARIANTE_INACTIVA' }]);",
+                  "});",
+                  "pm.test('El nombre del producto no aparece en la respuesta', () => {",
+                  "    pm.expect(pm.response.text()).to.not.include('Producto Newman editado');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas/cotizacion con un producto despublicado (detalle interno)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas/cotizacion",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "ventas", "cotizacion"]
+            },
+            "description": "El panel (solo admin) si ve el motivo real y el nombre.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    { \"varianteId\": {{variante_con_stock}}, \"cantidad\": 1 },\n    { \"varianteId\": {{variante_a}}, \"cantidad\": 1 }\n  ],\n  \"entrega\": { \"metodo\": \"en_mano\" }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Avisa el motivo real, con el nombre', () => {",
+                  "    pm.expect(pm.response.json().avisos).to.eql([{",
+                  "        varianteId: Number(pm.collectionVariables.get('variante_a')),",
+                  "        motivo: 'PRODUCTO_INACTIVO',",
+                  "        producto: 'Producto Newman editado',",
+                  "    }]);",
+                  "});"
                 ]
               }
             }

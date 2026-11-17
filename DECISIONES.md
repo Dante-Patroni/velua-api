@@ -337,3 +337,16 @@ antes de tocar código. Cada línea lleva fecha.
 - La idempotencia evita duplicados, no limita: el tope lo pone `limitadorGlobal` (100 req/min por IP).
 
 **Revisar si** se suma un segundo usuario con `VENTAS_REGISTRAR`: incluir `usuarioId` en la huella, subiendo `VERSION_HUELLA` para que las ventas viejas sigan comparándose con la suya.
+
+## 2026-11-17 — La cotización de la tienda no informa lo que no está publicado
+
+**Decisión:** `POST /cotizar` es pública, así que sus avisos no distinguen una variante que no existe de una inactiva o de un producto despublicado: los tres dan `VARIANTE_INACTIVA`, sin el nombre del producto. El detalle (el motivo real y el nombre) lo pide solo la cotización del panel, con `detalleInterno: true` fijo en `CotizacionPanelService`.
+
+**Por qué:** probando ids, una persona sin sesión podía sacar los nombres de productos no lanzados y saber qué ids existen (hallazgo 1h, modelo de amenazas del 3f). Se cierra la diferencia observable en la respuesta HTTP. Puede quedar una diferencia de tiempo entre las consultas a la base; no se trata acá.
+
+**Riesgo aceptado (pendiente de confirmar con la dueña):** `AJUSTADO_POR_STOCK` sigue mostrando el stock exacto, hasta `TOPE_POR_VARIANTE` ("Nos quedan N unidades").
+
+- Beneficio: la clienta sabe cuánto puede comprar.
+- Riesgo: un tercero puede estimar el inventario con carritos grandes.
+
+**Revisar si** se suma una ruta pública nueva que use el cotizador: no tiene que pasar `detalleInterno` (lo controla `detalleInternoSoloPanel.test.js`).
