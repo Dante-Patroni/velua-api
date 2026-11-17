@@ -39,24 +39,19 @@ const textoONull = (valor) => {
 };
 
 /**
- * @description Arma la venta del panel tal como se va a guardar, a partir de los
- * datos ya validados por la ruta. Es la ÚNICA normalización: el mismo objeto sirve
- * para calcular la huella y para crear el pedido. Si fueran dos, la huella podría
- * describir una venta y el servicio guardar otra.
+ * @description Normaliza el carrito (ítems y entrega) de una venta del panel. Lo
+ * usan la venta y su cotización: las dos leen el carrito de la misma manera.
  *
- * - Textos sin espacios de los bordes; lo vacío o ausente, null.
- * - Email en minúsculas.
  * - Ítems ordenados por variante: el orden en que se cargaron no cambia la venta.
  * - Dirección y zona solo con envío. Con retiro o en mano, si vienen, es un error y
  *   no se descartan en silencio: no se guarda un domicilio que no hace falta.
- * - Total esperado con dos decimales, a partir de sus centavos.
  *
- * @param {Object} datos - Datos validados (matchedData) de la venta.
- * @returns {Object} La venta normalizada.
- * @throws {Error} DATOS_INVALIDOS si no hay datos, si el total no tiene forma de
- *   importe o si vienen una dirección o una zona sin envío.
+ * @param {Object} datos - Datos validados (matchedData).
+ * @returns {{items: Object[], entrega: Object}} El carrito normalizado.
+ * @throws {Error} DATOS_INVALIDOS si no hay datos o si vienen una dirección o una
+ *   zona sin envío.
  */
-const normalizarVenta = (datos) => {
+const normalizarCarrito = (datos) => {
   if (datos === null || typeof datos !== "object") {
     throw datosInvalidos({ venta: "Faltan los datos de la venta" });
   }
@@ -74,12 +69,6 @@ const normalizarVenta = (datos) => {
     items: (datos.items ?? [])
       .map((i) => ({ varianteId: Number(i.varianteId), cantidad: Number(i.cantidad) }))
       .sort((a, b) => a.varianteId - b.varianteId),
-    cliente: {
-      nombre: textoONull(datos.cliente?.nombre),
-      telefono: textoONull(datos.cliente?.telefono),
-      email: textoONull(datos.cliente?.email)?.toLowerCase() ?? null,
-      documento: textoONull(datos.cliente?.documento),
-    },
     entrega: {
       metodo: datos.entrega?.metodo ?? null,
       zonaEnvioId: envio ? Number(datos.entrega.zonaEnvioId) : null,
@@ -88,6 +77,37 @@ const normalizarVenta = (datos) => {
           ? Object.fromEntries(CAMPOS_DIRECCION.map((c) => [c, textoONull(direccion[c])]))
           : null,
     },
+  };
+};
+
+/**
+ * @description Arma la venta del panel tal como se va a guardar, a partir de los
+ * datos ya validados por la ruta. Es la ÚNICA normalización: el mismo objeto sirve
+ * para calcular la huella y para crear el pedido. Si fueran dos, la huella podría
+ * describir una venta y el servicio guardar otra. El carrito lo normaliza
+ * normalizarCarrito, el mismo que usa la cotización.
+ *
+ * - Textos sin espacios de los bordes; lo vacío o ausente, null.
+ * - Email en minúsculas.
+ * - Total esperado con dos decimales, a partir de sus centavos.
+ *
+ * @param {Object} datos - Datos validados (matchedData) de la venta.
+ * @returns {Object} La venta normalizada.
+ * @throws {Error} DATOS_INVALIDOS si no hay datos, si el total no tiene forma de
+ *   importe o si vienen una dirección o una zona sin envío.
+ */
+const normalizarVenta = (datos) => {
+  const { items, entrega } = normalizarCarrito(datos);
+
+  return {
+    items,
+    cliente: {
+      nombre: textoONull(datos.cliente?.nombre),
+      telefono: textoONull(datos.cliente?.telefono),
+      email: textoONull(datos.cliente?.email)?.toLowerCase() ?? null,
+      documento: textoONull(datos.cliente?.documento),
+    },
+    entrega,
     medioPago: datos.medioPago ?? null,
     cobradoEnEfectivo: datos.cobradoEnEfectivo === true,
     totalEsperado: aImporte(aCentavos(datos.totalEsperado)),
@@ -96,19 +116,17 @@ const normalizarVenta = (datos) => {
 };
 
 /**
- * @description Verifica las reglas de la venta del panel que dependen de más de un
- * campo. El formato de cada campo lo valida la ruta; esto es la segunda barrera, por
- * si el servicio se llama desde otro lado.
- * @param {Object} venta - Venta normalizada.
+ * @description Verifica los ítems de un carrito normalizado.
+ * @param {Object[]} items - Ítems normalizados.
  * @returns {void}
  * @throws {Error} DATOS_INVALIDOS con el campo.
  */
-const validarVentaPanel = (venta) => {
-  if (venta.items.length === 0) {
+const validarItems = (items) => {
+  if (items.length === 0) {
     throw datosInvalidos({ items: "Agregá al menos un producto" });
   }
   const vistas = new Set();
-  for (const { varianteId, cantidad } of venta.items) {
+  for (const { varianteId, cantidad } of items) {
     if (!Number.isInteger(varianteId) || varianteId < 1) {
       throw datosInvalidos({ items: "Hay una variante inválida" });
     }
@@ -120,6 +138,48 @@ const validarVentaPanel = (venta) => {
     }
     vistas.add(varianteId);
   }
+};
+
+/**
+ * @description Verifica el método de entrega y, con envío, la zona.
+ * @param {Object} entrega - Entrega normalizada.
+ * @returns {void}
+ * @throws {Error} DATOS_INVALIDOS con el campo.
+ */
+const validarEntrega = (entrega) => {
+  if (!ENTREGAS_PANEL.includes(entrega.metodo)) {
+    throw datosInvalidos({ "entrega.metodo": "Envío, retiro o en mano" });
+  }
+  if (
+    entrega.metodo === "envio" &&
+    (!Number.isInteger(entrega.zonaEnvioId) || entrega.zonaEnvioId < 1)
+  ) {
+    throw datosInvalidos({ "entrega.zonaEnvioId": "Elegí la zona de envío" });
+  }
+};
+
+/**
+ * @description Verifica un carrito normalizado: ítems y entrega. Lo usa la
+ * cotización; la venta usa las mismas dos funciones.
+ * @param {{items: Object[], entrega: Object}} carrito - Carrito normalizado.
+ * @returns {void}
+ * @throws {Error} DATOS_INVALIDOS con el campo.
+ */
+const validarCarrito = (carrito) => {
+  validarItems(carrito.items);
+  validarEntrega(carrito.entrega);
+};
+
+/**
+ * @description Verifica las reglas de la venta del panel que dependen de más de un
+ * campo. El formato de cada campo lo valida la ruta; esto es la segunda barrera, por
+ * si el servicio se llama desde otro lado.
+ * @param {Object} venta - Venta normalizada.
+ * @returns {void}
+ * @throws {Error} DATOS_INVALIDOS con el campo.
+ */
+const validarVentaPanel = (venta) => {
+  validarItems(venta.items);
   if (!venta.cliente.nombre || !venta.cliente.telefono) {
     throw datosInvalidos({ cliente: "Faltan el nombre o el teléfono" });
   }
@@ -129,13 +189,8 @@ const validarVentaPanel = (venta) => {
   if (venta.cobradoEnEfectivo && venta.medioPago !== "efectivo") {
     throw datosInvalidos({ cobradoEnEfectivo: "Solo con efectivo" });
   }
-  if (!ENTREGAS_PANEL.includes(venta.entrega.metodo)) {
-    throw datosInvalidos({ "entrega.metodo": "Envío, retiro o en mano" });
-  }
+  validarEntrega(venta.entrega);
   if (venta.entrega.metodo === "envio") {
-    if (!Number.isInteger(venta.entrega.zonaEnvioId) || venta.entrega.zonaEnvioId < 1) {
-      throw datosInvalidos({ "entrega.zonaEnvioId": "Elegí la zona de envío" });
-    }
     const d = venta.entrega.direccion ?? {};
     const faltan = ["calle", "numero", "ciudad", "provincia", "cp"].filter((c) => !d[c]);
     if (faltan.length > 0) {
@@ -199,6 +254,8 @@ const huellaDeVenta = (venta) => {
 };
 
 module.exports = {
+  normalizarCarrito,
+  validarCarrito,
   normalizarVenta,
   validarVentaPanel,
   normalizarClave,
