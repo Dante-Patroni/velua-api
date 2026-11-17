@@ -35,7 +35,8 @@
     "mercadopago": "^2.13.0",
     "multer": "^2.4.0",
     "mysql2": "^3.15.3",
-    "sequelize": "^6.37.7"
+    "sequelize": "^6.37.7",
+    "sequelize-cli": "^6.6.3"
   },
   "overrides": {
     "uuid": "^11.1.1"
@@ -50,7 +51,6 @@
     "newman": "^6.2.2",
     "nodemon": "^3.1.11",
     "prettier": "^3.7.4",
-    "sequelize-cli": "^6.6.3",
     "swagger-jsdoc": "^6.3.0",
     "swagger-ui-express": "^5.0.1",
     "wait-on": "^9.0.3"

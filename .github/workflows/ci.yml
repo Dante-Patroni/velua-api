@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
@@ -93,6 +96,142 @@ jobs:
       - name: Mostrar logs del servidor si falló
         if: failure()
         run: cat server.log
+
+      - name: Detener servidor
+        if: always()
+        run: |
+          if [ -f server.pid ]; then
+            kill $(cat server.pid) || true
+          fi
+
+  # Prueba la API con la instalación de producción: sin las dependencias de
+  # desarrollo, como queda la imagen de Railway cuando se poda. Migra con el usuario
+  # de migraciones y arranca con el de la aplicación, con los permisos de producción
+  # (PLAN.md) y claves ficticias. Sin seeds: las migraciones corren sobre una base vacía.
+  production-pruned:
+    runs-on: ubuntu-latest
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_DATABASE: velua_test
+      DB_MIGRATION_USERNAME: velua_migraciones
+      DB_MIGRATION_PASSWORD: clave-migraciones-solo-para-ci
+      DB_USERNAME: velua_app
+      DB_PASSWORD: clave-app-solo-para-ci
+      JWT_SECRET: secreto_solo_para_ci
+      CLOUDINARY_CLOUD_NAME: cuenta_de_prueba
+      CLOUDINARY_API_KEY: clave_de_prueba
+      CLOUDINARY_API_SECRET: secreto_de_prueba
+      PORT: 3000
+
+    services:
+      mysql:
+        # La misma versión que producción
+        image: mysql:9.7.2
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: velua_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "npm"
+
+      - name: Instalar solo las dependencias de producción
+        run: npm ci --omit=dev
+
+      - name: Las herramientas de desarrollo no están instaladas
+        # Compara contra las devDependencies del package.json: una nueva entra sola
+        # al control. Falla si alguna quedó instalada, también como transitiva.
+        run: |
+          node -e '
+            const fs = require("fs");
+            const dev = Object.keys(require("./package.json").devDependencies);
+            const presentes = dev.filter((p) => fs.existsSync(`node_modules/${p}`));
+            if (presentes.length > 0) {
+              console.log(`::error::En la instalación de producción: ${presentes.join(", ")}`);
+              process.exit(1);
+            }
+            console.log(`${dev.length} herramientas de desarrollo, ninguna instalada`);
+          '
+
+      - name: Auditoría de las dependencias de producción
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Esperar MySQL
+        run: |
+          until mysqladmin ping -h 127.0.0.1 --silent; do
+            echo 'Esperando MySQL...'
+            sleep 2
+          done
+
+      - name: Usuarios con los permisos de producción
+        run: |
+          mysql -h 127.0.0.1 -uroot -proot <<'SQL'
+          CREATE USER 'velua_migraciones'@'%' IDENTIFIED BY 'clave-migraciones-solo-para-ci';
+          GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, DROP, INDEX, REFERENCES
+            ON velua_test.* TO 'velua_migraciones'@'%';
+          CREATE USER 'velua_app'@'%' IDENTIFIED BY 'clave-app-solo-para-ci';
+          GRANT SELECT, INSERT, UPDATE, DELETE ON velua_test.* TO 'velua_app'@'%';
+          SQL
+
+      - name: La base empieza vacía
+        run: |
+          tablas=$(mysql -h 127.0.0.1 -uroot -proot -N -e \
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = 'velua_test'")
+          if [ "$tablas" != "0" ]; then
+            echo "::error::La base tenía $tablas tablas antes de migrar"
+            exit 1
+          fi
+
+      # Con --no, si el CLI no está instalado, falla en vez de descargarlo
+      - name: Migraciones con el usuario de migraciones
+        run: npx --no -- sequelize-cli db:migrate --env migraciones
+
+      - name: El usuario de la aplicación no puede cambiar el esquema
+        run: |
+          if mysql -h 127.0.0.1 -uvelua_app -pclave-app-solo-para-ci velua_test \
+            -e "CREATE TABLE intrusa (id INT)"; then
+            echo "::error::velua_app pudo crear una tabla"
+            exit 1
+          fi
+
+      - name: Arrancar en modo producción con el usuario de la aplicación
+        env:
+          NODE_ENV: production
+        run: |
+          node src/server.js > server-produccion.log 2>&1 &
+          echo $! > server.pid
+          for intento in $(seq 1 30); do
+            curl -sf http://127.0.0.1:3000/api/v1/salud > salud.json && exit 0
+            sleep 2
+          done
+          echo "::error::La API no respondió en modo producción"
+          exit 1
+
+      - name: Salud con la base conectada, y sin documentación
+        run: |
+          cat salud.json
+          grep -q '"entorno":"production"' salud.json
+          grep -q '"baseDatos":"conectada"' salud.json
+          docs=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api-docs)
+          if [ "$docs" != "404" ]; then
+            echo "::error::/api-docs respondió $docs en producción"
+            exit 1
+          fi
+
+      - name: Mostrar logs del servidor si falló
+        if: failure()
+        run: cat server-produccion.log
 
       - name: Detener servidor
         if: always()
