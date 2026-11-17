@@ -378,7 +378,16 @@ class CheckoutService {
       // la última unidad, esta encuentra el stock en 0 al pasar el bloqueo y falla
       // antes del INSERT (por ejemplo, CARRITO_SIN_ITEMS_VALIDOS). Por eso, ante
       // cualquier error, se vuelve a mirar la clave; si no hay venta, sigue el error.
-      const ganadora = await this.#ventaPrevia(clave, huella);
+      let ganadora;
+      try {
+        ganadora = await this.#ventaPrevia(clave, huella);
+      } catch (errorAlBuscar) {
+        // Si la clave se usó con otra venta, ese es el error que importa. Si la
+        // búsqueda falló por otra cosa, sigue el error original: es el que explica
+        // qué pasó, y no tiene que quedar tapado por el de la búsqueda.
+        if (errorAlBuscar.message === "CLAVE_REUTILIZADA") throw errorAlBuscar;
+        throw error;
+      }
       if (ganadora) return { creada: false, venta: ganadora };
       throw error;
     }

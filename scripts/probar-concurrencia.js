@@ -9,6 +9,11 @@
  * Después dispara varios "Ya transferí" al mismo tiempo sobre el pedido ganador y
  * verifica que quede un solo aviso: es la prueba real del bloqueo de registrarAviso.
  *
+ * Y las ventas del panel (POST /admin/ventas): una venta del panel y una compra de
+ * la tienda por la última unidad (gana una sola), y varios reintentos simultáneos
+ * de la misma venta, con la misma clave, por la última unidad (queda una sola
+ * venta y todos responden bien: uno 201 y el resto 200).
+ *
  * Requiere el servidor corriendo y un usuario administrador en la base.
  *
  *   node scripts/probar-concurrencia.js
@@ -16,6 +21,8 @@
  * Termina con código 1 si algo no se cumple, así puede correr en el CI.
  */
 require("dotenv").config();
+
+const { randomUUID } = require("crypto");
 
 const { exigirEntornoDeDesarrollo, exigirApiLocal } = require("../src/config/soloDesarrollo");
 
@@ -49,15 +56,16 @@ try {
 /**
  * @description Hace una petición JSON a la API.
  * @param {string} ruta - Ruta relativa a la base.
- * @param {Object} [opciones] - Método, cuerpo y cookie.
+ * @param {Object} [opciones] - Método, cuerpo, cookie y clave de idempotencia.
  * @returns {Promise<{status: number, cuerpo: *, respuesta: Response}>} Resultado.
  */
-const pedir = async (ruta, { method = "GET", body, cookie } = {}) => {
+const pedir = async (ruta, { method = "GET", body, cookie, clave } = {}) => {
   const respuesta = await fetch(`${BASE}${ruta}`, {
     method,
     headers: {
       ...(body ? { "Content-Type": "application/json" } : {}),
       ...(cookie ? { Cookie: cookie } : {}),
+      ...(clave ? { "Idempotency-Key": clave } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -112,6 +120,23 @@ const fijarStock = async (cookie, productoId, varianteId, stock) => {
 const leerStock = async (cookie, productoId, varianteId) => {
   const { cuerpo } = await pedir(`/admin/productos/${productoId}`, { cookie });
   return cuerpo.variantes.find((v) => v.id === varianteId).stock;
+};
+
+/**
+ * @description Cancela un pedido de prueba desde el panel, para que no quede
+ * apartando stock.
+ * @param {string} cookie - Cookie de sesión.
+ * @param {number} id - Id del pedido.
+ * @param {string} motivo - Motivo interno.
+ * @returns {Promise<void>}
+ */
+const cancelar = async (cookie, id, motivo) => {
+  const { status } = await pedir(`/admin/pedidos/${id}/cancelacion`, {
+    method: "POST",
+    body: { motivo, confirmaSinPago: true },
+    cookie,
+  });
+  if (status !== 200) throw new Error(`No se pudo cancelar el pedido ${id} (HTTP ${status})`);
 };
 
 (async () => {
@@ -233,8 +258,97 @@ const leerStock = async (cookie, productoId, varianteId) => {
     }
 
     console.log(`\n✓ ${SIMULTANEOS} avisos simultáneos dejaron un solo evento`);
+
+    // 8. Una venta del panel y una compra de la tienda por la última unidad
+    const venta = (n) => ({
+      items: [{ varianteId: v.id, cantidad: 1 }],
+      cliente: { nombre: `Concurrencia panel ${n}`, telefono: "358 400-0000" },
+      entrega: { metodo: "retiro" },
+      medioPago: MEDIO_PAGO,
+      totalEsperado: cotizacion.totales.total,
+    });
+
+    await fijarStock(cookie, ficha.id, v.id, 1);
+    console.log(
+      "\nDisparando una venta del panel y una compra de la tienda por la última unidad..."
+    );
+    const cruzados = await Promise.all([
+      pedir("/admin/ventas", { method: "POST", body: venta(1), cookie, clave: randomUUID() }),
+      pedir("/pedidos", { method: "POST", body: pedido(6) }),
+      pedir("/admin/ventas", { method: "POST", body: venta(2), cookie, clave: randomUUID() }),
+      pedir("/pedidos", { method: "POST", body: pedido(7) }),
+    ]);
+    cruzados.forEach((r, i) =>
+      console.log(
+        `  ${i % 2 === 0 ? "panel " : "tienda"}: HTTP ${r.status}  ${r.cuerpo?.numero ?? r.cuerpo?.error ?? ""}`
+      )
+    );
+
+    const ganadoresCruzados = cruzados.filter((r) => r.status === 201);
+    const rarosCruzados = cruzados.filter(
+      (r) => r.status !== 201 && !motivosValidos.includes(r.cuerpo?.error)
+    );
+    const stockCruzado = await leerStock(cookie, ficha.id, v.id);
+    if (ganadoresCruzados.length !== 1) {
+      throw new Error(
+        `Entre el panel y la tienda tenía que ganar uno y ganaron ${ganadoresCruzados.length}`
+      );
+    }
+    if (stockCruzado !== 0)
+      throw new Error(`El stock tenía que quedar en 0 y quedó en ${stockCruzado}`);
+    if (rarosCruzados.length > 0) {
+      throw new Error(
+        `Hubo rechazos por un motivo inesperado: ${rarosCruzados.map((r) => r.cuerpo?.error ?? r.status).join(", ")}`
+      );
+    }
+
+    const { cuerpo: listaCruzada } = await pedir("/admin/pedidos?limite=50", { cookie });
+    const ganadorCruzado = listaCruzada.datos.find(
+      (p) => p.numero === ganadoresCruzados[0].cuerpo.numero
+    );
+    await cancelar(cookie, ganadorCruzado.id, "Prueba de concurrencia entre el panel y la tienda");
+    console.log("\n✓ Entre el panel y la tienda ganó exactamente uno");
+
+    // 9. La misma venta del panel, con la misma clave, varias veces a la vez y por
+    // la última unidad: una sola venta, y ningún reintento responde un error
+    await fijarStock(cookie, ficha.id, v.id, 1);
+    const clave = randomUUID();
+    console.log(
+      `\nDisparando ${SIMULTANEOS} reintentos simultáneos de la misma venta del panel...`
+    );
+    const reintentos = await Promise.all(
+      Array.from({ length: SIMULTANEOS }, () =>
+        pedir("/admin/ventas", { method: "POST", body: venta(3), cookie, clave })
+      )
+    );
+    reintentos.forEach((r, i) =>
+      console.log(
+        `  reintento ${i + 1}: HTTP ${r.status}  ${r.cuerpo?.numero ?? r.cuerpo?.error ?? ""}`
+      )
+    );
+
+    const creadas = reintentos.filter((r) => r.status === 201);
+    const repetidas = reintentos.filter(
+      (r) => r.status === 200 && r.respuesta.headers.get("Idempotent-Replayed") === "true"
+    );
+    const numeros = new Set(reintentos.map((r) => r.cuerpo?.numero));
+    const stockReintentos = await leerStock(cookie, ficha.id, v.id);
+    if (creadas.length !== 1)
+      throw new Error(`Tenía que crearse una venta y se crearon ${creadas.length}`);
+    if (repetidas.length !== SIMULTANEOS - 1) {
+      throw new Error(
+        `Los otros ${SIMULTANEOS - 1} tenían que responder 200 como reintento y fueron ${repetidas.length}`
+      );
+    }
+    if (numeros.size !== 1) throw new Error("Los reintentos no devolvieron todos la misma venta");
+    if (stockReintentos !== 0) {
+      throw new Error(`El stock tenía que quedar en 0 y quedó en ${stockReintentos}`);
+    }
+
+    await cancelar(cookie, creadas[0].cuerpo.id, "Prueba de concurrencia de reintentos del panel");
+    console.log(`\n✓ ${SIMULTANEOS} reintentos simultáneos dejaron una sola venta`);
   } finally {
-    // 8. Siempre devolver el stock, pase lo que pase
+    // 10. Siempre devolver el stock, pase lo que pase
     await fijarStock(cookie, ficha.id, v.id, stockOriginal);
     console.log(`Stock restaurado a ${stockOriginal}`);
   }

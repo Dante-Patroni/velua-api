@@ -111,6 +111,7 @@ module.exports = {
     { name: "Carrito", description: "Cotizacion del carrito y zonas de envio" },
     { name: "Pedidos", description: "Creacion de pedidos y consulta publica de su estado" },
     { name: "Admin - Pedidos", description: "Consulta y gestión de pedidos desde el panel" },
+    { name: "Admin - Ventas", description: "Ventas en persona registradas desde el panel" },
   ],
   components: {
     parameters: {
@@ -1264,6 +1265,94 @@ module.exports = {
           motivo: { type: "string", enum: ["YA_CONFIRMADO"], description: "Solo cuando confirmado es false." },
         },
       },      
+      VentaPanelEntrada: {
+        type: "object",
+        required: ["items", "cliente", "entrega", "medioPago", "totalEsperado"],
+        description:
+          "No lleva precio ni usuario: el total lo calcula la API y el usuario sale de la sesión.",
+        properties: {
+          items: {
+            type: "array",
+            minItems: 1,
+            maxItems: 30,
+            description: "Sin variantes repetidas: una línea por variante.",
+            items: {
+              type: "object",
+              required: ["varianteId", "cantidad"],
+              properties: {
+                varianteId: { type: "integer", minimum: 1 },
+                cantidad: { type: "integer", minimum: 1 },
+              },
+            },
+          },
+          cliente: {
+            type: "object",
+            required: ["nombre", "telefono"],
+            properties: {
+              nombre: { type: "string", minLength: 2, maxLength: 140, example: "Lucía Fernández" },
+              telefono: { type: "string", minLength: 6, maxLength: 40, example: "358 412-3344" },
+              email: {
+                type: "string",
+                format: "email",
+                nullable: true,
+                maxLength: 180,
+                description: "Opcional. Sin email no se manda ningún mail.",
+              },
+              documento: { type: "string", nullable: true, maxLength: 20 },
+            },
+          },
+          entrega: {
+            type: "object",
+            required: ["metodo"],
+            description:
+              "Con envio, zonaEnvioId y la direccion completa son obligatorios. Con retiro o en_mano, mandar una zona o una direccion es un error.",
+            properties: {
+              metodo: { type: "string", enum: ["envio", "retiro", "en_mano"] },
+              zonaEnvioId: { type: "integer", nullable: true },
+              direccion: {
+                type: "object",
+                nullable: true,
+                properties: {
+                  calle: { type: "string", maxLength: 180 },
+                  numero: { type: "string", maxLength: 20 },
+                  extra: { type: "string", nullable: true, maxLength: 120 },
+                  ciudad: { type: "string", maxLength: 120 },
+                  provincia: { type: "string", maxLength: 80 },
+                  cp: { type: "string", maxLength: 20 },
+                },
+              },
+            },
+          },
+          medioPago: { type: "string", enum: ["efectivo", "transferencia"] },
+          cobradoEnEfectivo: {
+            type: "boolean",
+            description:
+              "Solo los booleanos true o false. Con true (solo con efectivo), el pago nace aprobado. Sin el campo o con false, queda pendiente.",
+          },
+          totalEsperado: {
+            type: "string",
+            description:
+              "El total que mostró la cotización. Si no coincide con el real, se rechaza con TOTAL_CAMBIO.",
+            example: "15300.00",
+          },
+          notas: { type: "string", nullable: true, maxLength: 500 },
+        },
+      },
+      VentaPanelResultado: {
+        type: "object",
+        required: ["id", "numero", "total", "estadoPago", "medioPago"],
+        properties: {
+          id: { type: "integer", example: 42 },
+          numero: { type: "string", example: "VEL-4K7Q2X" },
+          total: { type: "string", example: "15300.00" },
+          estadoPago: {
+            type: "string",
+            description: "En un reintento, el estado actual del pedido.",
+            example: "aprobado",
+          },
+          medioPago: { type: "string", enum: ["efectivo", "transferencia"] },
+        },
+      },
       CancelacionResultado: {
         type: "object",
         required: ["cancelado", "numero"],

@@ -19,7 +19,7 @@ describe("permisos", () => {
     expect(operador).not.toContain(PERMISOS.PEDIDOS_CANCELAR);
   });
 
-  test("el operador no toca dinero, usuarios ni borrados", () => {
+  test("el operador no toca dinero, usuarios, borrados ni ventas", () => {
     const operador = permisosDeRol("operador");
 
     for (const permiso of [
@@ -27,6 +27,7 @@ describe("permisos", () => {
       PERMISOS.PAGOS_DEVOLVER,
       PERMISOS.USUARIOS_GESTIONAR,
       PERMISOS.CATALOGO_BORRAR,
+      PERMISOS.VENTAS_REGISTRAR,
     ]) {
       expect(operador).not.toContain(permiso);
     }

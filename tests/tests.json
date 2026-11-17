@@ -6591,6 +6591,1022 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Admin - Ventas",
+      "description": "Ventas en persona registradas desde el panel (t27). Usa la variante y el total del grupo Pedidos.",
+      "item": [
+        {
+          "name": "POST /admin/ventas sin sesion",
+          "protocolProfileBehavior": {
+            "disableCookies": true
+          },
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "description": "Genera la clave de idempotencia del grupo: un UUID por venta, que se repite en los reintentos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('venta_clave', pm.variables.replaceIn('{{$guid}}'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login (ventas del panel)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{admin_email}}\",\"password\":\"{{admin_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('El admin tiene VENTAS_REGISTRAR', () => pm.expect(pm.response.json().permisos).to.include('VENTAS_REGISTRAR'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas sin Idempotency-Key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));",
+                  "pm.test('Señala idempotency-key', () => pm.expect(pm.response.json().details).to.have.property('idempotency-key'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas con una clave que no es un UUID",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "venta-1"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala idempotency-key', () => pm.expect(pm.response.json().details).to.have.property('idempotency-key'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas con cobradoEnEfectivo como texto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"efectivo\",\n  \"totalEsperado\": \"{{ped_total}}\",\n  \"cobradoEnEfectivo\": \"true\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala cobradoEnEfectivo', () => pm.expect(pm.response.json().details).to.have.property('cobradoEnEfectivo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas cobrada en efectivo con transferencia",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\",\n  \"cobradoEnEfectivo\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Devuelve DATOS_INVALIDOS', () => pm.expect(pm.response.json().error).to.eql('DATOS_INVALIDOS'));",
+                  "pm.test('Señala cobradoEnEfectivo', () => pm.expect(pm.response.json().details).to.have.property('cobradoEnEfectivo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas con direccion y retiro",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\", \"direccion\": { \"calle\": \"Sobremonte\", \"numero\": \"1200\", \"ciudad\": \"Río Cuarto\", \"provincia\": \"Córdoba\", \"cp\": \"5800\" } },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala entrega.direccion', () => pm.expect(pm.response.json().details).to.have.property('entrega.direccion'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas con Mercado Pago",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"mercadopago\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala medioPago', () => pm.expect(pm.response.json().details).to.have.property('medioPago'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas con una variante repetida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }, { \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Señala items', () => pm.expect(pm.response.json().details).to.have.property('items'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas con otro total",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"1.00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Devuelve TOTAL_CAMBIO', () => pm.expect(pm.response.json().error).to.eql('TOTAL_CAMBIO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock antes de la venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{ped_producto_id}}"
+              ]
+            },
+            "description": "Ninguno de los pedidos rechazados de arriba tiene que haber tocado el stock."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "const original = Number(pm.collectionVariables.get('ped_stock_original'));",
+                  "pm.test('Los rechazos no descontaron stock', () => pm.expect(v.stock).to.eql(original + 0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas (transferencia, retiro)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "description": "Los campos de más (precio, usuarioId, canal) no se usan: solo llega al servicio lo validado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\",\n  \"precio\": \"1.00\",\n  \"usuarioId\": 999999,\n  \"canal\": \"tienda\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const v = pm.response.json();",
+                  "pm.test('Devuelve id, numero, total, estadoPago y medioPago', () => pm.expect(v).to.have.all.keys('id', 'numero', 'total', 'estadoPago', 'medioPago'));",
+                  "pm.test('Queda pendiente, por transferencia', () => { pm.expect(v.estadoPago).to.eql('pendiente'); pm.expect(v.medioPago).to.eql('transferencia'); });",
+                  "pm.test('El total lo calcula la API, no el precio del cuerpo', () => pm.expect(v.total).to.eql(pm.collectionVariables.get('ped_total')));",
+                  "pm.test('No es un reintento', () => pm.expect(pm.response.headers.has('Idempotent-Replayed')).to.eql(false));",
+                  "pm.collectionVariables.set('venta_id', v.id);",
+                  "pm.collectionVariables.set('venta_numero', v.numero);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas reintento (misma clave, misma venta)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave_mayusculas}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "description": "La misma clave, en mayúsculas: un UUID es el mismo valor.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('venta_clave_mayusculas', pm.collectionVariables.get('venta_clave').toUpperCase());"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const v = pm.response.json();",
+                  "pm.test('Devuelve la venta original', () => { pm.expect(v.id).to.eql(Number(pm.collectionVariables.get('venta_id'))); pm.expect(v.numero).to.eql(pm.collectionVariables.get('venta_numero')); });",
+                  "pm.test('Avisa que es un reintento', () => pm.expect(pm.response.headers.get('Idempotent-Replayed')).to.eql('true'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas misma clave con otra venta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\",\n  \"notas\": \"Otra venta\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Devuelve CLAVE_REUTILIZADA', () => pm.expect(pm.response.json().error).to.eql('CLAVE_REUTILIZADA'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock despues de la venta y los reintentos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{ped_producto_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "const original = Number(pm.collectionVariables.get('ped_stock_original'));",
+                  "pm.test('Descontó una sola unidad', () => pm.expect(v.stock).to.eql(original - 1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/pedidos/{id} de la venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{venta_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{venta_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const p = pm.response.json();",
+                  "pm.test('Es la venta registrada', () => pm.expect(p.numero).to.eql(pm.collectionVariables.get('venta_numero')));",
+                  "pm.test('No vence sola', () => pm.expect(p.expiraEn).to.eql(null));",
+                  "pm.test('Sin email', () => pm.expect(p.cliente.email).to.eql(null));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST cancelacion de la venta (restaura el stock)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/pedidos/{{venta_id}}/cancelacion",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "pedidos",
+                "{{venta_id}}",
+                "cancelacion"
+              ]
+            },
+            "description": "Para que correr Newman muchas veces no cambie el catalogo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\"motivo\": \"Prueba Newman de venta del panel\", \"confirmaSinPago\": true}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cancela la venta', () => pm.expect(pm.response.json()).to.eql({ cancelado: true, numero: pm.collectionVariables.get('venta_numero') }));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET stock despues de cancelar la venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos/{{ped_producto_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "productos",
+                "{{ped_producto_id}}"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const id = Number(pm.collectionVariables.get('ped_variante_id'));",
+                  "const v = pm.response.json().variantes.find((x) => x.id === id);",
+                  "const original = Number(pm.collectionVariables.get('ped_stock_original'));",
+                  "pm.test('El stock volvió al original', () => pm.expect(v.stock).to.eql(original + 0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas reintento de una venta cancelada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{venta_clave}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "description": "Un reintento nunca crea otra venta, aunque la original se haya cancelado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve el estado actual', () => pm.expect(pm.response.json().estadoPago).to.eql('cancelado'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (ventas del panel)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cierra la sesión', () => pm.expect(pm.response.code).to.be.oneOf([200, 204]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/login (operador, ventas)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"email\":\"{{operador_email}}\",\"password\":\"{{operador_password}}\"}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('El operador no tiene VENTAS_REGISTRAR', () => pm.expect(pm.response.json().permisos).to.not.include('VENTAS_REGISTRAR'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /admin/ventas como operador",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/ventas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "admin",
+                "ventas"
+              ]
+            },
+            "description": "Directo a la API con la sesión del operador: el control es el 403, no que el panel esconda el botón.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [{ \"varianteId\": {{ped_variante_id}}, \"cantidad\": 1 }],\n  \"cliente\": { \"nombre\": \"Prueba Newman Venta\", \"telefono\": \"358 400-0000\" },\n  \"entrega\": { \"metodo\": \"retiro\" },\n  \"medioPago\": \"transferencia\",\n  \"totalEsperado\": \"{{ped_total}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Devuelve SIN_PERMISO', () => pm.expect(pm.response.json().error).to.eql('SIN_PERMISO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /auth/logout (operador, ventas)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Cierra la sesión', () => pm.expect(pm.response.code).to.be.oneOf([200, 204]));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
@@ -6696,6 +7712,22 @@
     },
     {
       "key": "arr_codigo",
+      "value": ""
+    },
+    {
+      "key": "venta_clave",
+      "value": ""
+    },
+    {
+      "key": "venta_clave_mayusculas",
+      "value": ""
+    },
+    {
+      "key": "venta_id",
+      "value": ""
+    },
+    {
+      "key": "venta_numero",
       "value": ""
     }
   ]

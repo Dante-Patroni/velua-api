@@ -40,6 +40,7 @@ app.use("/api/v1", require("./routes/webhookRoutes"));
 app.use("/api/v1", require("./routes/arrepentimientoRoutes"));
 app.use("/api/v1", require("./routes/adminArrepentimientosRoutes"));
 app.use("/api/v1", require("./routes/adminPedidosRoutes"));
+app.use("/api/v1", require("./routes/adminVentasRoutes"));
 
 /**
  * @openapi

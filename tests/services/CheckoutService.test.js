@@ -988,6 +988,16 @@ describe("registrarVentaDelPanel", () => {
       expect(repo.buscarPorClaveVenta).toHaveBeenCalledTimes(2);
     });
 
+    it("si la segunda búsqueda de la clave falla, sigue el error original", async () => {
+      const repo = crearRepositorio();
+      repo.tx.crearPedido.mockRejectedValueOnce(new Error("ER_LOCK_DEADLOCK"));
+      repo.buscarPorClaveVenta
+        .mockResolvedValueOnce(null)
+        .mockRejectedValueOnce(new Error("ER_CONEXION_PERDIDA"));
+
+      await expect(registrar(repo)).rejects.toThrow("ER_LOCK_DEADLOCK");
+    });
+
     it("sin stock y sin venta con esa clave, sigue siendo un carrito sin ítems válidos", async () => {
       const repo = crearRepositorio({ variantes: [variante({ stock: 0 })] });
 
