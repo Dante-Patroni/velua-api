@@ -248,6 +248,28 @@ describe("CheckoutService", () => {
   });
 
   describe("nunca cobrar algo distinto de lo que la clienta vio", () => {
+    // Los avisos públicos ya no distinguen "no existe" de "no está publicado", pero
+    // el checkout solo mira si hay avisos: los dos casos siguen rechazándose.
+    it.each([
+      ["una variante que no existe", [variante()]],
+      ["una variante inactiva", [variante(), variante({ id: 2, activa: false })]],
+    ])("rechaza un carrito con %s, sin dejar nada", async (_caso, variantes) => {
+      const repo = crearRepositorio({ variantes });
+
+      await expect(
+        servicioCon(repo).crearPedido(
+          entrada({
+            items: [
+              { varianteId: 1, cantidad: 1 },
+              { varianteId: 2, cantidad: 1 },
+            ],
+          })
+        )
+      ).rejects.toThrow("CARRITO_DESACTUALIZADO");
+
+      expect(repo.estado.pedidos).toHaveLength(0);
+    });
+
     it("rechaza si el carrito cambió, sin dejar nada", async () => {
       // Pide 5 y hay 3: el cotizador ajustaria y avisaria, el checkout rechaza
       const repo = crearRepositorio({ variantes: [variante({ stock: 3 })] });
