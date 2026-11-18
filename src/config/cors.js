@@ -28,4 +28,23 @@ const leerConfigCors = (env = process.env) => ({
   patron: env.CORS_PATRON_PREVIEWS ? new RegExp(env.CORS_PATRON_PREVIEWS) : null,
 });
 
-module.exports = { crearValidadorOrigen, leerConfigCors };
+/**
+ * Encabezados propios que el navegador puede leer en una respuesta de otro origen.
+ * Sin esta lista, el panel (veluanature.com.ar) no ve Idempotent-Replayed de la API
+ * (api.veluanature.com.ar), aunque la API lo mande.
+ */
+const ENCABEZADOS_EXPUESTOS = Object.freeze(["Idempotent-Replayed"]);
+
+/**
+ * @description Opciones del paquete cors para la API: orígenes permitidos, cookies
+ * de sesión y los encabezados propios que el navegador puede leer.
+ * @param {object} config - Configuración de CORS (leerConfigCors).
+ * @returns {object} Opciones para cors().
+ */
+const crearOpcionesCors = (config) => ({
+  origin: crearValidadorOrigen(config),
+  credentials: true,
+  exposedHeaders: [...ENCABEZADOS_EXPUESTOS],
+});
+
+module.exports = { crearValidadorOrigen, leerConfigCors, crearOpcionesCors, ENCABEZADOS_EXPUESTOS };

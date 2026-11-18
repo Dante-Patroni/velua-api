@@ -1,4 +1,10 @@
-const { crearValidadorOrigen, leerConfigCors } = require("../../src/config/cors");
+const express = require("express");
+const cors = require("cors");
+const {
+  crearValidadorOrigen,
+  leerConfigCors,
+  crearOpcionesCors,
+} = require("../../src/config/cors");
 
 const PRODUCCION = "https://veluanature.com.ar";
 const PATRON = /^https:\/\/velua-web-[a-z0-9-]+-dante-patroni\.vercel\.app$/;
@@ -83,5 +89,38 @@ describe("leerConfigCors", () => {
 
   it("tira error al arrancar si el patrón está mal escrito", () => {
     expect(() => leerConfigCors({ CORS_PATRON_PREVIEWS: "^https://(" })).toThrow();
+  });
+});
+
+describe("crearOpcionesCors", () => {
+  // Una app mínima con las mismas opciones que la API: el navegador solo puede leer
+  // un encabezado propio de otro origen si viene en Access-Control-Expose-Headers.
+  let servidor;
+  let base;
+
+  beforeAll(async () => {
+    const app = express();
+    app.use(cors(crearOpcionesCors({ origenes: [PRODUCCION] })));
+    app.get("/venta", (_req, res) => res.set("Idempotent-Replayed", "true").json({ ok: true }));
+    await new Promise((listo) => {
+      servidor = app.listen(0, "127.0.0.1", listo);
+    });
+    base = `http://127.0.0.1:${servidor.address().port}`;
+  });
+
+  afterAll(() => new Promise((listo) => servidor.close(listo)));
+
+  test("expone Idempotent-Replayed y manda las cookies de sesión", async () => {
+    const res = await fetch(`${base}/venta`, { headers: { Origin: PRODUCCION } });
+
+    expect(res.headers.get("access-control-allow-origin")).toBe(PRODUCCION);
+    expect(res.headers.get("access-control-allow-credentials")).toBe("true");
+    expect(res.headers.get("access-control-expose-headers")).toBe("Idempotent-Replayed");
+  });
+
+  test("un origen no permitido sigue rechazado", async () => {
+    const res = await fetch(`${base}/venta`, { headers: { Origin: "https://otro.example" } });
+
+    expect(res.headers.get("access-control-allow-origin")).toBeNull();
   });
 });
