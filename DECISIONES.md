@@ -348,5 +348,7 @@ antes de tocar código. Cada línea lleva fecha.
 
 - Beneficio: la clienta sabe cuánto puede comprar.
 - Riesgo: un tercero puede estimar el inventario con carritos grandes.
+- Alcance: solo de variantes publicadas y activas. Las inexistentes, inactivas o de productos despublicados se descartan antes de mirar el stock.
+- La confirmación de la dueña se anota acá, con la fecha, cuando llegue.
 
 **Revisar si** se suma una ruta pública nueva que use el cotizador: no tiene que pasar `detalleInterno` (lo controla `detalleInternoSoloPanel.test.js`).
