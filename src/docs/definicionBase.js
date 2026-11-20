@@ -62,10 +62,18 @@ const CAMPOS_PEDIDO_PANEL = {
     example: "Lucía Fernández",
   },
   total: { type: "string", description: "Cadena decimal. No operar en el frontend.", example: "23500.00" },
-  medioPago: { type: "string", enum: ["mercadopago", "transferencia"] },
+  medioPago: {
+    type: "string",
+    enum: ["mercadopago", "transferencia", "efectivo"],
+    description: "efectivo: solo en ventas registradas desde el panel.",
+  },
   estadoPago: { $ref: "#/components/schemas/EstadoPago" },
   estadoPedido: { $ref: "#/components/schemas/EstadoPedido" },
-  metodoEntrega: { type: "string", enum: ["envio", "retiro"] },
+  metodoEntrega: {
+    type: "string",
+    enum: ["envio", "retiro", "en_mano"],
+    description: "en_mano: solo en ventas registradas desde el panel.",
+  },
   expiraEn: {
     type: "string",
     format: "date-time",
@@ -1010,8 +1018,16 @@ module.exports = {
             type: "string",
             enum: ["nuevo", "en_preparacion", "enviado", "entregado", "cancelado"],
           },
-          medioPago: { type: "string", enum: ["mercadopago", "transferencia"] },
-          metodoEntrega: { type: "string", enum: ["envio", "retiro"] },
+          medioPago: {
+            type: "string",
+            enum: ["mercadopago", "transferencia", "efectivo"],
+            description: "efectivo: solo en ventas registradas desde el panel.",
+          },
+          metodoEntrega: {
+            type: "string",
+            enum: ["envio", "retiro", "en_mano"],
+            description: "en_mano: solo en ventas registradas desde el panel.",
+          },
           expiraEn: { type: "string", format: "date-time", nullable: true },
           comprobanteInformado: { type: "boolean" },
           seguimiento: { type: "string", nullable: true },
@@ -1087,7 +1103,12 @@ module.exports = {
             required: ["nombre", "email", "telefono", "documento"],
             properties: {
               nombre: { type: "string" },
-              email: { type: "string", format: "email" },
+              email: {
+                type: "string",
+                format: "email",
+                nullable: true,
+                description: "Null en una venta del panel sin email: mostrar \"Sin email\".",
+              },
               telefono: { type: "string" },
               documento: { type: "string", nullable: true },
             },
@@ -1096,12 +1117,17 @@ module.exports = {
             type: "object",
             required: ["metodo", "zona", "direccion", "seguimiento"],
             properties: {
-              metodo: { type: "string", enum: ["envio", "retiro"] },
-              zona: { type: "string", nullable: true, description: "Nombre de la zona. Null si es para retirar." },
+              metodo: { type: "string", enum: ["envio", "retiro", "en_mano"] },
+              zona: {
+                type: "string",
+                nullable: true,
+                description: "Nombre de la zona. Null si es para retirar o en mano.",
+              },
               direccion: {
                 type: "object",
                 nullable: true,
-                description: "Null si es para retirar. La base no exige cada campo: mostrar un guion si alguno falta.",
+                description:
+                  "Null si es para retirar o en mano. La base no exige cada campo: mostrar un guion si alguno falta.",
                 required: ["calle", "numero", "extra", "ciudad", "provincia", "cp"],
                 properties: {
                   calle: { type: "string", nullable: true },

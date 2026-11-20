@@ -1622,15 +1622,19 @@
             "type": "string",
             "enum": [
               "mercadopago",
-              "transferencia"
-            ]
+              "transferencia",
+              "efectivo"
+            ],
+            "description": "efectivo: solo en ventas registradas desde el panel."
           },
           "metodoEntrega": {
             "type": "string",
             "enum": [
               "envio",
-              "retiro"
-            ]
+              "retiro",
+              "en_mano"
+            ],
+            "description": "en_mano: solo en ventas registradas desde el panel."
           },
           "expiraEn": {
             "type": "string",
@@ -1771,8 +1775,10 @@
             "type": "string",
             "enum": [
               "mercadopago",
-              "transferencia"
-            ]
+              "transferencia",
+              "efectivo"
+            ],
+            "description": "efectivo: solo en ventas registradas desde el panel."
           },
           "estadoPago": {
             "$ref": "#/components/schemas/EstadoPago"
@@ -1784,8 +1790,10 @@
             "type": "string",
             "enum": [
               "envio",
-              "retiro"
-            ]
+              "retiro",
+              "en_mano"
+            ],
+            "description": "en_mano: solo en ventas registradas desde el panel."
           },
           "expiraEn": {
             "type": "string",
@@ -1845,8 +1853,10 @@
             "type": "string",
             "enum": [
               "mercadopago",
-              "transferencia"
-            ]
+              "transferencia",
+              "efectivo"
+            ],
+            "description": "efectivo: solo en ventas registradas desde el panel."
           },
           "estadoPago": {
             "$ref": "#/components/schemas/EstadoPago"
@@ -1858,8 +1868,10 @@
             "type": "string",
             "enum": [
               "envio",
-              "retiro"
-            ]
+              "retiro",
+              "en_mano"
+            ],
+            "description": "en_mano: solo en ventas registradas desde el panel."
           },
           "expiraEn": {
             "type": "string",
@@ -1881,7 +1893,9 @@
               },
               "email": {
                 "type": "string",
-                "format": "email"
+                "format": "email",
+                "nullable": true,
+                "description": "Null en una venta del panel sin email: mostrar \"Sin email\"."
               },
               "telefono": {
                 "type": "string"
@@ -1905,18 +1919,19 @@
                 "type": "string",
                 "enum": [
                   "envio",
-                  "retiro"
+                  "retiro",
+                  "en_mano"
                 ]
               },
               "zona": {
                 "type": "string",
                 "nullable": true,
-                "description": "Nombre de la zona. Null si es para retirar."
+                "description": "Nombre de la zona. Null si es para retirar o en mano."
               },
               "direccion": {
                 "type": "object",
                 "nullable": true,
-                "description": "Null si es para retirar. La base no exige cada campo: mostrar un guion si alguno falta.",
+                "description": "Null si es para retirar o en mano. La base no exige cada campo: mostrar un guion si alguno falta.",
                 "required": [
                   "calle",
                   "numero",

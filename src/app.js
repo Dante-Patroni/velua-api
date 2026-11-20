@@ -1,7 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const { crearValidadorOrigen, leerConfigCors } = require("./config/cors");
+const { crearOpcionesCors, leerConfigCors } = require("./config/cors");
 const cookieParser = require("cookie-parser");
 const { limitadorGlobal } = require("./middlewares/rateLimitMiddleware");
 const { normalizarUnicode } = require("./middlewares/normalizarUnicode");
@@ -15,7 +15,7 @@ app.set("trust proxy", leerSaltosProxy(process.env.TRUST_PROXY_SALTOS));
 // Primero de todo: así también quedan registradas las peticiones que rechazan CORS o el JSON.
 app.use(registroPeticiones);
 
-app.use(cors({ origin: crearValidadorOrigen(leerConfigCors()), credentials: true }));
+app.use(cors(crearOpcionesCors(leerConfigCors())));
 
 app.use(express.json({ limit: "1mb" }));
 app.use(normalizarUnicode);
