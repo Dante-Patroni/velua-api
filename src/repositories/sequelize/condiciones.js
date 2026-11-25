@@ -41,9 +41,12 @@ const padreActivo = (alias) => {
  * la inyección (comillas), pero no los comodines: sin esto, buscar `%` devuelve
  * todo y `_` coincide con cualquier carácter.
  *
- * Supone que el servidor no usa `NO_BACKSLASH_ESCAPES` en `sql_mode` (el modo
- * por defecto de MySQL no lo incluye). Con ese modo, la barra no escaparía y las
- * búsquedas con `%`, `_` o `\` no encontrarían nada: falla cerrado, nunca de más.
+ * Supone, como todo el escape de Sequelize en MySQL, que el servidor no usa
+ * `NO_BACKSLASH_ESCAPES` en `sql_mode` (el modo por defecto no lo incluye). Con
+ * ese modo la barra invertida deja de escapar, y no solo fallarían estas
+ * búsquedas: las comillas que Sequelize escapa como `\'` cerrarían el texto en
+ * cualquier consulta de la API, también en los `replacements`. Es una condición
+ * de toda la API, no de esta función.
  *
  * @param {string} texto - Texto que escribió la persona.
  * @returns {string} El texto con `\`, `%` y `_` escapados.
