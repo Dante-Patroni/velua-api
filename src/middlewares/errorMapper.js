@@ -72,6 +72,30 @@ const ERRORES_DEL_PARSER = {
 };
 
 /**
+ * @description Errores del cliente que arma Express antes de llegar a un controller,
+ * como una URL con una secuencia `%` mal codificada. Se reconocen por su origen,
+ * nunca solo por traer un status 4xx: un error de un SDK con `status: 401` (por
+ * ejemplo, una credencial nuestra vencida) es una falla del servidor, y tratarlo
+ * como del cliente lo escondería del log de errores internos (falla abierto).
+ *
+ * Se aceptan dos orígenes:
+ * - el `URIError` con status 400 del router de Express ("Failed to decode param");
+ * - un error con `expose === true`, la marca de `http-errors`. Es confiable porque,
+ *   al 21/11/2026, `http-errors` solo entra a producción por Express (`npm ls
+ *   http-errors --omit=dev`). Lo verifica `errorMapper.cliente.test.js`: si una
+ *   dependencia nueva la trae, el test falla y hay que revisar esta decisión.
+ * @param {Error|undefined|null} error - Error recibido.
+ * @returns {number|null} El status 4xx si el error es del cliente y de origen conocido; si no, null.
+ */
+function statusDeErrorDelCliente(error) {
+  if (!error) return null;
+  const status = error.status ?? error.statusCode;
+  if (!Number.isInteger(status) || status < 400 || status > 499) return null;
+  if (error instanceof URIError) return status === 400 ? 400 : null;
+  return error.expose === true ? status : null;
+}
+
+/**
  * @description Obtiene un codigo de dominio estable a partir de un error recibido.
  * @param {Error|undefined|null} error - Error original lanzado por service, repository o middleware.
  * @returns {string} Codigo de dominio normalizado.
@@ -103,6 +127,15 @@ function obtenerCodigoError(error) {
 function manejarErrorHttp(error, res) {
   const codigo = obtenerCodigoError(error);
   const status = ERROR_HTTP_MAP[codigo] || 500;
+
+  const statusCliente = status === 500 ? statusDeErrorDelCliente(error) : null;
+  if (statusCliente) {
+    // Sin console.error: no es una falla nuestra, y si no, cualquiera llena el log de
+    // errores internos con URLs mal escritas. Queda en el registro de peticiones (una
+    // línea con el status y el código, sin la URL ni el mensaje), y ahí se ve un pico.
+    if (res.locals) res.locals.codigoError = "SOLICITUD_INVALIDA";
+    return res.status(statusCliente).json({ error: "SOLICITUD_INVALIDA" });
+  }
 
   // Para el registro de peticiones: el código de error, nunca el mensaje ni el detalle.
   if (res.locals) {
