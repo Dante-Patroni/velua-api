@@ -97,7 +97,7 @@ jobs:
         run: node scripts/probar-aviso-contra-vencimiento.js
 
       - name: Guarda del sql_mode con MySQL real
-        run: node scripts/probar-sql-mode.js        
+        run: node scripts/probar-sql-mode.js
 
       - name: Mostrar logs del servidor si falló
         if: failure()
