@@ -1,7 +1,12 @@
 require("dotenv").config();
+const { verificarSqlMode } = require("./sqlMode");
 
 const base = {
   dialect: "mysql",
+  // Cada conexión nueva verifica que el sql_mode no anule el escape de Sequelize
+  // (NO_BACKSLASH_ESCAPES). Va en la base para que la hereden la API, la CLI de
+  // migraciones y los scripts: todos arman su instancia desde esta configuración.
+  hooks: { afterConnect: verificarSqlMode },
   seederStorage: "sequelize",
   seederStorageTableName: "SequelizeData",
   define: { underscored: true, timestamps: false },
