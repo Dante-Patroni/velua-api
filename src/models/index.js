@@ -3,6 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 const Sequelize = require("sequelize");
+const { instalarGuardaSqlMode } = require("../config/sqlMode");
 
 const basename = path.basename(__filename);
 const env = process.env.NODE_ENV || "development";
@@ -16,6 +17,10 @@ if (config.use_env_variable) {
 } else {
   sequelize = new Sequelize(config.database, config.username, config.password, config);
 }
+
+// Antes de cualquier consulta: cada conexión nueva verifica que el sql_mode no anule
+// el escape de Sequelize (NO_BACKSLASH_ESCAPES). Ver src/config/sqlMode.js.
+instalarGuardaSqlMode(sequelize);
 
 fs.readdirSync(__dirname)
   .filter(
