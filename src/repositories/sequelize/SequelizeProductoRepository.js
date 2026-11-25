@@ -1,5 +1,6 @@
 const { Op, literal } = require("sequelize");
 const ProductoRepository = require("../ProductoRepository");
+const { contiene } = require("./condiciones");
 
 /**
  * @description Subconsultas que resumen las variantes y las imágenes de cada
@@ -69,8 +70,8 @@ class SequelizeProductoRepository extends ProductoRepository {
     if (filtros.categoriaId) where.categoriaId = filtros.categoriaId;
     if (filtros.q) {
       where[Op.or] = [
-        { nombre: { [Op.like]: `%${filtros.q}%` } },
-        { slug: { [Op.like]: `%${filtros.q}%` } },
+        { nombre: { [Op.like]: contiene(filtros.q) } },
+        { slug: { [Op.like]: contiene(filtros.q) } },
       ];
     }
 
