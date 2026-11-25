@@ -1,21 +1,6 @@
 const { Op, literal } = require("sequelize");
 const CatalogoRepository = require("../CatalogoRepository");
-
-/**
- * @description Condición que exige que la categoría padre, si existe, esté activa.
- *
- * Desactivar una categoría oculta todo lo que cuelga de ella: sus productos y
- * también sus hijas, con los productos de cada una. Sin esta condición, apagar
- * "Jabones" dejaría visibles sus tres colecciones.
- *
- * @param {string} alias - Alias de la tabla de categorías en la consulta.
- * @returns {Object} Literal de Sequelize para usar dentro de un where.
- */
-const padreActivo = (alias) =>
-  literal(
-    `(\`${alias}\`.\`padre_id\` IS NULL OR EXISTS (` +
-      `SELECT 1 FROM categorias p WHERE p.id = \`${alias}\`.\`padre_id\` AND p.activa = 1))`
-  );
+const { padreActivo, contiene } = require("./condiciones");
 
 /** Campos de la categoría que necesita el catálogo. */
 const ATRIBUTOS_CATEGORIA = ["id", "padreId", "nombre", "slug", "descripcion", "imagenUrl"];
@@ -73,8 +58,8 @@ class SequelizeCatalogoRepository extends CatalogoRepository {
     }
     if (filtros.q) {
       whereProducto[Op.or] = [
-        { nombre: { [Op.like]: `%${filtros.q}%` } },
-        { descripcionCorta: { [Op.like]: `%${filtros.q}%` } },
+        { nombre: { [Op.like]: contiene(filtros.q) } },
+        { descripcionCorta: { [Op.like]: contiene(filtros.q) } },
       ];
     }
 

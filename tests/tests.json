@@ -233,6 +233,70 @@
           ]
         },
         {
+          "name": "GET /productos?q=% (comod\u00edn escapado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?q=%25",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "%25"
+                }
+              ]
+            },
+            "description": "Buscar % busca el carácter %, no todo el catálogo: los comodines del LIKE se escapan."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const cuerpo = pm.response.json();",
+                  "pm.test('Hay productos en el catálogo (si no, el test no prueba nada)', () => pm.expect(Number(pm.collectionVariables.get('total_productos'))).to.be.above(0));",
+                  "pm.test('Ningún producto del seed tiene % en el nombre: no devuelve ninguno', () => pm.expect(cuerpo.meta.total).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /productos?q=_ (comod\u00edn escapado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos?q=_",
+              "host": ["{{base_url}}"],
+              "path": ["productos"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "_"
+                }
+              ]
+            },
+            "description": "Buscar _ busca el carácter _, no cualquier carácter."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Ningún producto del seed tiene _ en el nombre: no devuelve ninguno', () => pm.expect(pm.response.json().meta.total).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "GET /productos?destacados=true",
           "request": {
             "method": "GET",
@@ -3311,6 +3375,59 @@
                   "pm.test('Viene de menor a mayor stock', () => {",
                   "    const s = d.map((f) => f.stockTotal);",
                   "    for (let i = 1; i < s.length; i++) pm.expect(s[i]).to.be.at.least(s[i - 1]);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/productos?q=% (comod\u00edn escapado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos?q=%25&limite=50",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos?q=%25&limite=50"]
+            },
+            "description": "En el panel tampoco: buscar % no lista todos los productos."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('No devuelve ninguno', () => pm.expect(pm.response.json().meta.total).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /admin/productos?q=<slug> (la b\u00fasqueda sigue andando)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/admin/productos?q={{slug_producto}}&limite=50",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "productos?q={{slug_producto}}&limite=50"]
+            },
+            "description": "Control positivo: escapar los comodines no rompe una búsqueda común."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Encuentra el producto por su slug', () => {",
+                  "    const slugs = pm.response.json().datos.map((f) => f.slug);",
+                  "    pm.expect(slugs).to.include(pm.collectionVariables.get('slug_producto'));",
                   "});"
                 ]
               }
