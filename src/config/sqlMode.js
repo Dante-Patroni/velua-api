@@ -22,8 +22,24 @@ const modosProhibidos = (sqlMode) =>
     .filter((modo) => MODOS_PROHIBIDOS.includes(modo));
 
 /**
+ * @description Error para un `sql_mode` que no se pudo verificar.
+ * @param {string} motivo - Qué forma tenía la respuesta.
+ * @returns {Error} Error con código SQL_MODE_ILEGIBLE.
+ */
+const errorIlegible = (motivo) => {
+  const error = new Error(`SQL_MODE_ILEGIBLE: ${motivo}`);
+  error.code = "SQL_MODE_ILEGIBLE";
+  return error;
+};
+
+/**
  * @description Lee el `sql_mode` de la sesión con la API de callbacks de mysql2,
  * que es la conexión cruda que recibe el hook `afterConnect`.
+ *
+ * Exige exactamente una fila con `modo` de tipo texto. Un `sql_mode` vacío es
+ * válido, así que "no pude leer" no puede terminar como `""`: sin filas, con otra
+ * columna o con otro tipo, lanza SQL_MODE_ILEGIBLE.
+ *
  * @param {Object} conexion - Conexión de mysql2.
  * @returns {Promise<string>} El `sql_mode` de esa conexión.
  */
@@ -31,23 +47,35 @@ const leerSqlMode = (conexion) =>
   new Promise((resolver, rechazar) => {
     conexion.query("SELECT @@SESSION.sql_mode AS modo", (error, filas) => {
       if (error) return rechazar(error);
-      return resolver(String(filas?.[0]?.modo ?? ""));
+      if (!Array.isArray(filas) || filas.length !== 1) {
+        return rechazar(errorIlegible("se esperaba exactamente una fila"));
+      }
+      const modo = filas[0]?.modo;
+      if (typeof modo !== "string") {
+        return rechazar(errorIlegible("la columna modo no es texto"));
+      }
+      return resolver(modo);
     });
   });
 
 /**
  * @description Verifica una conexión recién abierta. Falla cerrado: si el modo es
  * inseguro, o si no se puede leer, cierra la conexión y lanza, así la conexión
- * nunca entra al pool.
+ * nunca entra al pool. Sequelize no la cierra si este hook lanza: el `destroy()`
+ * es imprescindible.
+ *
+ * Se registra en `config.js` (`hooks.afterConnect`), así la heredan todas las
+ * instancias que se arman desde esa configuración: la API (`src/models`), la CLI
+ * de migraciones del pre-deploy y los scripts.
  *
  * Al arrancar, `sequelize.authenticate()` abre la primera conexión: si falla acá,
- * `server.js` corta con código 1 y Railway deja el deploy anterior. Después, cada
- * conexión nueva del pool pasa por el mismo control, por si el modo cambia con la
- * API corriendo: esa consulta falla (500) en vez de correr sin protección.
+ * `server.js` corta con código 1. Después, cada conexión nueva del pool pasa por el
+ * mismo control, por si el modo cambia con la API corriendo: esa consulta falla
+ * (500) en vez de correr sin protección.
  *
  * @param {Object} conexion - Conexión de mysql2.
  * @returns {Promise<void>}
- * @throws {Error} SQL_MODE_INSEGURO, o el error de la lectura.
+ * @throws {Error} SQL_MODE_INSEGURO, SQL_MODE_ILEGIBLE o el error de la lectura.
  */
 const verificarSqlMode = async (conexion) => {
   let prohibidos;
@@ -69,13 +97,4 @@ const verificarSqlMode = async (conexion) => {
   }
 };
 
-/**
- * @description Registra la verificación en cada conexión nueva de Sequelize.
- * @param {Object} sequelize - Instancia de Sequelize.
- * @returns {void}
- */
-const instalarGuardaSqlMode = (sequelize) => {
-  sequelize.addHook("afterConnect", "guardaSqlMode", verificarSqlMode);
-};
-
-module.exports = { MODOS_PROHIBIDOS, modosProhibidos, verificarSqlMode, instalarGuardaSqlMode };
+module.exports = { MODOS_PROHIBIDOS, modosProhibidos, verificarSqlMode };

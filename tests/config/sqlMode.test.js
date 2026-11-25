@@ -11,8 +11,10 @@ const MODO_POR_DEFECTO =
  * @param {Object} respuesta - `{ modo }` o `{ error }`.
  * @returns {Object} Conexión con query y destroy espiables.
  */
-const crearConexion = ({ modo, error }) => ({
-  query: jest.fn((sql, callback) => (error ? callback(error) : callback(null, [{ modo }]))),
+const crearConexion = ({ modo, error, filas }) => ({
+  query: jest.fn((sql, callback) =>
+    error ? callback(error) : callback(null, filas !== undefined ? filas : [{ modo }])
+  ),
   destroy: jest.fn(),
 });
 
@@ -72,13 +74,48 @@ describe("verificarSqlMode", () => {
     await expect(verificarSqlMode(conexion)).rejects.toBe(fallo);
     expect(conexion.destroy).toHaveBeenCalledTimes(1);
   });
+
+  it("un sql_mode vacío es válido: deja pasar", async () => {
+    const conexion = crearConexion({ modo: "" });
+
+    await expect(verificarSqlMode(conexion)).resolves.toBeUndefined();
+    expect(conexion.destroy).not.toHaveBeenCalled();
+  });
+
+  describe("si la respuesta no tiene la forma esperada, falla cerrado (no la toma como vacía)", () => {
+    it.each([
+      ["sin filas", []],
+      ["sin resultado", null],
+      ["dos filas", [{ modo: "" }, { modo: "" }]],
+      ["filas como arrays (rowsAsArray)", [["NO_BACKSLASH_ESCAPES"]]],
+      ["la columna con otro nombre", [{ MODO: "NO_BACKSLASH_ESCAPES" }]],
+      ["el modo como Buffer", [{ modo: Buffer.from("NO_BACKSLASH_ESCAPES") }]],
+      ["el modo null", [{ modo: null }]],
+    ])("%s: cierra la conexión y lanza SQL_MODE_ILEGIBLE", async (_caso, filas) => {
+      const conexion = crearConexion({ filas });
+
+      await expect(verificarSqlMode(conexion)).rejects.toMatchObject({
+        code: "SQL_MODE_ILEGIBLE",
+      });
+      expect(conexion.destroy).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe("la guarda está instalada", () => {
-  it("la instancia de Sequelize de la API verifica cada conexión nueva", () => {
+  it("todas las configuraciones (API, test, migraciones) registran la guarda", () => {
+    const config = require("../../src/config/config");
+
+    for (const entorno of ["development", "test", "production", "migraciones"]) {
+      expect(config[entorno].hooks?.afterConnect).toBe(verificarSqlMode);
+    }
+  });
+
+  it("la instancia de Sequelize de la API tiene la guarda entre sus hooks de conexión", () => {
     const db = require("../../src/models");
 
-    expect(db.sequelize.hasHook("afterConnect")).toBe(true);
+    // Por identidad, no solo "hay algún hook": otro afterConnect no la reemplaza.
+    expect(db.sequelize.options.hooks.afterConnect).toContain(verificarSqlMode);
   });
 
   it("nadie en src cambia el sql_mode", () => {
