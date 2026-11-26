@@ -1,6 +1,7 @@
 const { Op, literal } = require("sequelize");
 const CatalogoRepository = require("../CatalogoRepository");
 const { padreActivo, contiene } = require("./condiciones");
+const { entradaPropia } = require("../../utils/entradaPropia");
 
 /** Campos de la categoría que necesita el catálogo. */
 const ATRIBUTOS_CATEGORIA = ["id", "padreId", "nombre", "slug", "descripcion", "imagenUrl"];
@@ -97,7 +98,7 @@ class SequelizeCatalogoRepository extends CatalogoRepository {
     };
 
     // mas_vendidos todavia no esta implementado: cae al orden por defecto
-    const orden = ordenes[filtros.orden] || ordenes.defecto;
+    const orden = entradaPropia(ordenes, filtros.orden) ?? ordenes.defecto;
 
     const { rows, count } = await this.models.Producto.findAndCountAll({
       where: whereProducto,
