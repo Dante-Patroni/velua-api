@@ -1,3 +1,5 @@
+const { entradaPropia } = require("../utils/entradaPropia");
+
 const ERROR_HTTP_MAP = {
   // 400
   CONTRASENA_ACTUAL_INCORRECTA: 400,
@@ -126,7 +128,8 @@ function obtenerCodigoError(error) {
  */
 function manejarErrorHttp(error, res) {
   const codigo = obtenerCodigoError(error);
-  const status = ERROR_HTTP_MAP[codigo] || 500;
+  // El código puede venir del mensaje de un error ajeno: solo claves propias del mapa.
+  const status = entradaPropia(ERROR_HTTP_MAP, codigo) || 500;
 
   const statusCliente = status === 500 ? statusDeErrorDelCliente(error) : null;
   if (statusCliente) {

@@ -1,6 +1,7 @@
 const { Op, literal } = require("sequelize");
 const ProductoRepository = require("../ProductoRepository");
 const { contiene } = require("./condiciones");
+const { entradaPropia } = require("../../utils/entradaPropia");
 
 /**
  * @description Subconsultas que resumen las variantes y las imágenes de cada
@@ -87,7 +88,7 @@ class SequelizeProductoRepository extends ProductoRepository {
       ],
       limit: limite,
       offset,
-      order: ORDENES[filtros.orden] || ORDENES.recientes,
+      order: entradaPropia(ORDENES, filtros.orden) ?? ORDENES.recientes,
     });
 
     return { filas: rows.map((r) => r.toJSON()), total: count };

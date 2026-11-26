@@ -1,4 +1,5 @@
 const { aCentavos } = require("../utils/dinero");
+const { entradaPropia } = require("../utils/entradaPropia");
 
 /** Estados de Mercado Pago que mueven el pedido, traducidos a los nuestros. */
 const RESULTADO_POR_ESTADO = Object.freeze({ approved: "aprobado", rejected: "rechazado" });
@@ -70,7 +71,7 @@ class PagoWebhookService {
   async aplicarPago(pago, opciones = {}) {
     const prefijo = `[${opciones.origen ?? "webhook"}]`;
     {
-      const resultado = RESULTADO_POR_ESTADO[pago.estado];
+      const resultado = entradaPropia(RESULTADO_POR_ESTADO, pago.estado);
       if (!resultado) {
         return { procesado: false, motivo: "SIN_RESULTADO" };
       }
